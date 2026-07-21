@@ -15,8 +15,9 @@ from sqlmodel import Field, SQLModel
 from app.state import BookingState
 
 
-def _utcnow() -> datetime:
-    return datetime.now(UTC)
+def utcnow() -> datetime:
+    # Naive UTC: the columns are TIMESTAMP WITHOUT TIME ZONE, so an aware datetime fails to insert.
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class FitnessLevel(StrEnum):
@@ -59,7 +60,7 @@ class User(SQLModel, table=True):
     # append-only audit rows, which reference user_id only, fully intact.
     email: str | None = Field(default=None, unique=True, index=True)
     is_anonymized: bool = Field(default=False)
-    created_at: datetime = Field(default_factory=_utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
 
 
 class TripRequest(SQLModel, table=True):
@@ -76,7 +77,7 @@ class TripRequest(SQLModel, table=True):
     fitness_level: FitnessLevel | None = None  # optional — the agent asks if it needs it
     budget_usd: float | None = None
     status: TripStatus = Field(default=TripStatus.CREATED)
-    created_at: datetime = Field(default_factory=_utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
 
 
 class FlightSearchResult(SQLModel, table=True):
@@ -94,7 +95,7 @@ class FlightSearchResult(SQLModel, table=True):
     booking_token: str
     raw_offer: dict[str, Any] = Field(sa_column=Column(JSON))  # the real SearchApi offer payload
     source: FlightResultSource = Field(default=FlightResultSource.LIVE)
-    created_at: datetime = Field(default_factory=_utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
 
 
 class Itinerary(SQLModel, table=True):
@@ -109,7 +110,7 @@ class Itinerary(SQLModel, table=True):
     # source_url}]} — every activity carries the Tavily source_url that grounds it.
     days: list[dict[str, Any]] = Field(sa_column=Column(JSON))
     generated_by: str = Field(default="gemini-3-flash")
-    created_at: datetime = Field(default_factory=_utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
 
 
 class HITLBookingLog(SQLModel, table=True):
@@ -136,7 +137,7 @@ class HITLBookingLog(SQLModel, table=True):
     expires_at: datetime  # price-staleness TTL
     confirmed_at: datetime | None = None
     executed_at: datetime | None = None
-    created_at: datetime = Field(default_factory=_utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
 
 
 # ── Audit & observability ────────────────────────────────────────────────────────────────
@@ -153,7 +154,7 @@ class BookingTransition(SQLModel, table=True):
     to_state: BookingState
     actor_user_id: int | None = Field(default=None, foreign_key="user_account.id")
     reason: str
-    created_at: datetime = Field(default_factory=_utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
 
 
 class ExecutionEvent(SQLModel, table=True):
@@ -169,7 +170,7 @@ class ExecutionEvent(SQLModel, table=True):
     status: str
     detail: str
     duration_ms: int | None = None
-    created_at: datetime = Field(default_factory=_utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
 
 
 class AgentRun(SQLModel, table=True):
@@ -183,7 +184,7 @@ class AgentRun(SQLModel, table=True):
     total_input_tokens: int = 0
     total_output_tokens: int = 0
     total_ms: int = 0
-    started_at: datetime = Field(default_factory=_utcnow)
+    started_at: datetime = Field(default_factory=utcnow)
     finished_at: datetime | None = None
 
 

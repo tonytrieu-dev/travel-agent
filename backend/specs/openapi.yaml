@@ -1,0 +1,177 @@
+openapi: 3.1.0
+info:
+  title: Travel Agent API
+  version: 0.1.0
+  description: >-
+    Authored (spec-first) API contract. The runtime FastAPI schema is asserted to conform to
+    this file by tests/test_openapi_contract.py — a route that drifts from this contract turns
+    the suite red. Extended one phase at a time; frozen once a phase stabilizes.
+
+paths:
+  /api/trips/{trip_id}/booking/request:
+    post:
+      operationId: request_booking
+      summary: Open a HITL booking request for a chosen flight offer (idempotent per trip+flight).
+      parameters:
+        - { name: trip_id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BookingRequestCreate' }
+      responses:
+        '200':
+          description: The booking log, in state PENDING_USER_CONFIRMATION.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BookingLogOut' }
+        '404':
+          description: The trip or the flight offer does not exist.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/bookings/{log_id}:
+    get:
+      operationId: get_booking
+      summary: The current booking state plus its append-only transition history (what the UI polls).
+      parameters:
+        - { name: log_id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Current state and transition history.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BookingLogOut' }
+        '404':
+          description: No such booking log.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/bookings/{log_id}/confirm:
+    post:
+      operationId: confirm_booking
+      summary: Capture the human's confirmation intent (PENDING -> CONFIRMED). Idempotent replay.
+      parameters:
+        - { name: log_id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: The booking log, now CONFIRMED (or already CONFIRMED on replay).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BookingLogOut' }
+        '404':
+          description: No such booking log.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+        '409':
+          description: The fare's price-hold TTL has passed, or the transition is illegal.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/bookings/{log_id}/execute:
+    post:
+      operationId: execute_booking
+      summary: >-
+        The gated write (CONFIRMED -> EXECUTED): fetch real booking options, store them plus a
+        record locator. Atomic (SELECT ... FOR UPDATE) and idempotent once EXECUTED.
+      parameters:
+        - { name: log_id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: The booking log, now EXECUTED, carrying the stored booking options.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BookingLogOut' }
+        '404':
+          description: No such booking log.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+        '409':
+          description: Not in CONFIRMED state, or the fare's price-hold TTL has passed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/bookings/{log_id}/cancel:
+    post:
+      operationId: cancel_booking
+      summary: Cancel from PENDING_USER_CONFIRMATION or CONFIRMED (audited transition).
+      parameters:
+        - { name: log_id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: The booking log, now CANCELLED.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BookingLogOut' }
+        '404':
+          description: No such booking log.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+        '409':
+          description: The booking is already in a terminal state and cannot be cancelled.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+components:
+  schemas:
+    BookingState:
+      type: string
+      enum: [PENDING_USER_CONFIRMATION, CONFIRMED, EXECUTED, CANCELLED, EXPIRED]
+
+    ErrorCode:
+      type: string
+      description: Machine-readable failure code; the human explanation is in `detail`.
+      enum: [booking_not_found, trip_not_found, flight_not_found, booking_expired, invalid_transition]
+
+    BookingRequestCreate:
+      type: object
+      required: [flight_search_result_id]
+      properties:
+        flight_search_result_id: { type: integer }
+
+    BookingTransitionOut:
+      type: object
+      required: [from_state, to_state, reason, created_at]
+      properties:
+        from_state: { $ref: '#/components/schemas/BookingState' }
+        to_state: { $ref: '#/components/schemas/BookingState' }
+        reason: { type: string }
+        actor_user_id: { type: [integer, 'null'] }
+        created_at: { type: string, format: date-time }
+
+    BookingLogOut:
+      type: object
+      required: [id, trip_request_id, flight_search_result_id, state, expires_at, created_at]
+      properties:
+        id: { type: integer }
+        trip_request_id: { type: integer }
+        flight_search_result_id: { type: integer }
+        state: { $ref: '#/components/schemas/BookingState' }
+        booking_reference: { type: [string, 'null'] }
+        booking_options:
+          type: [array, 'null']
+          items: { type: object, additionalProperties: true }
+        expires_at: { type: string, format: date-time }
+        confirmed_at: { type: [string, 'null'], format: date-time }
+        executed_at: { type: [string, 'null'], format: date-time }
+        created_at: { type: string, format: date-time }
+        transitions:
+          type: array
+          items: { $ref: '#/components/schemas/BookingTransitionOut' }
+
+    ProblemDetail:
+      type: object
+      required: [code, detail]
+      properties:
+        code: { $ref: '#/components/schemas/ErrorCode' }
+        detail:
+          type: string
+          description: A human-readable message naming the specific failed precondition and the fix.

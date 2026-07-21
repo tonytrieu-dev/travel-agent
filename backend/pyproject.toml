@@ -24,12 +24,21 @@ dependencies = [
 dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.25",
+    "pytest-bdd>=8.1",
+    "httpx>=0.28",
+    "pyyaml>=6.0",
     "pyrefly>=0.16",
 ]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
 testpaths = ["tests"]
 
 [tool.pyrefly]
 project-includes = ["app", "evals", "tests"]
+
+# SQLModel declares __tablename__ on its base in a way pyrefly reads as a descriptor, so every
+# table model trips bad-override. It is a pure framework artifact, not a real override bug.
+[tool.pyrefly.errors]
+bad-override = false
