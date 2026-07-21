@@ -22,6 +22,8 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.adapters.flights_searchapi import FlightSearchOutcome, NormalizedFlightOffer
+from app.schemas import ClarificationOut, ItineraryDayOut, ItineraryOut
 from tests.db_helpers import TEST_DATABASE_URL, run_db
 
 # Must run before any ``app.*`` import: ``app.db``/``app.config`` build their engine once from
@@ -70,13 +72,83 @@ class BookingOptionsFetchSpy:
         return self.options
 
 
+@dataclass
+class FlightSearchSpy:
+    """Stands in for the real SearchApi ``FlightProvider`` and counts live search calls, so a
+    cache-hit test can assert the provider was genuinely skipped, not just that a response looks
+    plausible."""
+
+    offers: list[NormalizedFlightOffer] = field(
+        default_factory=lambda: [
+            NormalizedFlightOffer(
+                carrier="AF",
+                price_usd=512.0,
+                currency="USD",
+                depart_at="2026-08-01T09:00:00",
+                arrive_at="2026-08-01T21:30:00",
+                stops=0,
+                booking_token="tok-live",
+                raw_offer={"price": 512.0},
+            )
+        ]
+    )
+    calls: int = 0
+
+    async def search_offers(
+        self, departure_id: str, arrival_id: str, outbound_date: str, return_date: str | None
+    ) -> FlightSearchOutcome:
+        self.calls += 1
+        return FlightSearchOutcome(offers=self.offers)
+
+    async def fetch_booking_options(self, booking_token: str) -> list[dict]:
+        raise NotImplementedError("FlightSearchSpy only stands in for search_offers")
+
+
+@dataclass
+class PlannerRunSpy:
+    """Stands in for ``run_planner_durable`` so trip-planning tests never spend real Gemini
+    quota, and counts calls so an idempotent /plan can assert the agent ran at most once."""
+
+    output: ItineraryOut | ClarificationOut = field(
+        default_factory=lambda: ItineraryOut(
+            days=[
+                ItineraryDayOut(
+                    day_number=1,
+                    summary="Explore",
+                    activities=[],
+                )
+            ]
+        )
+    )
+    calls: int = 0
+
+    async def __call__(self, prompt: str) -> ItineraryOut | ClarificationOut:
+        self.calls += 1
+        return self.output
+
+
 @pytest.fixture
 def booking_options_spy() -> BookingOptionsFetchSpy:
     return BookingOptionsFetchSpy()
 
 
 @pytest.fixture
-def client(booking_options_spy: BookingOptionsFetchSpy, monkeypatch: pytest.MonkeyPatch):
+def flight_search_spy() -> FlightSearchSpy:
+    return FlightSearchSpy()
+
+
+@pytest.fixture
+def planner_spy() -> PlannerRunSpy:
+    return PlannerRunSpy()
+
+
+@pytest.fixture
+def client(
+    booking_options_spy: BookingOptionsFetchSpy,
+    flight_search_spy: FlightSearchSpy,
+    planner_spy: PlannerRunSpy,
+    monkeypatch: pytest.MonkeyPatch,
+):
     from starlette.testclient import TestClient
 
     from app.db import get_engine, get_session
@@ -91,6 +163,8 @@ def client(booking_options_spy: BookingOptionsFetchSpy, monkeypatch: pytest.Monk
 
     app.dependency_overrides[get_session] = _override_get_session
     monkeypatch.setattr("app.dbos_runtime.get_flight_provider", lambda settings: booking_options_spy)
+    monkeypatch.setattr("app.routes.trips.get_flight_provider", lambda settings: flight_search_spy)
+    monkeypatch.setattr("app.routes.trips.run_planner_durable", planner_spy)
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()

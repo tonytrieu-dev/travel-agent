@@ -1,4 +1,4 @@
-"""Direct-DB helpers for tests: seed a booking into a precise state and read booking facts back.
+"""Direct-DB helpers for tests: seed a booking/trip into a precise state and read facts back.
 
 ``run_db`` runs each unit of work on its own short-lived engine/loop so seed connections never
 share the app's portal event loop (see conftest for why that separation matters).
@@ -6,7 +6,7 @@ share the app's portal event loop (see conftest for why that separation matters)
 
 from collections.abc import Awaitable, Callable
 from datetime import timedelta
-from typing import TypeVar
+from typing import Any, TypeVar
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -14,8 +14,10 @@ from sqlmodel import col
 
 from app.models import (
     BookingTransition,
+    FlightResultSource,
     FlightSearchResult,
     HITLBookingLog,
+    Itinerary,
     TripRequest,
     User,
     utcnow,
@@ -94,7 +96,15 @@ async def seed_booking(
     return booking.id
 
 
-async def seed_trip(session: AsyncSession) -> int:
+async def seed_trip(
+    session: AsyncSession,
+    *,
+    origin: str = "JFK",
+    destination_airport: str = "CDG",
+    depart_date: str = "2026-08-01",
+    return_date: str | None = None,
+    budget_usd: float | None = None,
+) -> int:
     """Insert a bare user+trip (no flight/booking) and return the trip id."""
     user = User()
     session.add(user)
@@ -103,15 +113,74 @@ async def seed_trip(session: AsyncSession) -> int:
 
     trip = TripRequest(
         user_id=user.id,
-        origin="JFK",
+        origin=origin,
         destination="Paris",
-        destination_airport="CDG",
-        depart_date="2026-08-01",
+        destination_airport=destination_airport,
+        depart_date=depart_date,
+        return_date=return_date,
+        budget_usd=budget_usd,
     )
     session.add(trip)
     await session.flush()
     assert trip.id is not None
     return trip.id
+
+
+async def seed_flight_search_results(
+    session: AsyncSession,
+    trip_id: int,
+    *,
+    source: FlightResultSource = FlightResultSource.LIVE,
+    minutes_ago: int = 0,
+) -> list[int]:
+    """Attach one flight offer to ``trip_id``, backdated by ``minutes_ago``, and return its id
+    wrapped in a list (kept plural since a real search returns several offers)."""
+    result = FlightSearchResult(
+        trip_request_id=trip_id,
+        offer_index=0,
+        carrier="AF",
+        price_usd=512.0,
+        currency="USD",
+        depart_at="2026-08-01T09:00:00",
+        arrive_at="2026-08-01T21:30:00",
+        stops=0,
+        booking_token="tok-abc",
+        raw_offer={"price": 512.0},
+        source=source,
+        created_at=utcnow() - timedelta(minutes=minutes_ago),
+    )
+    session.add(result)
+    await session.flush()
+    assert result.id is not None
+    return [result.id]
+
+
+async def seed_itinerary(session: AsyncSession, trip_id: int) -> int:
+    days: list[dict[str, Any]] = [
+        {
+            "day_number": 1,
+            "summary": "Arrival",
+            "activities": [
+                {
+                    "name": "Check in",
+                    "description": "Settle into the hotel.",
+                    "intensity": "low",
+                    "source_url": "https://example.test/hotel",
+                }
+            ],
+        }
+    ]
+    itinerary = Itinerary(trip_request_id=trip_id, days=days)
+    session.add(itinerary)
+    await session.flush()
+    assert itinerary.id is not None
+    return itinerary.id
+
+
+async def get_trip(session: AsyncSession, trip_id: int) -> TripRequest:
+    trip = await session.get(TripRequest, trip_id)
+    assert trip is not None, f"trip {trip_id} vanished from the DB"
+    return trip
 
 
 async def get_booking(session: AsyncSession, log_id: int) -> HITLBookingLog:

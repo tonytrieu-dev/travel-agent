@@ -15,7 +15,8 @@ from fastapi.responses import JSONResponse
 from app.config import get_settings
 from app.dbos_runtime import launch_dbos, shutdown_dbos
 from app.repositories.booking_repository import BookingError
-from app.routes import booking
+from app.repositories.trips_repository import TripError
+from app.routes import booking, trips
 from app.schemas import ErrorCode, ProblemDetail
 
 
@@ -36,9 +37,15 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(booking.router)
+    app.include_router(trips.router)
 
     @app.exception_handler(BookingError)
     async def _render_booking_error(request: Request, error: BookingError) -> JSONResponse:
+        problem = ProblemDetail(code=error.code, detail=error.detail)
+        return JSONResponse(status_code=error.status_code, content=problem.model_dump(mode="json"))
+
+    @app.exception_handler(TripError)
+    async def _render_trip_error(request: Request, error: TripError) -> JSONResponse:
         problem = ProblemDetail(code=error.code, detail=error.detail)
         return JSONResponse(status_code=error.status_code, content=problem.model_dump(mode="json"))
 

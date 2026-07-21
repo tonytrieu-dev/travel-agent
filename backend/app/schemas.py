@@ -4,12 +4,13 @@ These mirror the authored contract in specs/openapi.yaml; test_openapi_contract 
 runtime schema FastAPI generates from them stays in sync with that file.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
-from typing import Any
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.models import FitnessLevel, TripStatus
 from app.state import BookingState
 
 
@@ -21,6 +22,17 @@ class ErrorCode(StrEnum):
     INVALID_TRANSITION = "invalid_transition"
     BOOKING_OPTIONS_UNAVAILABLE = "booking_options_unavailable"
     VALIDATION_ERROR = "validation_error"
+
+
+def validate_trip_dates(depart_date: str, return_date: str | None) -> None:
+    """Shared by TripRequestCreate and the trip-update repository path, so a PATCH that only
+    changes one of the two dates is checked against the same rule as trip creation."""
+    if date.fromisoformat(depart_date) < date.today():
+        raise ValueError(f"depart_date {depart_date} is in the past.")
+    if return_date is not None and date.fromisoformat(return_date) < date.fromisoformat(
+        depart_date
+    ):
+        raise ValueError(f"return_date {return_date} is before depart_date {depart_date}.")
 
 
 class ProblemDetail(BaseModel):
@@ -77,3 +89,81 @@ class ItineraryOut(BaseModel):
 
 class ClarificationOut(BaseModel):
     questions: list[str]
+
+
+class TripRequestCreate(BaseModel):
+    origin: str
+    destination: str
+    destination_airport: str
+    depart_date: str
+    return_date: str | None = None
+    age: int | None = None
+    fitness_level: FitnessLevel | None = None
+    budget_usd: float | None = None
+
+    @model_validator(mode="after")
+    def _check_dates(self) -> "TripRequestCreate":
+        validate_trip_dates(self.depart_date, self.return_date)
+        return self
+
+
+class TripRequestUpdate(BaseModel):
+    origin: str | None = None
+    destination: str | None = None
+    destination_airport: str | None = None
+    depart_date: str | None = None
+    return_date: str | None = None
+    age: int | None = None
+    fitness_level: FitnessLevel | None = None
+    budget_usd: float | None = None
+
+
+class TripRequestOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    user_id: int
+    origin: str
+    destination: str
+    destination_airport: str
+    depart_date: str
+    return_date: str | None = None
+    age: int | None = None
+    fitness_level: FitnessLevel | None = None
+    budget_usd: float | None = None
+    status: TripStatus
+    created_at: datetime
+
+
+class FlightOfferOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    offer_index: int
+    carrier: str
+    price_usd: float
+    currency: str
+    depart_at: str
+    arrive_at: str
+    stops: int
+    source: str
+
+
+class FlightSearchOut(BaseModel):
+    offers: list[FlightOfferOut]
+    unavailable_reason: str | None = None
+
+
+class PlanReadyOut(BaseModel):
+    status: Literal["ready"] = "ready"
+    itinerary: ItineraryOut
+
+
+class PlanNeedsClarificationOut(BaseModel):
+    status: Literal["needs_clarification"] = "needs_clarification"
+    questions: list[str]
+
+
+PlanOut = Annotated[
+    PlanReadyOut | PlanNeedsClarificationOut, Field(discriminator="status")
+]

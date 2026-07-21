@@ -36,13 +36,21 @@ MAX_TOOL_RESULT_CHARS = 6_000
 BOOKING_TTL_MINUTES = 30
 
 # Reuse a real flight search for the same route+dates for this long instead of spending another
-# unit of the scarce one-time 100-search SearchApi quota.
-FLIGHT_CACHE_TTL_HOURS = 24
+# unit of the scarce one-time 100-search SearchApi quota. Deliberately short relative to that
+# quota concern: flight prices reprice multiple times a day, and a cached result must not
+# outlive BOOKING_TTL_MINUTES (30) by much, or a "fresh" search could already hand out a token
+# that's dead by the time a human confirms it. A renewable-quota production deployment should
+# revalidate even more often than this.
+FLIGHT_CACHE_TTL_MINUTES = 15
 
 # Gemini list prices (USD per million tokens) for the *estimated* cost shown in the execution
 # panel. Actual cost on the free tier is $0; the panel labels the estimate honestly.
 GEMINI_INPUT_PRICE_PER_MILLION_TOKENS = 0.50
 GEMINI_OUTPUT_PRICE_PER_MILLION_TOKENS = 3.00
+
+# No auth yet: every request acts as this one fixed user. get_current_user() is the single seam
+# that will start resolving a real identity later — route handlers never read this directly.
+DEMO_USER_EMAIL = "demo@travel-agent.local"
 
 
 class Settings(BaseSettings):
