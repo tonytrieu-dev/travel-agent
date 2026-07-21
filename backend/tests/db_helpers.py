@@ -94,6 +94,26 @@ async def seed_booking(
     return booking.id
 
 
+async def seed_trip(session: AsyncSession) -> int:
+    """Insert a bare user+trip (no flight/booking) and return the trip id."""
+    user = User()
+    session.add(user)
+    await session.flush()
+    assert user.id is not None
+
+    trip = TripRequest(
+        user_id=user.id,
+        origin="JFK",
+        destination="Paris",
+        destination_airport="CDG",
+        depart_date="2026-08-01",
+    )
+    session.add(trip)
+    await session.flush()
+    assert trip.id is not None
+    return trip.id
+
+
 async def get_booking(session: AsyncSession, log_id: int) -> HITLBookingLog:
     booking = await session.get(HITLBookingLog, log_id)
     assert booking is not None, f"booking log {log_id} vanished from the DB"
