@@ -6,6 +6,8 @@ against a real captured SearchApi payload (never a hand-fabricated shape).
 
 from pathlib import Path
 
+import pytest
+
 from app.adapters.flights_searchapi import (
     LiveSearchApiProvider,
     RecordedProvider,
@@ -24,21 +26,21 @@ def _settings(use_live_flight_api: bool) -> Settings:
     )
 
 
-def test_use_live_flight_api_true_selects_the_live_provider() -> None:
-    provider = get_flight_provider(_settings(use_live_flight_api=True))
+@pytest.mark.parametrize(
+    ("use_live_flight_api", "expected_type", "wrong_selection_consequence"),
+    [
+        (True, LiveSearchApiProvider, "the live demo would silently replay stale cassettes"),
+        (False, RecordedProvider, "tests/dev-reloads would burn the one-time 100-search quota"),
+    ],
+)
+def test_use_live_flight_api_selects_the_matching_provider(
+    use_live_flight_api: bool, expected_type: type, wrong_selection_consequence: str
+) -> None:
+    provider = get_flight_provider(_settings(use_live_flight_api=use_live_flight_api))
 
-    assert isinstance(provider, LiveSearchApiProvider), (
-        f"USE_LIVE_FLIGHT_API=true must select LiveSearchApiProvider, got {type(provider).__name__}; "
-        "a wrong selection here means the live demo would silently replay stale cassettes."
-    )
-
-
-def test_use_live_flight_api_false_selects_the_recorded_provider() -> None:
-    provider = get_flight_provider(_settings(use_live_flight_api=False))
-
-    assert isinstance(provider, RecordedProvider), (
-        f"USE_LIVE_FLIGHT_API=false must select RecordedProvider, got {type(provider).__name__}; "
-        "a wrong selection here means tests/dev-reloads would burn the one-time 100-search quota."
+    assert isinstance(provider, expected_type), (
+        f"USE_LIVE_FLIGHT_API={use_live_flight_api} must select {expected_type.__name__}, got "
+        f"{type(provider).__name__}; a wrong selection here means {wrong_selection_consequence}."
     )
 
 

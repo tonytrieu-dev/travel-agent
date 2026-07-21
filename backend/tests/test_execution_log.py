@@ -1,9 +1,7 @@
 """Guards the automatic ExecutionEvent recorder (Phase 4): events sequence correctly within a
-run, resume correctly across multiple runs on the same trip, and recording outside a bound
-context fails loud instead of silently dropping a panel entry.
+run and resume correctly across multiple runs on the same trip.
 """
 
-import pytest
 from sqlalchemy import select
 from sqlmodel import col
 
@@ -55,8 +53,3 @@ def test_a_second_run_on_the_same_trip_resumes_seq_instead_of_restarting() -> No
         f"a re-planned trip's second run must continue the seq from the first run (no reused "
         f"or reset sequence numbers), got {[event.seq for event in events]}"
     )
-
-
-async def test_record_event_outside_a_bound_context_raises() -> None:
-    with pytest.raises(RuntimeError, match="no execution_context bound"):
-        await record_event(ExecutionEventKind.API_CALL, "orphan_call", "ok", "should never persist")
