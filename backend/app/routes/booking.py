@@ -24,6 +24,11 @@ _NOT_FOUND_OR_CONFLICT: dict[int | str, dict[str, Any]] = {
     404: {"model": ProblemDetail},
     409: {"model": ProblemDetail},
 }
+_EXECUTE_RESPONSES: dict[int | str, dict[str, Any]] = {
+    404: {"model": ProblemDetail},
+    409: {"model": ProblemDetail},
+    502: {"model": ProblemDetail},
+}
 
 
 def get_booking_options_fetcher() -> BookingOptionsFetcher:
@@ -78,7 +83,7 @@ async def confirm_booking(
 
 
 @router.post(
-    "/bookings/{log_id}/execute", response_model=BookingLogOut, responses=_NOT_FOUND_OR_CONFLICT
+    "/bookings/{log_id}/execute", response_model=BookingLogOut, responses=_EXECUTE_RESPONSES
 )
 async def execute_booking(
     log_id: int,

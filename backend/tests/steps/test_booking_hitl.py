@@ -50,6 +50,11 @@ def _confirmed_expired() -> int:
     )
 
 
+@given("the booking-options provider will fail")
+def _provider_will_fail(booking_options_spy: BookingOptionsFetchSpy) -> None:
+    booking_options_spy.should_fail = True
+
+
 @when("execute is called twice concurrently")
 def _execute_twice(client, log_id: int, bag: dict) -> None:
     url = f"/api/bookings/{log_id}/execute"
@@ -101,11 +106,11 @@ def _one_executed_transition(log_id: int) -> None:
     )
 
 
-@then(parsers.parse('the response is 409 with error code "{code}"'))
-def _response_409(bag: dict, code: str) -> None:
+@then(parsers.parse('the response is {status:d} with error code "{code}"'))
+def _response_with_code(bag: dict, status: int, code: str) -> None:
     response = bag["response"]
-    assert response.status_code == 409, (
-        f"expected 409 rejecting the transition, got {response.status_code}: {response.text}"
+    assert response.status_code == status, (
+        f"expected {status} rejecting the request, got {response.status_code}: {response.text}"
     )
     actual_code = response.json()["code"]
     assert actual_code == code, f"expected error code {code!r}, got {actual_code!r}"
@@ -130,4 +135,16 @@ def _left_expired(log_id: int) -> None:
     )
     assert expired_transitions == 1, (
         f"exactly one audit transition into EXPIRED expected, got {expired_transitions}"
+    )
+
+
+@then("the booking is left CONFIRMED with no booking reference stored")
+def _left_confirmed_no_reference(log_id: int) -> None:
+    booking = run_db(lambda session: get_booking(session, log_id))
+    assert booking.state is BookingState.CONFIRMED, (
+        f"an upstream booking-options failure must leave the booking retryable in CONFIRMED, "
+        f"got {booking.state}"
+    )
+    assert booking.booking_reference is None, (
+        f"a failed execute must not write a booking_reference, found {booking.booking_reference!r}"
     )

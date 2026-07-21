@@ -23,3 +23,10 @@ Feature: Human-in-the-loop booking gate
     Then the response is 409 with error code "booking_expired"
     And the booking is left EXPIRED with an audit transition into EXPIRED
     And the booking-options provider is never called
+
+  Scenario: A booking-options upstream failure surfaces as a structured error, not a crash
+    Given a confirmed booking whose price hold is still valid
+    And the booking-options provider will fail
+    When execute is called once
+    Then the response is 502 with error code "booking_options_unavailable"
+    And the booking is left CONFIRMED with no booking reference stored

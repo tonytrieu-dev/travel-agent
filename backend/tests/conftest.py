@@ -40,7 +40,7 @@ def _truncate_between_tests() -> None:
 
 @dataclass
 class BookingOptionsFetchSpy:
-    """Stands in for the real SearchApi booking-options call (Phase 3) and counts invocations."""
+    """Stands in for the real SearchApi booking-options call and counts invocations."""
 
     options: list[dict] = field(
         default_factory=lambda: [
@@ -48,9 +48,12 @@ class BookingOptionsFetchSpy:
         ]
     )
     calls: int = 0
+    should_fail: bool = False
 
     async def __call__(self, flight_search_result) -> list[dict]:
         self.calls += 1
+        if self.should_fail:
+            raise RuntimeError("simulated upstream failure")
         return self.options
 
 

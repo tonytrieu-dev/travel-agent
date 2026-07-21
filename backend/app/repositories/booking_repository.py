@@ -185,7 +185,17 @@ async def execute_booking(
 
     flight = await session.get(FlightSearchResult, booking.flight_search_result_id)
     assert flight is not None, "booking references a flight row that no longer exists"
-    booking.booking_options = await fetch_options(flight)
+    try:
+        booking_options = await fetch_options(flight)
+    except Exception as upstream_error:
+        raise BookingError(
+            ErrorCode.BOOKING_OPTIONS_UNAVAILABLE,
+            502,
+            f"Could not fetch booking options for flight {flight.id} "
+            f"(booking_token={flight.booking_token}): {upstream_error}. "
+            "The booking stays CONFIRMED; retry execute once the upstream is available.",
+        ) from upstream_error
+    booking.booking_options = booking_options
     booking.booking_reference = f"TA-{booking.id}-{uuid.uuid4().hex[:10].upper()}"
     booking.executed_at = utcnow()
     _record_transition(

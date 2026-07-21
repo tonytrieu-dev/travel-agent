@@ -19,6 +19,7 @@ class ErrorCode(StrEnum):
     FLIGHT_NOT_FOUND = "flight_not_found"
     BOOKING_EXPIRED = "booking_expired"
     INVALID_TRANSITION = "invalid_transition"
+    BOOKING_OPTIONS_UNAVAILABLE = "booking_options_unavailable"
 
 
 class ProblemDetail(BaseModel):

@@ -96,6 +96,11 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetail' }
+        '502':
+          description: The booking-options upstream (SearchApi or its recorded cassette) is unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
 
   /api/bookings/{log_id}/cancel:
     post:
@@ -129,7 +134,7 @@ components:
     ErrorCode:
       type: string
       description: Machine-readable failure code; the human explanation is in `detail`.
-      enum: [booking_not_found, trip_not_found, flight_not_found, booking_expired, invalid_transition]
+      enum: [booking_not_found, trip_not_found, flight_not_found, booking_expired, invalid_transition, booking_options_unavailable]
 
     BookingRequestCreate:
       type: object
