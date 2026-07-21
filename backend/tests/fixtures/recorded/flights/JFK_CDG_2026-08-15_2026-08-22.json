@@ -1,0 +1,1469 @@
+{
+  "search_metadata": {
+    "id": "search_6dAL2p4KqYsglOBQlk7wnGOm",
+    "status": "Success",
+    "created_at": "2026-07-21T18:39:33Z",
+    "request_time_taken": 1.13,
+    "parsing_time_taken": 0.06,
+    "total_time_taken": 1.19,
+    "request_url": "https://www.google.com/travel/flights/search?tfs=CBwQAhoeEgoyMDI2LTA4LTE1agcIARIDSkZLcgcIARIDQ0RHGh4SCjIwMjYtMDgtMjJqBwgBEgNDREdyBwgBEgNKRktAAUgBcAGCAQsI____________AZgBAQ&hl=en&gl=us&curr=USD",
+    "html_url": "https://www.searchapi.io/api/v1/searches/search_6dAL2p4KqYsglOBQlk7wnGOm.html",
+    "json_url": "https://www.searchapi.io/api/v1/searches/search_6dAL2p4KqYsglOBQlk7wnGOm"
+  },
+  "search_parameters": {
+    "engine": "google_flights",
+    "departure_id": "JFK",
+    "arrival_id": "CDG",
+    "currency": "USD",
+    "hl": "en",
+    "gl": "us",
+    "outbound_date": "2026-08-15",
+    "return_date": "2026-08-22",
+    "flight_type": "round_trip",
+    "travel_class": "economy",
+    "stops": "any",
+    "adults": "1",
+    "children": "0",
+    "infants_in_seat": "0",
+    "infants_on_lap": "0"
+  },
+  "best_flights": [
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "John F. Kennedy International Airport",
+            "id": "JFK",
+            "date": "2026-08-15",
+            "time": "01:00"
+          },
+          "arrival_airport": {
+            "name": "A\u00e9roport de Paris-Charles de Gaulle",
+            "id": "CDG",
+            "date": "2026-08-15",
+            "time": "14:10"
+          },
+          "duration": 430,
+          "airplane": "Airbus A350",
+          "airline": "Air France",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AF.png",
+          "travel_class": "Economy",
+          "flight_number": "AF 11",
+          "ticket_also_sold_by": [
+            "Delta"
+          ],
+          "is_overnight": true,
+          "extensions": [
+            "In-seat USB outlet",
+            "On-demand video",
+            "Seat type Average Legroom",
+            "Legroom 31 inches",
+            "Carbon emission: 358 kg"
+          ],
+          "detected_extensions": {
+            "has_in_seat_usb_outlet": true,
+            "has_on_demand_video": true,
+            "seat_type": "Average Legroom",
+            "legroom_short": "31 in",
+            "legroom_long": "31 inches",
+            "carbon_emission": 358
+          }
+        }
+      ],
+      "total_duration": 430,
+      "carbon_emissions": {
+        "this_flight": 359000,
+        "typical_for_this_route": 426000,
+        "difference_percent": -16,
+        "lowest_route": 422000
+      },
+      "price": 772,
+      "type": "Round trip",
+      "extensions": [
+        "Free change, possible fare difference",
+        "Full refund for cancellations",
+        "Checked baggage for a fee",
+        "Bag and fare conditions depend on the return flight"
+      ],
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AF.png",
+      "departure_token": "WyJDalJJVVRGck9HTm9aSFpEU1UxQlIyUjZaMmRDUnkwdExTMHRMUzB0TFc5NWVIVXhNa0ZCUVVGQlIzQm1kazlWVEVKRVlXTkJFZ1JCUmpFeEdnc0kxOW9FRUFJYUExVlRSRGdkY05mYUJBPT0iLFtbIkpGSyIsIjIwMjYtMDgtMTUiLCJDREciLG51bGwsIkFGIiwiMTEiXV1d"
+    },
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "John F. Kennedy International Airport",
+            "id": "JFK",
+            "date": "2026-08-15",
+            "time": "17:50"
+          },
+          "arrival_airport": {
+            "name": "A\u00e9roport de Paris-Charles de Gaulle",
+            "id": "CDG",
+            "date": "2026-08-16",
+            "time": "07:20"
+          },
+          "duration": 450,
+          "airplane": "Boeing 777",
+          "airline": "American",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AA.png",
+          "travel_class": "Economy",
+          "flight_number": "AA 42",
+          "ticket_also_sold_by": [
+            "Finnair",
+            "Iberia"
+          ],
+          "is_overnight": true,
+          "extensions": [
+            "Power and USB outlets",
+            "On-demand video",
+            "Wi-Fi for fee",
+            "Seat type Average Legroom",
+            "Legroom 31 inches",
+            "Carbon emission: 471 kg"
+          ],
+          "detected_extensions": {
+            "has_power_and_usb_outlets": true,
+            "has_on_demand_video": true,
+            "wifi": "for fee",
+            "seat_type": "Average Legroom",
+            "legroom_short": "31 in",
+            "legroom_long": "31 inches",
+            "carbon_emission": 471
+          }
+        }
+      ],
+      "total_duration": 450,
+      "carbon_emissions": {
+        "this_flight": 471000,
+        "typical_for_this_route": 426000,
+        "difference_percent": 11,
+        "lowest_route": 422000
+      },
+      "price": 772,
+      "type": "Round trip",
+      "extensions": [
+        "Ticket changes for a fee",
+        "Fare non-refundable, taxes may be refundable",
+        "Checked baggage for a fee",
+        "Bag and fare conditions depend on the return flight"
+      ],
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AA.png",
+      "departure_token": "WyJDalJJVVRGck9HTm9aSFpEU1UxQlIyUjZaMmRDUnkwdExTMHRMUzB0TFc5NWVIVXhNa0ZCUVVGQlIzQm1kazlWVEVKRVlXTkJFZ1JCUVRReUdnc0k0ZG9FRUFJYUExVlRSRGdkY09IYUJBPT0iLFtbIkpGSyIsIjIwMjYtMDgtMTUiLCJDREciLG51bGwsIkFBIiwiNDIiXV1d"
+    },
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "John F. Kennedy International Airport",
+            "id": "JFK",
+            "date": "2026-08-15",
+            "time": "22:37"
+          },
+          "arrival_airport": {
+            "name": "A\u00e9roport de Paris-Charles de Gaulle",
+            "id": "CDG",
+            "date": "2026-08-16",
+            "time": "12:15"
+          },
+          "duration": 458,
+          "airplane": "Boeing 767",
+          "airline": "Delta",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/DL.png",
+          "travel_class": "Economy",
+          "flight_number": "DL 264",
+          "ticket_also_sold_by": [
+            "Air France",
+            "Virgin Atlantic"
+          ],
+          "is_overnight": true,
+          "extensions": [
+            "Power and USB outlets",
+            "On-demand video",
+            "Wi-Fi free",
+            "Seat type Average Legroom",
+            "Legroom 31 inches",
+            "Carbon emission: 332 kg"
+          ],
+          "detected_extensions": {
+            "has_power_and_usb_outlets": true,
+            "has_on_demand_video": true,
+            "wifi": "free",
+            "seat_type": "Average Legroom",
+            "legroom_short": "31 in",
+            "legroom_long": "31 inches",
+            "carbon_emission": 332
+          }
+        }
+      ],
+      "total_duration": 458,
+      "carbon_emissions": {
+        "this_flight": 333000,
+        "typical_for_this_route": 426000,
+        "difference_percent": -22,
+        "lowest_route": 422000
+      },
+      "price": 817,
+      "type": "Round trip",
+      "extensions": [
+        "Free change, possible fare difference",
+        "Full refund for cancellations",
+        "Checked baggage for a fee",
+        "Bag and fare conditions depend on the return flight"
+      ],
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/DL.png",
+      "departure_token": "WyJDalJJVVRGck9HTm9aSFpEU1UxQlIyUjZaMmRDUnkwdExTMHRMUzB0TFc5NWVIVXhNa0ZCUVVGQlIzQm1kazlWVEVKRVlXTkJFZ1ZFVERJMk5Cb0xDT3Y5QkJBQ0dnTlZVMFE0SFhEci9RUT0iLFtbIkpGSyIsIjIwMjYtMDgtMTUiLCJDREciLG51bGwsIkRMIiwiMjY0Il1dXQ=="
+    },
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "John F. Kennedy International Airport",
+            "id": "JFK",
+            "date": "2026-08-15",
+            "time": "19:34"
+          },
+          "arrival_airport": {
+            "name": "A\u00e9roport de Paris-Charles de Gaulle",
+            "id": "CDG",
+            "date": "2026-08-16",
+            "time": "09:15"
+          },
+          "duration": 461,
+          "airplane": "Airbus A321neo",
+          "airline": "JetBlue",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/B6.png",
+          "travel_class": "Economy",
+          "flight_number": "B6 1407",
+          "is_overnight": true,
+          "extensions": [
+            "Power and USB outlets",
+            "On-demand video",
+            "Wi-Fi free",
+            "Seat type Above Average Legroom",
+            "Legroom 32 inches",
+            "Carbon emission: 585 kg"
+          ],
+          "detected_extensions": {
+            "has_power_and_usb_outlets": true,
+            "has_on_demand_video": true,
+            "wifi": "free",
+            "seat_type": "Above Average Legroom",
+            "legroom_short": "32 in",
+            "legroom_long": "32 inches",
+            "carbon_emission": 585
+          }
+        }
+      ],
+      "total_duration": 461,
+      "carbon_emissions": {
+        "this_flight": 586000,
+        "typical_for_this_route": 426000,
+        "difference_percent": 38,
+        "lowest_route": 422000
+      },
+      "price": 959,
+      "type": "Round trip",
+      "extensions": [
+        "Free change, possible fare difference",
+        "Full refund for cancellations",
+        "Checked baggage for a fee",
+        "Bag and fare conditions depend on the return flight"
+      ],
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/B6.png",
+      "departure_token": "WyJDalJJVVRGck9HTm9aSFpEU1UxQlIyUjZaMmRDUnkwdExTMHRMUzB0TFc5NWVIVXhNa0ZCUVVGQlIzQm1kazlWVEVKRVlXTkJFZ1pDTmpFME1EY2FDd2pqN0FVUUFob0RWVk5FT0IxdzQrd0YiLFtbIkpGSyIsIjIwMjYtMDgtMTUiLCJDREciLG51bGwsIkI2IiwiMTQwNyJdXV0="
+    }
+  ],
+  "other_flights": [
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "John F. Kennedy International Airport",
+            "id": "JFK",
+            "date": "2026-08-15",
+            "time": "18:29"
+          },
+          "arrival_airport": {
+            "name": "Cincinnati/Northern Kentucky International Airport",
+            "id": "CVG",
+            "date": "2026-08-15",
+            "time": "21:06"
+          },
+          "duration": 157,
+          "airplane": "Canadair RJ 900",
+          "airline": "Delta",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/DL.png",
+          "travel_class": "Economy",
+          "flight_number": "DL 5023",
+          "is_often_delayed": true,
+          "extensions": [
+            "Power and USB outlets",
+            "Wi-Fi free",
+            "Seat type Average Legroom",
+            "Legroom 31 inches",
+            "Carbon emission: 148 kg"
+          ],
+          "detected_extensions": {
+            "has_power_and_usb_outlets": true,
+            "wifi": "free",
+            "seat_type": "Average Legroom",
+            "legroom_short": "31 in",
+            "legroom_long": "31 inches",
+            "carbon_emission": 148
+          }
+        },
+        {
+          "departure_airport": {
+            "name": "Cincinnati/Northern Kentucky International Airport",
+            "id": "CVG",
+            "date": "2026-08-16",
+            "time": "17:10"
+          },
+          "arrival_airport": {
+            "name": "A\u00e9roport de Paris-Charles de Gaulle",
+            "id": "CDG",
+            "date": "2026-08-17",
+            "time": "07:15"
+          },
+          "duration": 485,
+          "airplane": "Boeing 767",
+          "airline": "Delta",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/DL.png",
+          "travel_class": "Economy",
+          "flight_number": "DL 98",
+          "is_overnight": true,
+          "is_often_delayed": true,
+          "extensions": [
+            "Power and USB outlets",
+            "On-demand video",
+            "Wi-Fi free",
+            "Seat type Average Legroom",
+            "Legroom 31 inches",
+            "Carbon emission: 387 kg"
+          ],
+          "detected_extensions": {
+            "has_power_and_usb_outlets": true,
+            "has_on_demand_video": true,
+            "wifi": "free",
+            "seat_type": "Average Legroom",
+            "legroom_short": "31 in",
+            "legroom_long": "31 inches",
+            "carbon_emission": 387
+          }
+        }
+      ],
+      "layovers": [
+        {
+          "duration": 1204,
+          "name": "Cincinnati/Northern Kentucky International Airport",
+          "id": "CVG",
+          "is_overnight": true
+        }
+      ],
+      "total_duration": 1846,
+      "carbon_emissions": {
+        "this_flight": 537000,
+        "typical_for_this_route": 426000,
+        "difference_percent": 26,
+        "lowest_route": 422000
+      },
+      "price": 752,
+      "type": "Round trip",
+      "extensions": [
+        "Free change, possible fare difference",
+        "Full refund for cancellations",
+        "Checked baggage for a fee",
+        "Bag and fare conditions depend on the return flight"
+      ],
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/DL.png",
+      "departure_token": "WyJDalJJVVRGck9HTm9aSFpEU1UxQlIyUjZaMmRDUnkwdExTMHRMUzB0TFc5NWVIVXhNa0ZCUVVGQlIzQm1kazlWVEVKRVlXTkJFZ3RFVERVd01qTjhSRXc1T0JvTENQM0tCQkFDR2dOVlUwUTRIWEQ5eWdRPSIsW1siSkZLIiwiMjAyNi0wOC0xNSIsIkNWRyIsbnVsbCwiREwiLCI1MDIzIl0sWyJDVkciLCIyMDI2LTA4LTE2IiwiQ0RHIixudWxsLCJETCIsIjk4Il1dXQ=="
+    },
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "John F. Kennedy International Airport",
+            "id": "JFK",
+            "date": "2026-08-15",
+            "time": "16:30"
+          },
+          "arrival_airport": {
+            "name": "A\u00e9roport de Paris-Charles de Gaulle",
+            "id": "CDG",
+            "date": "2026-08-16",
+            "time": "05:55"
+          },
+          "duration": 445,
+          "airplane": "Boeing 777",
+          "airline": "Air France",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AF.png",
+          "travel_class": "Economy",
+          "flight_number": "AF 1",
+          "ticket_also_sold_by": [
+            "Delta"
+          ],
+          "is_overnight": true,
+          "extensions": [
+            "In-seat USB outlet",
+            "On-demand video",
+            "Wi-Fi free",
+            "Seat type Average Legroom",
+            "Legroom 31 inches",
+            "Carbon emission: 421 kg"
+          ],
+          "detected_extensions": {
+            "has_in_seat_usb_outlet": true,
+            "has_on_demand_video": true,
+            "wifi": "free",
+            "seat_type": "Average Legroom",
+            "legroom_short": "31 in",
+            "legroom_long": "31 inches",
+            "carbon_emission": 421
+          }
+        }
+      ],
+      "total_duration": 445,
+      "carbon_emissions": {
+        "this_flight": 422000,
+        "typical_for_this_route": 426000,
+        "difference_percent": -1,
+        "lowest_route": 422000
+      },
+      "price": 817,
+      "type": "Round trip",
+      "extensions": [
+        "Free change, possible fare difference",
+        "Full refund for cancellations",
+        "Checked baggage for a fee",
+        "Bag and fare conditions depend on the return flight"
+      ],
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AF.png",
+      "departure_token": "WyJDalJJVVRGck9HTm9aSFpEU1UxQlIyUjZaMmRDUnkwdExTMHRMUzB0TFc5NWVIVXhNa0ZCUVVGQlIzQm1kazlWVEVKRVlXTkJFZ05CUmpFYUN3ajEvUVFRQWhvRFZWTkVPQjF3OWYwRSIsW1siSkZLIiwiMjAyNi0wOC0xNSIsIkNERyIsbnVsbCwiQUYiLCIxIl1dXQ=="
+    },
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "John F. Kennedy International Airport",
+            "id": "JFK",
+            "date": "2026-08-15",
+            "time": "17:30"
+          },
+          "arrival_airport": {
+            "name": "A\u00e9roport de Paris-Charles de Gaulle",
+            "id": "CDG",
+            "date": "2026-08-16",
+            "time": "07:00"
+          },
+          "duration": 450,
+          "airplane": "Boeing 777",
+          "airline": "Air France",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AF.png",
+          "travel_class": "Economy",
+          "flight_number": "AF 3",
+          "ticket_also_sold_by": [
+            "Delta"
+          ],
+          "is_overnight": true,
+          "extensions": [
+            "In-seat USB outlet",
+            "On-demand video",
+            "Wi-Fi free",
+            "Seat type Average Legroom",
+            "Legroom 31 inches",
+            "Carbon emission: 421 kg"
+          ],
+          "detected_extensions": {
+            "has_in_seat_usb_outlet": true,
+            "has_on_demand_video": true,
+            "wifi": "free",
+            "seat_type": "Average Legroom",
+            "legroom_short": "31 in",
+            "legroom_long": "31 inches",
+            "carbon_emission": 421
+          }
+        }
+      ],
+      "total_duration": 450,
+      "carbon_emissions": {
+        "this_flight": 422000,
+        "typical_for_this_route": 426000,
+        "difference_percent": -1,
+        "lowest_route": 422000
+      },
+      "price": 817,
+      "type": "Round trip",
+      "extensions": [
+        "Free change, possible fare difference",
+        "Full refund for cancellations",
+        "Checked baggage for a fee",
+        "Bag and fare conditions depend on the return flight"
+      ],
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AF.png",
+      "departure_token": "WyJDalJJVVRGck9HTm9aSFpEU1UxQlIyUjZaMmRDUnkwdExTMHRMUzB0TFc5NWVIVXhNa0ZCUVVGQlIzQm1kazlWVEVKRVlXTkJFZ05CUmpNYUN3ajEvUVFRQWhvRFZWTkVPQjF3OWYwRSIsW1siSkZLIiwiMjAyNi0wOC0xNSIsIkNERyIsbnVsbCwiQUYiLCIzIl1dXQ=="
+    },
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "John F. Kennedy International Airport",
+            "id": "JFK",
+            "date": "2026-08-15",
+            "time": "19:15"
+          },
+          "arrival_airport": {
+            "name": "A\u00e9roport de Paris-Charles de Gaulle",
+            "id": "CDG",
+            "date": "2026-08-16",
+            "time": "09:05"
+          },
+          "duration": 470,
+          "airplane": "Boeing 767",
+          "airline": "Delta",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/DL.png",
+          "travel_class": "Economy",
+          "flight_number": "DL 262",
+          "ticket_also_sold_by": [
+            "Virgin Atlantic"
+          ],
+          "is_overnight": true,
+          "extensions": [
+            "Power and USB outlets",
+            "On-demand video",
+            "Wi-Fi free",
+            "Seat type Average Legroom",
+            "Legroom 31 inches",
+            "Carbon emission: 332 kg"
+          ],
+          "detected_extensions": {
+            "has_power_and_usb_outlets": true,
+            "has_on_demand_video": true,
+            "wifi": "free",
+            "seat_type": "Average Legroom",
+            "legroom_short": "31 in",
+            "legroom_long": "31 inches",
+            "carbon_emission": 332
+          }
+        }
+      ],
+      "total_duration": 470,
+      "carbon_emissions": {
+        "this_flight": 333000,
+        "typical_for_this_route": 426000,
+        "difference_percent": -22,
+        "lowest_route": 422000
+      },
+      "price": 817,
+      "type": "Round trip",
+      "extensions": [
+        "Free change, possible fare difference",
+        "Full refund for cancellations",
+        "Checked baggage for a fee",
+        "Bag and fare conditions depend on the return flight"
+      ],
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/DL.png",
+      "departure_token": "WyJDalJJVVRGck9HTm9aSFpEU1UxQlIyUjZaMmRDUnkwdExTMHRMUzB0TFc5NWVIVXhNa0ZCUVVGQlIzQm1kazlWVEVKRVlXTkJFZ1ZFVERJMk1ob0xDUFg5QkJBQ0dnTlZVMFE0SFhEMS9RUT0iLFtbIkpGSyIsIjIwMjYtMDgtMTUiLCJDREciLG51bGwsIkRMIiwiMjYyIl1dXQ=="
+    },
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "John F. Kennedy International Airport",
+            "id": "JFK",
+            "date": "2026-08-15",
+            "time": "18:30"
+          },
+          "arrival_airport": {
+            "name": "A\u00e9roport de Paris-Charles de Gaulle",
+            "id": "CDG",
+            "date": "2026-08-16",
+            "time": "08:05"
+          },
+          "duration": 455,
+          "airplane": "Boeing 777",
+          "airline": "Air France",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AF.png",
+          "travel_class": "Economy",
+          "flight_number": "AF 5",
+          "ticket_also_sold_by": [
+            "Delta"
+          ],
+          "is_overnight": true,
+          "extensions": [
+            "In-seat USB outlet",
+            "On-demand video",
+            "Wi-Fi free",
+            "Seat type Average Legroom",
+            "Legroom 31 inches",
+            "Carbon emission: 421 kg"
+          ],
+          "detected_extensions": {
+            "has_in_seat_usb_outlet": true,
+            "has_on_demand_video": true,
+            "wifi": "free",
+            "seat_type": "Average Legroom",
+            "legroom_short": "31 in",
+            "legroom_long": "31 inches",
+            "carbon_emission": 421
+          }
+        }
+      ],
+      "total_duration": 455,
+      "carbon_emissions": {
+        "this_flight": 422000,
+        "typical_for_this_route": 426000,
+        "difference_percent": -1,
+        "lowest_route": 422000
+      },
+      "price": 922,
+      "type": "Round trip",
+      "extensions": [
+        "Free change, possible fare difference",
+        "Full refund for cancellations",
+        "Checked baggage for a fee",
+        "Bag and fare conditions depend on the return flight"
+      ],
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AF.png",
+      "departure_token": "WyJDalJJVVRGck9HTm9aSFpEU1UxQlIyUjZaMmRDUnkwdExTMHRMUzB0TFc5NWVIVXhNa0ZCUVVGQlIzQm1kazlWVEVKRVlXTkJFZ05CUmpVYUN3ajV6d1VRQWhvRFZWTkVPQjF3K2M4RiIsW1siSkZLIiwiMjAyNi0wOC0xNSIsIkNERyIsbnVsbCwiQUYiLCI1Il1dXQ=="
+    },
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "John F. Kennedy International Airport",
+            "id": "JFK",
+            "date": "2026-08-15",
+            "time": "20:10"
+          },
+          "arrival_airport": {
+            "name": "A\u00e9roport de Paris-Charles de Gaulle",
+            "id": "CDG",
+            "date": "2026-08-16",
+            "time": "10:00"
+          },
+          "duration": 470,
+          "airplane": "Boeing 767",
+          "airline": "Delta",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/DL.png",
+          "travel_class": "Economy",
+          "flight_number": "DL 266",
+          "ticket_also_sold_by": [
+            "Virgin Atlantic"
+          ],
+          "is_overnight": true,
+          "extensions": [
+            "Power and USB outlets",
+            "On-demand video",
+            "Wi-Fi free",
+            "Seat type Average Legroom",
+            "Legroom 31 inches",
+            "Carbon emission: 332 kg"
+          ],
+          "detected_extensions": {
+            "has_power_and_usb_outlets": true,
+            "has_on_demand_video": true,
+            "wifi": "free",
+            "seat_type": "Average Legroom",
+            "legroom_short": "31 in",
+            "legroom_long": "31 inches",
+            "carbon_emission": 332
+          }
+        }
+      ],
+      "total_duration": 470,
+      "carbon_emissions": {
+        "this_flight": 333000,
+        "typical_for_this_route": 426000,
+        "difference_percent": -22,
+        "lowest_route": 422000
+      },
+      "price": 922,
+      "type": "Round trip",
+      "extensions": [
+        "Free change, possible fare difference",
+        "Full refund for cancellations",
+        "Checked baggage for a fee",
+        "Bag and fare conditions depend on the return flight"
+      ],
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/DL.png",
+      "departure_token": "WyJDalJJVVRGck9HTm9aSFpEU1UxQlIyUjZaMmRDUnkwdExTMHRMUzB0TFc5NWVIVXhNa0ZCUVVGQlIzQm1kazlWVEVKRVlXTkJFZ1ZFVERJMk5ob0xDUG5QQlJBQ0dnTlZVMFE0SFhENXp3VT0iLFtbIkpGSyIsIjIwMjYtMDgtMTUiLCJDREciLG51bGwsIkRMIiwiMjY2Il1dXQ=="
+    },
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "John F. Kennedy International Airport",
+            "id": "JFK",
+            "date": "2026-08-15",
+            "time": "21:30"
+          },
+          "arrival_airport": {
+            "name": "A\u00e9roport de Paris-Charles de Gaulle",
+            "id": "CDG",
+            "date": "2026-08-16",
+            "time": "11:10"
+          },
+          "duration": 460,
+          "airplane": "Boeing 777",
+          "airline": "Air France",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AF.png",
+          "travel_class": "Economy",
+          "flight_number": "AF 7",
+          "ticket_also_sold_by": [
+            "Delta"
+          ],
+          "is_overnight": true,
+          "extensions": [
+            "In-seat USB outlet",
+            "On-demand video",
+            "Wi-Fi free",
+            "Seat type Average Legroom",
+            "Legroom 31 inches",
+            "Carbon emission: 421 kg"
+          ],
+          "detected_extensions": {
+            "has_in_seat_usb_outlet": true,
+            "has_on_demand_video": true,
+            "wifi": "free",
+            "seat_type": "Average Legroom",
+            "legroom_short": "31 in",
+            "legroom_long": "31 inches",
+            "carbon_emission": 421
+          }
+        }
+      ],
+      "total_duration": 460,
+      "carbon_emissions": {
+        "this_flight": 422000,
+        "typical_for_this_route": 426000,
+        "difference_percent": -1,
+        "lowest_route": 422000
+      },
+      "price": 922,
+      "type": "Round trip",
+      "extensions": [
+        "Free change, possible fare difference",
+        "Full refund for cancellations",
+        "Checked baggage for a fee",
+        "Bag and fare conditions depend on the return flight"
+      ],
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AF.png",
+      "departure_token": "WyJDalJJVVRGck9HTm9aSFpEU1UxQlIyUjZaMmRDUnkwdExTMHRMUzB0TFc5NWVIVXhNa0ZCUVVGQlIzQm1kazlWVEVKRVlXTkJFZ05CUmpjYUN3ajV6d1VRQWhvRFZWTkVPQjF3K2M4RiIsW1siSkZLIiwiMjAyNi0wOC0xNSIsIkNERyIsbnVsbCwiQUYiLCI3Il1dXQ=="
+    },
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "John F. Kennedy International Airport",
+            "id": "JFK",
+            "date": "2026-08-15",
+            "time": "23:30"
+          },
+          "arrival_airport": {
+            "name": "A\u00e9roport de Paris-Charles de Gaulle",
+            "id": "CDG",
+            "date": "2026-08-16",
+            "time": "12:55"
+          },
+          "duration": 445,
+          "airplane": "Boeing 777",
+          "airline": "Air France",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AF.png",
+          "travel_class": "Economy",
+          "flight_number": "AF 9",
+          "ticket_also_sold_by": [
+            "Delta"
+          ],
+          "is_overnight": true,
+          "extensions": [
+            "In-seat USB outlet",
+            "On-demand video",
+            "Wi-Fi free",
+            "Seat type Average Legroom",
+            "Legroom 31 inches",
+            "Carbon emission: 421 kg"
+          ],
+          "detected_extensions": {
+            "has_in_seat_usb_outlet": true,
+            "has_on_demand_video": true,
+            "wifi": "free",
+            "seat_type": "Average Legroom",
+            "legroom_short": "31 in",
+            "legroom_long": "31 inches",
+            "carbon_emission": 421
+          }
+        }
+      ],
+      "total_duration": 445,
+      "carbon_emissions": {
+        "this_flight": 422000,
+        "typical_for_this_route": 426000,
+        "difference_percent": -1,
+        "lowest_route": 422000
+      },
+      "price": 922,
+      "type": "Round trip",
+      "extensions": [
+        "Free change, possible fare difference",
+        "Full refund for cancellations",
+        "Checked baggage for a fee",
+        "Bag and fare conditions depend on the return flight"
+      ],
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AF.png",
+      "departure_token": "WyJDalJJVVRGck9HTm9aSFpEU1UxQlIyUjZaMmRDUnkwdExTMHRMUzB0TFc5NWVIVXhNa0ZCUVVGQlIzQm1kazlWVEVKRVlXTkJFZ05CUmprYUN3ajV6d1VRQWhvRFZWTkVPQjF3K2M4RiIsW1siSkZLIiwiMjAyNi0wOC0xNSIsIkNERyIsbnVsbCwiQUYiLCI5Il1dXQ=="
+    }
+  ],
+  "price_insights": {
+    "lowest_price": 752,
+    "price_level": "typical",
+    "typical_price_range": {
+      "low_price": 500,
+      "high_price": 800
+    },
+    "price_history": [
+      {
+        "price": 671,
+        "iso_date": "2026-05-22T04:00:00Z"
+      },
+      {
+        "price": 671,
+        "iso_date": "2026-05-23T04:00:00Z"
+      },
+      {
+        "price": 650,
+        "iso_date": "2026-05-24T04:00:00Z"
+      },
+      {
+        "price": 650,
+        "iso_date": "2026-05-25T04:00:00Z"
+      },
+      {
+        "price": 701,
+        "iso_date": "2026-05-26T04:00:00Z"
+      },
+      {
+        "price": 650,
+        "iso_date": "2026-05-27T04:00:00Z"
+      },
+      {
+        "price": 650,
+        "iso_date": "2026-05-28T04:00:00Z"
+      },
+      {
+        "price": 650,
+        "iso_date": "2026-05-29T04:00:00Z"
+      },
+      {
+        "price": 650,
+        "iso_date": "2026-05-30T04:00:00Z"
+      },
+      {
+        "price": 650,
+        "iso_date": "2026-05-31T04:00:00Z"
+      },
+      {
+        "price": 650,
+        "iso_date": "2026-06-01T04:00:00Z"
+      },
+      {
+        "price": 722,
+        "iso_date": "2026-06-02T04:00:00Z"
+      },
+      {
+        "price": 676,
+        "iso_date": "2026-06-03T04:00:00Z"
+      },
+      {
+        "price": 707,
+        "iso_date": "2026-06-04T04:00:00Z"
+      },
+      {
+        "price": 780,
+        "iso_date": "2026-06-05T04:00:00Z"
+      },
+      {
+        "price": 780,
+        "iso_date": "2026-06-06T04:00:00Z"
+      },
+      {
+        "price": 780,
+        "iso_date": "2026-06-07T04:00:00Z"
+      },
+      {
+        "price": 780,
+        "iso_date": "2026-06-08T04:00:00Z"
+      },
+      {
+        "price": 779,
+        "iso_date": "2026-06-09T04:00:00Z"
+      },
+      {
+        "price": 739,
+        "iso_date": "2026-06-10T04:00:00Z"
+      },
+      {
+        "price": 739,
+        "iso_date": "2026-06-11T04:00:00Z"
+      },
+      {
+        "price": 739,
+        "iso_date": "2026-06-12T04:00:00Z"
+      },
+      {
+        "price": 739,
+        "iso_date": "2026-06-13T04:00:00Z"
+      },
+      {
+        "price": 739,
+        "iso_date": "2026-06-14T04:00:00Z"
+      },
+      {
+        "price": 739,
+        "iso_date": "2026-06-15T04:00:00Z"
+      },
+      {
+        "price": 739,
+        "iso_date": "2026-06-16T04:00:00Z"
+      },
+      {
+        "price": 739,
+        "iso_date": "2026-06-17T04:00:00Z"
+      },
+      {
+        "price": 698,
+        "iso_date": "2026-06-18T04:00:00Z"
+      },
+      {
+        "price": 697,
+        "iso_date": "2026-06-19T04:00:00Z"
+      },
+      {
+        "price": 699,
+        "iso_date": "2026-06-20T04:00:00Z"
+      },
+      {
+        "price": 698,
+        "iso_date": "2026-06-21T04:00:00Z"
+      },
+      {
+        "price": 697,
+        "iso_date": "2026-06-22T04:00:00Z"
+      },
+      {
+        "price": 695,
+        "iso_date": "2026-06-23T04:00:00Z"
+      },
+      {
+        "price": 694,
+        "iso_date": "2026-06-24T04:00:00Z"
+      },
+      {
+        "price": 670,
+        "iso_date": "2026-06-25T04:00:00Z"
+      },
+      {
+        "price": 670,
+        "iso_date": "2026-06-26T04:00:00Z"
+      },
+      {
+        "price": 670,
+        "iso_date": "2026-06-27T04:00:00Z"
+      },
+      {
+        "price": 670,
+        "iso_date": "2026-06-28T04:00:00Z"
+      },
+      {
+        "price": 690,
+        "iso_date": "2026-06-29T04:00:00Z"
+      },
+      {
+        "price": 690,
+        "iso_date": "2026-06-30T04:00:00Z"
+      },
+      {
+        "price": 690,
+        "iso_date": "2026-07-01T04:00:00Z"
+      },
+      {
+        "price": 742,
+        "iso_date": "2026-07-02T04:00:00Z"
+      },
+      {
+        "price": 764,
+        "iso_date": "2026-07-03T04:00:00Z"
+      },
+      {
+        "price": 757,
+        "iso_date": "2026-07-04T04:00:00Z"
+      },
+      {
+        "price": 747,
+        "iso_date": "2026-07-05T04:00:00Z"
+      },
+      {
+        "price": 747,
+        "iso_date": "2026-07-06T04:00:00Z"
+      },
+      {
+        "price": 742,
+        "iso_date": "2026-07-07T04:00:00Z"
+      },
+      {
+        "price": 742,
+        "iso_date": "2026-07-08T04:00:00Z"
+      },
+      {
+        "price": 742,
+        "iso_date": "2026-07-09T04:00:00Z"
+      },
+      {
+        "price": 684,
+        "iso_date": "2026-07-10T04:00:00Z"
+      },
+      {
+        "price": 742,
+        "iso_date": "2026-07-11T04:00:00Z"
+      },
+      {
+        "price": 742,
+        "iso_date": "2026-07-12T04:00:00Z"
+      },
+      {
+        "price": 742,
+        "iso_date": "2026-07-13T04:00:00Z"
+      },
+      {
+        "price": 742,
+        "iso_date": "2026-07-14T04:00:00Z"
+      },
+      {
+        "price": 742,
+        "iso_date": "2026-07-15T04:00:00Z"
+      },
+      {
+        "price": 725,
+        "iso_date": "2026-07-16T04:00:00Z"
+      },
+      {
+        "price": 725,
+        "iso_date": "2026-07-17T04:00:00Z"
+      },
+      {
+        "price": 743,
+        "iso_date": "2026-07-18T04:00:00Z"
+      },
+      {
+        "price": 747,
+        "iso_date": "2026-07-19T04:00:00Z"
+      },
+      {
+        "price": 747,
+        "iso_date": "2026-07-20T04:00:00Z"
+      },
+      {
+        "price": 752,
+        "iso_date": "2026-07-21T04:00:00Z"
+      }
+    ]
+  },
+  "airports": [
+    {
+      "departure": [
+        {
+          "airport": {
+            "id": "JFK",
+            "name": "John F. Kennedy International Airport"
+          },
+          "city": "New York",
+          "country": "United States",
+          "country_code": "US",
+          "image": "https://encrypted-tbn1.gstatic.com/images?q=tbn:ANd9GcRa1dwH1NZQk4dsbPiyA9Vrq2RX75jXSZ-OkHn7NkLHl-11HercqDXoZ4p2cDxJkH6vca2degawrCzHEQ",
+          "thumbnail": "https://encrypted-tbn1.gstatic.com/images?q=tbn:ANd9GcQEaUa9NsdPWGpAUGkTApkZDT_4M6_6V8wTcC0v1b1wJAJX-BuMSiipXbsoznGgcI1xLOc5QiTcR_xovexgjdOz0gqQe0tRQ9h0bUkZ07Q"
+        }
+      ],
+      "arrival": [
+        {
+          "airport": {
+            "id": "CDG",
+            "name": "A\u00e9roport de Paris-Charles de Gaulle"
+          },
+          "city": "Paris",
+          "country": "France",
+          "country_code": "FR",
+          "image": "https://encrypted-tbn3.gstatic.com/images?q=tbn:ANd9GcQGx8ii2KbSDdbdzfKye5oDN2bwBA6audqI7XUEf2iMRZezpn_ZbQe1ZIuvUSH-8XOMe958umDwSsAF1w",
+          "thumbnail": "https://encrypted-tbn3.gstatic.com/images?q=tbn:ANd9GcSyQJ-woNs0iO22mPSkmRUM5gcsTbbYeypQ6BBTeFxXr90mqTxZl57Fdq2CDuLn4w7cKZ8TT9_zZhOpF57rIpA7yWKQnqKvkKIf9Y-qJDo"
+        }
+      ]
+    },
+    {
+      "departure": [
+        {
+          "airport": {
+            "id": "CDG",
+            "name": "A\u00e9roport de Paris-Charles de Gaulle"
+          },
+          "city": "Paris",
+          "country": "France",
+          "country_code": "FR",
+          "image": "https://encrypted-tbn3.gstatic.com/images?q=tbn:ANd9GcQGx8ii2KbSDdbdzfKye5oDN2bwBA6audqI7XUEf2iMRZezpn_ZbQe1ZIuvUSH-8XOMe958umDwSsAF1w",
+          "thumbnail": "https://encrypted-tbn3.gstatic.com/images?q=tbn:ANd9GcSyQJ-woNs0iO22mPSkmRUM5gcsTbbYeypQ6BBTeFxXr90mqTxZl57Fdq2CDuLn4w7cKZ8TT9_zZhOpF57rIpA7yWKQnqKvkKIf9Y-qJDo"
+        }
+      ],
+      "arrival": [
+        {
+          "airport": {
+            "id": "JFK",
+            "name": "John F. Kennedy International Airport"
+          },
+          "city": "New York",
+          "country": "United States",
+          "country_code": "US",
+          "image": "https://encrypted-tbn1.gstatic.com/images?q=tbn:ANd9GcRa1dwH1NZQk4dsbPiyA9Vrq2RX75jXSZ-OkHn7NkLHl-11HercqDXoZ4p2cDxJkH6vca2degawrCzHEQ",
+          "thumbnail": "https://encrypted-tbn1.gstatic.com/images?q=tbn:ANd9GcQEaUa9NsdPWGpAUGkTApkZDT_4M6_6V8wTcC0v1b1wJAJX-BuMSiipXbsoznGgcI1xLOc5QiTcR_xovexgjdOz0gqQe0tRQ9h0bUkZ07Q"
+        }
+      ]
+    }
+  ],
+  "airlines": {
+    "alliances": [
+      {
+        "code": "ONEWORLD",
+        "name": "Oneworld"
+      },
+      {
+        "code": "SKYTEAM",
+        "name": "SkyTeam"
+      },
+      {
+        "code": "STAR_ALLIANCE",
+        "name": "Star Alliance"
+      }
+    ],
+    "airlines": [
+      {
+        "code": "EI",
+        "name": "Aer Lingus"
+      },
+      {
+        "code": "AM",
+        "name": "Aeromexico"
+      },
+      {
+        "code": "UX",
+        "name": "Air Europa"
+      },
+      {
+        "code": "AF",
+        "name": "Air France"
+      },
+      {
+        "code": "JU",
+        "name": "Air Serbia"
+      },
+      {
+        "code": "AS",
+        "name": "Alaska"
+      },
+      {
+        "code": "AA",
+        "name": "American"
+      },
+      {
+        "code": "OS",
+        "name": "Austrian"
+      },
+      {
+        "code": "S4",
+        "name": "Azores Airlines"
+      },
+      {
+        "code": "BA",
+        "name": "British Airways"
+      },
+      {
+        "code": "SN",
+        "name": "Brussels Airlines"
+      },
+      {
+        "code": "DE",
+        "name": "Condor"
+      },
+      {
+        "code": "DL",
+        "name": "Delta"
+      },
+      {
+        "code": "MS",
+        "name": "EgyptAir"
+      },
+      {
+        "code": "AY",
+        "name": "Finnair"
+      },
+      {
+        "code": "H4",
+        "name": "HiSky Europe SRL"
+      },
+      {
+        "code": "IB",
+        "name": "Iberia"
+      },
+      {
+        "code": "FI",
+        "name": "Icelandair"
+      },
+      {
+        "code": "6E",
+        "name": "IndiGo"
+      },
+      {
+        "code": "AZ",
+        "name": "ITA"
+      },
+      {
+        "code": "B6",
+        "name": "JetBlue"
+      },
+      {
+        "code": "KL",
+        "name": "KLM"
+      },
+      {
+        "code": "LL",
+        "name": "LEVEL"
+      },
+      {
+        "code": "LO",
+        "name": "LOT"
+      },
+      {
+        "code": "LH",
+        "name": "Lufthansa"
+      },
+      {
+        "code": "MH",
+        "name": "Malaysia Airlines"
+      },
+      {
+        "code": "QR",
+        "name": "Qatar Airways"
+      },
+      {
+        "code": "AT",
+        "name": "Royal Air Maroc"
+      },
+      {
+        "code": "SV",
+        "name": "Saudia"
+      },
+      {
+        "code": "SK",
+        "name": "Scandinavian Airlines"
+      },
+      {
+        "code": "SQ",
+        "name": "Singapore Airlines"
+      },
+      {
+        "code": "LX",
+        "name": "SWISS"
+      },
+      {
+        "code": "TP",
+        "name": "Tap Air Portugal"
+      },
+      {
+        "code": "TK",
+        "name": "Turkish Airlines"
+      },
+      {
+        "code": "UA",
+        "name": "United"
+      },
+      {
+        "code": "VS",
+        "name": "Virgin Atlantic"
+      },
+      {
+        "code": "WS",
+        "name": "WestJet"
+      }
+    ],
+    "hubs": [
+      {
+        "code": "AMS",
+        "name": "Amsterdam"
+      },
+      {
+        "code": "ATL",
+        "name": "Atlanta"
+      },
+      {
+        "code": "BCN",
+        "name": "Barcelona"
+      },
+      {
+        "code": "BEG",
+        "name": "Belgrade"
+      },
+      {
+        "code": "BOS",
+        "name": "Boston"
+      },
+      {
+        "code": "BRU",
+        "name": "Brussels"
+      },
+      {
+        "code": "CMN",
+        "name": "Casablanca"
+      },
+      {
+        "code": "CLT",
+        "name": "Charlotte"
+      },
+      {
+        "code": "ORD",
+        "name": "Chicago"
+      },
+      {
+        "code": "CVG",
+        "name": "Cincinnati"
+      },
+      {
+        "code": "CPH",
+        "name": "Copenhagen"
+      },
+      {
+        "code": "DFW",
+        "name": "Dallas"
+      },
+      {
+        "code": "DTW",
+        "name": "Detroit"
+      },
+      {
+        "code": "DUB",
+        "name": "Dublin"
+      },
+      {
+        "code": "FRA",
+        "name": "Frankfurt am Main"
+      },
+      {
+        "code": "GVA",
+        "name": "Geneva"
+      },
+      {
+        "code": "HEL",
+        "name": "Helsinki"
+      },
+      {
+        "code": "IST",
+        "name": "Istanbul"
+      },
+      {
+        "code": "LHR",
+        "name": "London"
+      },
+      {
+        "code": "MAD",
+        "name": "Madrid"
+      },
+      {
+        "code": "MAN",
+        "name": "Manchester"
+      },
+      {
+        "code": "MUC",
+        "name": "Munich"
+      },
+      {
+        "code": "OSL",
+        "name": "Oslo"
+      },
+      {
+        "code": "RDU",
+        "name": "Raleigh"
+      },
+      {
+        "code": "KEF",
+        "name": "Reykjav\u00edk"
+      },
+      {
+        "code": "FCO",
+        "name": "Rome"
+      },
+      {
+        "code": "SNN",
+        "name": "Shannon"
+      },
+      {
+        "code": "VIE",
+        "name": "Vienna"
+      },
+      {
+        "code": "WAW",
+        "name": "Warsaw"
+      },
+      {
+        "code": "DCA",
+        "name": "Washington"
+      },
+      {
+        "code": "IAD",
+        "name": "Washington"
+      },
+      {
+        "code": "ZRH",
+        "name": "Z\u00fcrich"
+      }
+    ]
+  },
+  "baggage_allowance_links": [
+    {
+      "airline_code": "AF",
+      "airline": "Air France",
+      "url": "https://wwws.airfrance.us/information/bagages"
+    },
+    {
+      "airline_code": "AA",
+      "airline": "American",
+      "url": "https://www.aa.com/i18n/travel-info/baggage/checked-baggage-policy.jsp"
+    },
+    {
+      "airline_code": "DL",
+      "airline": "Delta",
+      "url": "https://www.delta.com/content/www/en_US/traveling-with-us/baggage/before-your-trip/checked.html"
+    },
+    {
+      "airline_code": "B6",
+      "airline": "JetBlue",
+      "url": "https://www.jetblue.com/at-the-airport/baggage-information?intcmp=hd_info"
+    }
+  ],
+  "passenger_assistance_links": [
+    {
+      "airline_code": "AF",
+      "airline": "Air France",
+      "url": "https://wwws.airfrance.fr/en/information/passagers"
+    },
+    {
+      "airline_code": "AA",
+      "airline": "American",
+      "url": "https://www.aa.com/i18n/travel-info/special-assistance/special-assistance.jsp"
+    },
+    {
+      "airline_code": "DL",
+      "airline": "Delta",
+      "url": "https://www.delta.com/us/en/accessible-travel-services/overview"
+    },
+    {
+      "airline_code": "B6",
+      "airline": "JetBlue",
+      "url": "https://www.jetblue.com/at-the-airport/accessibility-assistance"
+    }
+  ]
+}

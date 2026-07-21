@@ -62,10 +62,17 @@ def cache_key(
 
 
 def _parse_offers(payload: dict[str, Any]) -> list[NormalizedFlightOffer]:
+    # Confirmed against a real captured payload: a one-way search returns booking_token
+    # directly, but a round-trip search returns departure_token instead — booking_token only
+    # appears after a second SearchApi call selects the return leg with that departure_token.
+    # ponytail: booking_token stores whichever token the search returned; resolving a
+    # departure_token to a real booking_token is deferred to the booking-selection point
+    # (Phase 6's request_booking), the natural place a user picks one offer to book.
     offers: list[NormalizedFlightOffer] = []
     for raw_offer in [*payload.get("best_flights", []), *payload.get("other_flights", [])]:
         flights = raw_offer.get("flights", [])
-        if not flights or "price" not in raw_offer or "booking_token" not in raw_offer:
+        token = raw_offer.get("booking_token") or raw_offer.get("departure_token")
+        if not flights or "price" not in raw_offer or not token:
             continue
         first_leg, last_leg = flights[0], flights[-1]
         offers.append(
@@ -76,7 +83,7 @@ def _parse_offers(payload: dict[str, Any]) -> list[NormalizedFlightOffer]:
                 depart_at=first_leg.get("departure_airport", {}).get("time", ""),
                 arrive_at=last_leg.get("arrival_airport", {}).get("time", ""),
                 stops=len(flights) - 1,
-                booking_token=raw_offer["booking_token"],
+                booking_token=token,
                 raw_offer=raw_offer,
             )
         )
