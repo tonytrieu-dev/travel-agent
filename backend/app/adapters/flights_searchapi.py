@@ -55,9 +55,7 @@ def cache_key(
 
 
 def _parse_offers(payload: dict[str, Any]) -> list[NormalizedFlightOffer]:
-    # Round-trip offers carry departure_token, not booking_token (confirmed against a real
-    # payload). ponytail: resolving it to a real booking_token is deferred to Phase 6's
-    # request_booking, where a user picks one offer.
+    # Round-trip offers carry departure_token, not booking_token (confirmed against a real payload).
     offers: list[NormalizedFlightOffer] = []
     for raw_offer in [*payload.get("best_flights", []), *payload.get("other_flights", [])]:
         flights = raw_offer.get("flights", [])

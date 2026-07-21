@@ -205,11 +205,6 @@ async def get_or_create_itinerary(
     if isinstance(output, ClarificationOut):
         return output
 
-    # ponytail: no row lock here (unlike execute_booking's SELECT ... FOR UPDATE) — two
-    # concurrent first-time /plan calls on the same brand-new trip could both reach this point
-    # and both burn a real Gemini call; the DB's UniqueConstraint on trip_request_id still stops
-    # a double-stored itinerary. Add a lock (mirroring execute_booking) if concurrent /plan
-    # traffic on one trip becomes a real quota concern.
     session.add(
         Itinerary(trip_request_id=trip_id, days=[day.model_dump() for day in output.days])
     )

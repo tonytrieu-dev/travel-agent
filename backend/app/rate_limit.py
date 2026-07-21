@@ -1,9 +1,5 @@
 """Rate limiting for the two quota-spending routes (/plan, /flights/search): a per-IP request
 cap, and a global concurrency cap on real Gemini calls specifically.
-
-ponytail: single-process, in-memory — correct for this app's one-instance deployment. A
-multi-process deployment needs a shared store (Redis) behind the same two functions; nothing
-else would need to change.
 """
 
 import asyncio
