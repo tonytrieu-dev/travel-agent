@@ -82,7 +82,11 @@ def _two_tool_call_history() -> list:
 
 def test_persisted_agent_run_sums_tokens_and_orders_one_step_per_tool_call() -> None:
     message_history = _two_tool_call_history()
-    run_usage = RunUsage(input_tokens=600, output_tokens=285, requests=3, tool_calls=2)
+    # Deliberately NOT the per-response sum (input 120+180+300=600, output 15+20+250=285): the
+    # authoritative RunUsage differs (it accounts for cached/retried tokens the per-response parts
+    # miss), so the token assertion below fails if persist_agent_run ever re-sums the responses
+    # instead of trusting usage.
+    run_usage = RunUsage(input_tokens=650, output_tokens=310, requests=3, tool_calls=2)
 
     async def _work(session):
         trip_id = await seed_trip(session)
@@ -104,9 +108,10 @@ def test_persisted_agent_run_sums_tokens_and_orders_one_step_per_tool_call() -> 
 
     agent_run, steps = run_db(_work)
 
-    assert (agent_run.total_input_tokens, agent_run.total_output_tokens) == (600, 285), (
-        f"AgentRun must persist the run's aggregated usage() totals, not per-response tokens; "
-        f"got ({agent_run.total_input_tokens}, {agent_run.total_output_tokens})"
+    assert (agent_run.total_input_tokens, agent_run.total_output_tokens) == (650, 310), (
+        f"AgentRun must persist the run's aggregated usage() totals (650, 310), not the "
+        f"per-response sum (600, 285); got "
+        f"({agent_run.total_input_tokens}, {agent_run.total_output_tokens})"
     )
 
     tool_steps = [step for step in steps if step.kind is AgentStepKind.TOOL]
