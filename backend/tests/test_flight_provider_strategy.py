@@ -114,3 +114,20 @@ async def test_recorded_provider_parses_a_real_captured_round_trip_cassette() ->
     assert all(offer.booking_token for offer in outcome.offers), (
         "every parsed offer must carry a non-empty token (booking_token or departure_token)"
     )
+
+
+async def test_parsed_offer_departure_carries_its_date_not_just_a_clock_time() -> None:
+    """SearchApi returns an airport's ``date`` and ``time`` as separate fields; the adapter must
+    join them so ``depart_at`` holds a placeable timestamp. Dropping the date (the original bug)
+    left a bare ``06:05`` that the UI rendered as 'Invalid Date'. Fails red if the date is
+    dropped again."""
+    provider = RecordedProvider(cassette_dir=FLIGHT_CASSETTE_DIR)
+
+    outcome = await provider.search_offers("JFK", "CDG", "2026-08-15", "2026-08-22")
+
+    assert outcome.offers, "cassette must yield offers for this assertion to be meaningful"
+    departure_date = outcome.offers[0].raw_offer["flights"][0]["departure_airport"]["date"]
+    assert departure_date in outcome.offers[0].depart_at, (
+        f"depart_at must include the offer's departure date {departure_date!r} so it parses to a "
+        f"real datetime, got {outcome.offers[0].depart_at!r} — the SearchApi date field is dropped"
+    )

@@ -54,6 +54,17 @@ def cache_key(
     return f"{departure_id}_{arrival_id}_{outbound_date}_{return_date or 'oneway'}"
 
 
+def _airport_datetime(airport: dict[str, Any]) -> str:
+    # SearchApi returns date and time as separate fields; join them into one ISO datetime so the
+    # value is a real timestamp (the field's name promises), not a bare "06:05" that can't be
+    # placed on a calendar.
+    date = airport.get("date", "")
+    time = airport.get("time", "")
+    if date and time:
+        return f"{date}T{time}"
+    return time or date
+
+
 def _parse_offers(payload: dict[str, Any]) -> list[NormalizedFlightOffer]:
     # Round-trip offers carry departure_token, not booking_token (confirmed against a real payload).
     offers: list[NormalizedFlightOffer] = []
@@ -68,8 +79,8 @@ def _parse_offers(payload: dict[str, Any]) -> list[NormalizedFlightOffer]:
                 carrier=first_leg.get("airline", "Unknown"),
                 price_usd=float(raw_offer["price"]),
                 currency="USD",
-                depart_at=first_leg.get("departure_airport", {}).get("time", ""),
-                arrive_at=last_leg.get("arrival_airport", {}).get("time", ""),
+                depart_at=_airport_datetime(first_leg.get("departure_airport", {})),
+                arrive_at=_airport_datetime(last_leg.get("arrival_airport", {})),
                 stops=len(flights) - 1,
                 booking_token=token,
                 raw_offer=raw_offer,
