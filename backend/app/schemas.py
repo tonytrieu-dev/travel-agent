@@ -20,6 +20,7 @@ class ErrorCode(StrEnum):
     BOOKING_EXPIRED = "booking_expired"
     INVALID_TRANSITION = "invalid_transition"
     BOOKING_OPTIONS_UNAVAILABLE = "booking_options_unavailable"
+    VALIDATION_ERROR = "validation_error"
 
 
 class ProblemDetail(BaseModel):

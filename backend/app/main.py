@@ -8,6 +8,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -15,7 +16,7 @@ from app.config import get_settings
 from app.dbos_runtime import launch_dbos, shutdown_dbos
 from app.repositories.booking_repository import BookingError
 from app.routes import booking
-from app.schemas import ProblemDetail
+from app.schemas import ErrorCode, ProblemDetail
 
 
 @asynccontextmanager
@@ -40,6 +41,17 @@ def create_app() -> FastAPI:
     async def _render_booking_error(request: Request, error: BookingError) -> JSONResponse:
         problem = ProblemDetail(code=error.code, detail=error.detail)
         return JSONResponse(status_code=error.status_code, content=problem.model_dump(mode="json"))
+
+    @app.exception_handler(RequestValidationError)
+    async def _render_validation_error(
+        request: Request, error: RequestValidationError
+    ) -> JSONResponse:
+        field_errors = "; ".join(
+            f"{'.'.join(str(part) for part in violation['loc'])}: {violation['msg']}"
+            for violation in error.errors()
+        )
+        problem = ProblemDetail(code=ErrorCode.VALIDATION_ERROR, detail=field_errors)
+        return JSONResponse(status_code=422, content=problem.model_dump(mode="json"))
 
     return app
 

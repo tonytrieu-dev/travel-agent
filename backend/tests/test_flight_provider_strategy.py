@@ -6,6 +6,7 @@ against a real captured SearchApi payload (never a hand-fabricated shape).
 
 from pathlib import Path
 
+import httpx
 import pytest
 
 from app.adapters.flights_searchapi import (
@@ -14,6 +15,42 @@ from app.adapters.flights_searchapi import (
     get_flight_provider,
 )
 from app.config import FLIGHT_CASSETTE_DIR, Settings
+
+
+async def test_live_provider_booking_options_error_includes_the_upstream_response_body(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression guard: a bare status code told a developer nothing about *why* SearchApi
+    rejected the token (invalid vs expired vs malformed) — the response body is the only place
+    that distinction lives."""
+
+    async def _fake_get(self, url, params=None, headers=None) -> httpx.Response:
+        return httpx.Response(400, json={"error": "booking_token has expired"})
+
+    monkeypatch.setattr(httpx.AsyncClient, "get", _fake_get)
+    provider = LiveSearchApiProvider(api_key="test-key")
+
+    with pytest.raises(RuntimeError, match="booking_token has expired"):
+        await provider.fetch_booking_options("some-token")
+
+
+async def test_live_provider_search_offers_unavailable_reason_includes_the_upstream_response_body(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Same gap, the other call: a non-429 non-200 search failure previously discarded the
+    upstream body, hiding *why* (malformed params vs an account issue vs anything else)."""
+
+    async def _fake_get(self, url, params=None, headers=None) -> httpx.Response:
+        return httpx.Response(400, json={"error": "unsupported currency"})
+
+    monkeypatch.setattr(httpx.AsyncClient, "get", _fake_get)
+    provider = LiveSearchApiProvider(api_key="test-key")
+
+    outcome = await provider.search_offers("JFK", "CDG", "2026-08-01", None)
+
+    assert outcome.unavailable_reason is not None and "unsupported currency" in outcome.unavailable_reason, (
+        f"unavailable_reason must surface the upstream body, got {outcome.unavailable_reason!r}"
+    )
 
 
 def _settings(use_live_flight_api: bool) -> Settings:

@@ -131,7 +131,7 @@ class LiveSearchApiProvider:
                 unavailable_reason=(
                     f"searchapi flight search failed: HTTP {response.status_code} "
                     f"(departure_id={departure_id} arrival_id={arrival_id} "
-                    f"outbound_date={outbound_date})"
+                    f"outbound_date={outbound_date}): {response.text}"
                 )
             )
 
@@ -163,7 +163,7 @@ class LiveSearchApiProvider:
         if response.status_code != 200:
             raise RuntimeError(
                 f"searchapi booking-options fetch failed: HTTP {response.status_code} "
-                f"for booking_token={booking_token}"
+                f"for booking_token={booking_token}: {response.text}"
             )
         return list(response.json().get("booking_options", []))
 
