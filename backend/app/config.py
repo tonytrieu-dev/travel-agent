@@ -6,6 +6,7 @@ numbers scattered through the codebase.
 """
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import SecretStr, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -13,6 +14,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # The Gemini model driving the planner. gemini-3-flash is free-tier eligible with a plain
 # AI Studio key (~10 requests/min, ~1500/day, 1M-token context window).
 GEMINI_MODEL = "google-gla:gemini-3-flash"
+
+# SearchApi.io's Google Flights engine: one endpoint, engine=google_flights for offers and
+# engine=google_flights (with booking_token) for booking options.
+SEARCHAPI_BASE_URL = "https://www.searchapi.io/api/v1/search"
+
+# Where RecordedProvider replays real-captured SearchApi payloads from, and where the
+# quota-aware capture script writes them. One JSON file per (departure, arrival, outbound_date,
+# return_date) cache key — never hand-fabricated, only ever real captured responses.
+FLIGHT_CASSETTE_DIR = Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "recorded" / "flights"
 
 # Agent guardrails. We self-impose a context budget far below the model's real 1M window so
 # runs never approach the region where answer quality degrades, and a hard tool-call ceiling

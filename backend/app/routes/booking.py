@@ -9,6 +9,8 @@ from typing import Any
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.adapters.flights_searchapi import get_flight_provider
+from app.config import get_settings
 from app.db import get_session
 from app.models import BookingTransition, FlightSearchResult, HITLBookingLog
 from app.repositories import booking_repository as repository
@@ -24,15 +26,16 @@ _NOT_FOUND_OR_CONFLICT: dict[int | str, dict[str, Any]] = {
 }
 
 
-async def _unwired_fetch(flight_search_result: FlightSearchResult) -> list[dict]:
-    raise NotImplementedError(
-        "booking-options adapter is not wired yet (Phase 3); the SearchApi fetch is injected here."
-    )
-
-
 def get_booking_options_fetcher() -> BookingOptionsFetcher:
-    """Injected so tests count/replace the real SearchApi booking-options call (Phase 3)."""
-    return _unwired_fetch
+    """The Strategy-selected flight provider's real booking-options call — live SearchApi or a
+    replayed cassette per ``USE_LIVE_FLIGHT_API``. Tests override this dependency with a
+    counting spy so they never hit the real API or a cassette file."""
+    provider = get_flight_provider(get_settings())
+
+    async def _fetch(flight_search_result: FlightSearchResult) -> list[dict]:
+        return await provider.fetch_booking_options(flight_search_result.booking_token)
+
+    return _fetch
 
 
 def _to_out(
