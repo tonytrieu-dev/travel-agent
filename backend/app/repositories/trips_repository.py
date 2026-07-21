@@ -13,6 +13,9 @@ from sqlmodel import col, select
 from app.adapters.flights_searchapi import FlightProvider
 from app.config import FLIGHT_CACHE_TTL_MINUTES
 from app.models import (
+    AgentRun,
+    AgentRunStep,
+    ExecutionEvent,
     FlightResultSource,
     FlightSearchResult,
     Itinerary,
@@ -29,7 +32,7 @@ from app.schemas import (
     validate_trip_dates,
 )
 
-PlannerRunner = Callable[[str], Awaitable[ItineraryOut | ClarificationOut]]
+PlannerRunner = Callable[[int, str], Awaitable[ItineraryOut | ClarificationOut]]
 
 
 class TripError(Exception):
@@ -198,7 +201,7 @@ async def get_or_create_itinerary(
     if existing is not None:
         return ItineraryOut(days=existing.days)
 
-    output = await run_planner(_build_planner_prompt(trip))
+    output = await run_planner(trip_id, _build_planner_prompt(trip))
     if isinstance(output, ClarificationOut):
         return output
 
@@ -213,3 +216,38 @@ async def get_or_create_itinerary(
     trip.status = TripStatus.ITINERARY_READY
     await session.commit()
     return output
+
+
+async def get_execution_panel(
+    session: AsyncSession, trip_id: int
+) -> tuple[AgentRun | None, list[AgentRunStep], list[ExecutionEvent]]:
+    """The latest agent run (if `/plan` has ever executed for this trip) plus its ordered steps,
+    and the trip's full ExecutionEvent timeline (tool/API calls recorded during that run)."""
+    trip = await session.get(TripRequest, trip_id)
+    if trip is None:
+        raise TripError(ErrorCode.TRIP_NOT_FOUND, 404, f"No trip {trip_id}.")
+
+    agent_run = await session.scalar(
+        select(AgentRun)
+        .where(col(AgentRun.trip_request_id) == trip_id)
+        .order_by(col(AgentRun.started_at).desc())
+        .limit(1)
+    )
+    steps: list[AgentRunStep] = []
+    if agent_run is not None:
+        steps = list(
+            await session.scalars(
+                select(AgentRunStep)
+                .where(col(AgentRunStep.agent_run_id) == agent_run.id)
+                .order_by(col(AgentRunStep.seq))
+            )
+        )
+
+    events = list(
+        await session.scalars(
+            select(ExecutionEvent)
+            .where(col(ExecutionEvent.trip_request_id) == trip_id)
+            .order_by(col(ExecutionEvent.seq))
+        )
+    )
+    return agent_run, steps, events

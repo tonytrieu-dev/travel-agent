@@ -13,7 +13,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlmodel import col
 
 from app.models import (
+    AgentRun,
+    AgentRunStep,
+    AgentStepKind,
     BookingTransition,
+    ExecutionEvent,
+    ExecutionEventKind,
     FlightResultSource,
     FlightSearchResult,
     HITLBookingLog,
@@ -175,6 +180,59 @@ async def seed_itinerary(session: AsyncSession, trip_id: int) -> int:
     await session.flush()
     assert itinerary.id is not None
     return itinerary.id
+
+
+async def seed_agent_run(
+    session: AsyncSession,
+    trip_id: int,
+    *,
+    total_input_tokens: int = 1000,
+    total_output_tokens: int = 200,
+) -> int:
+    """Insert one AgentRun with a single MODEL step and return the run id."""
+    agent_run = AgentRun(
+        trip_request_id=trip_id,
+        status="completed",
+        model="gemini-3-flash-preview",
+        total_input_tokens=total_input_tokens,
+        total_output_tokens=total_output_tokens,
+        total_ms=1500,
+        finished_at=utcnow(),
+    )
+    session.add(agent_run)
+    await session.flush()
+    assert agent_run.id is not None
+
+    session.add(
+        AgentRunStep(
+            agent_run_id=agent_run.id,
+            seq=1,
+            kind=AgentStepKind.MODEL,
+            name="gemini-3-flash-preview",
+            status="completed",
+            duration_ms=1500,
+            output_summary="Here is your itinerary.",
+            tokens=total_output_tokens,
+        )
+    )
+    await session.flush()
+    return agent_run.id
+
+
+async def seed_execution_event(session: AsyncSession, trip_id: int, *, name: str = "search_flights") -> int:
+    event = ExecutionEvent(
+        trip_request_id=trip_id,
+        seq=1,
+        kind=ExecutionEventKind.API_CALL,
+        name=name,
+        status="ok",
+        detail="3 offers",
+        duration_ms=250,
+    )
+    session.add(event)
+    await session.flush()
+    assert event.id is not None
+    return event.id
 
 
 async def get_trip(session: AsyncSession, trip_id: int) -> TripRequest:

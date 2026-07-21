@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.dbos_runtime import launch_dbos, shutdown_dbos
+from app.rate_limit import RateLimitError
 from app.repositories.booking_repository import BookingError
 from app.repositories.trips_repository import TripError
 from app.routes import booking, trips
@@ -48,6 +49,15 @@ def create_app() -> FastAPI:
     async def _render_trip_error(request: Request, error: TripError) -> JSONResponse:
         problem = ProblemDetail(code=error.code, detail=error.detail)
         return JSONResponse(status_code=error.status_code, content=problem.model_dump(mode="json"))
+
+    @app.exception_handler(RateLimitError)
+    async def _render_rate_limit_error(request: Request, error: RateLimitError) -> JSONResponse:
+        problem = ProblemDetail(code=error.code, detail=error.detail)
+        return JSONResponse(
+            status_code=429,
+            content=problem.model_dump(mode="json"),
+            headers={"Retry-After": str(error.retry_after_seconds)},
+        )
 
     @app.exception_handler(RequestValidationError)
     async def _render_validation_error(

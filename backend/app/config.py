@@ -52,6 +52,16 @@ GEMINI_OUTPUT_PRICE_PER_MILLION_TOKENS = 3.00
 # that will start resolving a real identity later — route handlers never read this directly.
 DEMO_USER_EMAIL = "demo@travel-agent.local"
 
+# Gemini's free tier is ~15 RPM — a handful of concurrent /plan runs would blow through that
+# instantly. Caps how many agent runs execute at once; excess requests queue behind the
+# semaphore rather than firing a request Gemini would just 429.
+MAX_CONCURRENT_AGENT_RUNS = 2
+
+# Per-IP request cap on the expensive routes (/plan, /flights/search) — both spend real,
+# scarce third-party quota (Gemini RPD, the one-time SearchApi search allotment).
+RATE_LIMIT_MAX_REQUESTS = 10
+RATE_LIMIT_WINDOW_SECONDS = 60
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(

@@ -9,10 +9,13 @@ from dbos import DBOS, DBOSConfig
 
 from app.adapters.activities_tavily import TavilyActivityProvider
 from app.adapters.flights_searchapi import get_flight_provider
+from app.agent.execution_log import execution_context
+from app.agent.observability import persist_agent_run
 from app.agent.planner import PlannerDeps, agent, default_usage_limits
-from app.config import get_settings
+from app.config import GEMINI_MODEL, get_settings
 from app.db import get_session_factory
 from app.models import FlightSearchResult
+from app.rate_limit import acquire_agent_run_slot, release_agent_run_slot
 from app.repositories import booking_repository as repository
 from app.schemas import BookingLogOut, ClarificationOut, ItineraryOut
 
@@ -41,11 +44,31 @@ async def execute_booking_durable(log_id: int) -> BookingLogOut:
 
 
 @DBOS.workflow(name="run_planner")
-async def run_planner_durable(prompt: str) -> ItineraryOut | ClarificationOut:
+async def _run_planner_workflow(trip_id: int, prompt: str) -> ItineraryOut | ClarificationOut:
     settings = get_settings()
     deps = PlannerDeps(
         flight_provider=get_flight_provider(settings),
         activity_provider=TavilyActivityProvider(settings.tavily_api_key.get_secret_value()),
     )
-    result = await agent.run(prompt, deps=deps, usage_limits=default_usage_limits())
+    async with get_session_factory()() as session, execution_context(session, trip_id):
+        result = await agent.run(prompt, deps=deps, usage_limits=default_usage_limits())
+        await persist_agent_run(
+            session,
+            trip_request_id=trip_id,
+            model=GEMINI_MODEL,
+            message_history=result.all_messages(),
+            usage=result.usage,
+        )
     return result.output
+
+
+async def run_planner_durable(trip_id: int, prompt: str) -> ItineraryOut | ClarificationOut:
+    """Not itself a DBOS workflow: the concurrency slot is plain in-process state, and acquiring
+    it inside a replayable workflow body risks a double-acquire if DBOS re-enters that body
+    during its own internal record/persist resolution (observed empirically) — so the slot wraps
+    the durable call from the outside instead."""
+    await acquire_agent_run_slot()
+    try:
+        return await _run_planner_workflow(trip_id, prompt)
+    finally:
+        release_agent_run_slot()

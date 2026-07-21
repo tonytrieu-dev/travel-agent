@@ -81,6 +81,11 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetail' }
+        '429':
+          description: Per-IP rate limit exceeded on this route.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
 
   /api/trips/{trip_id}/plan:
     post:
@@ -104,6 +109,34 @@ paths:
                   mapping:
                     ready: '#/components/schemas/PlanReadyOut'
                     needs_clarification: '#/components/schemas/PlanNeedsClarificationOut'
+        '404':
+          description: No such trip.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+        '429':
+          description: >-
+            Per-IP rate limit exceeded, or the global concurrent-agent-run cap is full (both
+            protect the scarce Gemini quota).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/trips/{trip_id}/execution:
+    get:
+      operationId: get_trip_execution
+      summary: >-
+        The Agent Execution Panel data: the latest /plan run (tokens, timing, ordered
+        model/tool steps) plus the trip's full tool/API-call event timeline. Real derived data
+        only — a run that hasn't happened yet returns agent_run: null, never fabricated metrics.
+      parameters:
+        - { name: trip_id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: The execution panel data for this trip.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExecutionPanelOut' }
         '404':
           description: No such trip.
           content:
@@ -241,7 +274,7 @@ components:
     ErrorCode:
       type: string
       description: Machine-readable failure code; the human explanation is in `detail`.
-      enum: [booking_not_found, trip_not_found, flight_not_found, booking_expired, invalid_transition, booking_options_unavailable, validation_error]
+      enum: [booking_not_found, trip_not_found, flight_not_found, booking_expired, invalid_transition, booking_options_unavailable, validation_error, rate_limit_exceeded]
 
     BookingRequestCreate:
       type: object
@@ -412,3 +445,67 @@ components:
         questions:
           type: array
           items: { type: string }
+
+    AgentStepKind:
+      type: string
+      enum: [model, tool]
+
+    ExecutionEventKind:
+      type: string
+      enum: [api_call, db_query, protocol, hitl]
+
+    AgentRunStepOut:
+      type: object
+      required: [seq, kind, name, status]
+      properties:
+        seq: { type: integer }
+        kind: { $ref: '#/components/schemas/AgentStepKind' }
+        name: { type: string }
+        status: { type: string }
+        duration_ms: { type: [integer, 'null'] }
+        input_summary: { type: [string, 'null'] }
+        output_summary: { type: [string, 'null'] }
+        tokens: { type: [integer, 'null'] }
+
+    AgentRunOut:
+      type: object
+      required: [id, status, model, total_input_tokens, total_output_tokens, total_ms, started_at]
+      properties:
+        id: { type: integer }
+        status: { type: string }
+        model: { type: string }
+        total_input_tokens: { type: integer }
+        total_output_tokens: { type: integer }
+        total_ms: { type: integer }
+        started_at: { type: string, format: date-time }
+        finished_at: { type: [string, 'null'], format: date-time }
+        steps:
+          type: array
+          items: { $ref: '#/components/schemas/AgentRunStepOut' }
+
+    ExecutionEventOut:
+      type: object
+      required: [seq, kind, name, status, detail, created_at]
+      properties:
+        seq: { type: integer }
+        kind: { $ref: '#/components/schemas/ExecutionEventKind' }
+        name: { type: string }
+        status: { type: string }
+        detail: { type: string }
+        duration_ms: { type: [integer, 'null'] }
+        created_at: { type: string, format: date-time }
+
+    ExecutionPanelOut:
+      type: object
+      required: [trip_request_id, events]
+      properties:
+        trip_request_id: { type: integer }
+        agent_run:
+          oneOf:
+            - { $ref: '#/components/schemas/AgentRunOut' }
+            - type: 'null'
+        events:
+          type: array
+          items: { $ref: '#/components/schemas/ExecutionEventOut' }
+        estimated_cost_usd: { type: [number, 'null'] }
+        budget_utilization_pct: { type: [number, 'null'] }

@@ -1,6 +1,7 @@
 """The travel-planner agent: union output (asks or plans), two composable read-only tools."""
 
 import re
+import time
 from dataclasses import asdict, dataclass
 
 from pydantic_ai import Agent, ModelRetry, RunContext
@@ -10,6 +11,7 @@ from pydantic_ai.usage import UsageLimits
 
 from app.adapters.activities_tavily import TavilyActivityProvider
 from app.adapters.flights_searchapi import FlightProvider
+from app.agent.execution_log import record_event
 from app.agent.prompts import load_system_prompt, sanitize_web_content
 from app.agent.tool_gate import ToolClassification, register_tool
 from app.config import (
@@ -19,6 +21,7 @@ from app.config import (
     MAX_TOOL_STEPS,
     get_settings,
 )
+from app.models import ExecutionEventKind
 from app.schemas import ClarificationOut, ItineraryOut
 
 _IATA_CODE_PATTERN = re.compile(r"^[A-Z]{3}$")
@@ -51,8 +54,18 @@ async def search_flights(
             f"departure_id and arrival_id must be 3-letter IATA codes (e.g. JFK), got "
             f"departure_id={departure_id!r} arrival_id={arrival_id!r}"
         )
+    started_at = time.monotonic()
     outcome = await ctx.deps.flight_provider.search_offers(
         departure_id, arrival_id, outbound_date, return_date
+    )
+    duration_ms = round((time.monotonic() - started_at) * 1000)
+    await record_event(
+        ExecutionEventKind.API_CALL,
+        "search_flights",
+        "ok" if outcome.unavailable_reason is None else "unavailable",
+        f"{len(outcome.offers)} offers" if outcome.unavailable_reason is None
+        else outcome.unavailable_reason,
+        duration_ms,
     )
     return {
         "offers": [asdict(offer) for offer in outcome.offers],
@@ -62,7 +75,16 @@ async def search_flights(
 
 async def web_search(ctx: RunContext[PlannerDeps], query: str, max_results: int = 5) -> list[dict]:
     """Research real, source-attributed activities or information."""
+    started_at = time.monotonic()
     results = await ctx.deps.activity_provider.search(query, max_results=max_results)
+    duration_ms = round((time.monotonic() - started_at) * 1000)
+    await record_event(
+        ExecutionEventKind.API_CALL,
+        "web_search",
+        "ok",
+        f"{len(results)} results for query={query!r}",
+        duration_ms,
+    )
     return [
         {
             "title": result.title,

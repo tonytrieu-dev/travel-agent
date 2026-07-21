@@ -10,7 +10,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.models import FitnessLevel, TripStatus
+from app.models import AgentStepKind, ExecutionEventKind, FitnessLevel, TripStatus
 from app.state import BookingState
 
 
@@ -22,6 +22,7 @@ class ErrorCode(StrEnum):
     INVALID_TRANSITION = "invalid_transition"
     BOOKING_OPTIONS_UNAVAILABLE = "booking_options_unavailable"
     VALIDATION_ERROR = "validation_error"
+    RATE_LIMIT_EXCEEDED = "rate_limit_exceeded"
 
 
 def validate_trip_dates(depart_date: str, return_date: str | None) -> None:
@@ -167,3 +168,50 @@ class PlanNeedsClarificationOut(BaseModel):
 PlanOut = Annotated[
     PlanReadyOut | PlanNeedsClarificationOut, Field(discriminator="status")
 ]
+
+
+class AgentRunStepOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    seq: int
+    kind: AgentStepKind
+    name: str
+    status: str
+    duration_ms: int | None = None
+    input_summary: str | None = None
+    output_summary: str | None = None
+    tokens: int | None = None
+
+
+class AgentRunOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    status: str
+    model: str
+    total_input_tokens: int
+    total_output_tokens: int
+    total_ms: int
+    started_at: datetime
+    finished_at: datetime | None = None
+    steps: list[AgentRunStepOut] = []
+
+
+class ExecutionEventOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    seq: int
+    kind: ExecutionEventKind
+    name: str
+    status: str
+    detail: str
+    duration_ms: int | None = None
+    created_at: datetime
+
+
+class ExecutionPanelOut(BaseModel):
+    trip_request_id: int
+    agent_run: AgentRunOut | None = None
+    events: list[ExecutionEventOut] = []
+    estimated_cost_usd: float | None = None
+    budget_utilization_pct: float | None = None

@@ -47,6 +47,17 @@ def _truncate_between_tests() -> None:
     run_db(_truncate)
 
 
+@pytest.fixture(autouse=True)
+def _reset_rate_limit_state() -> None:
+    """The rate limiter's per-IP counters and in-flight-run counter are plain module-level
+    state (no DB truncation reaches them) — without this, request counts leak across tests that
+    share the TestClient's fixed IP and make rate-limit tests order-dependent."""
+    from app import rate_limit
+
+    rate_limit._request_timestamps.clear()
+    rate_limit._agent_runs_in_flight = 0
+
+
 @dataclass
 class BookingOptionsFetchSpy:
     """Stands in for the real SearchApi ``FlightProvider`` and counts booking-options calls.
@@ -122,7 +133,7 @@ class PlannerRunSpy:
     )
     calls: int = 0
 
-    async def __call__(self, prompt: str) -> ItineraryOut | ClarificationOut:
+    async def __call__(self, trip_id: int, prompt: str) -> ItineraryOut | ClarificationOut:
         self.calls += 1
         return self.output
 
