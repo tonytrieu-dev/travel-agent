@@ -15,7 +15,7 @@ so app connections (portal loop) and seed connections (seed loop) never cross ev
 """
 
 import asyncio
-from collections.abc import Callable
+import os
 from dataclasses import dataclass, field
 
 import pytest
@@ -23,6 +23,13 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from tests.db_helpers import TEST_DATABASE_URL, run_db
+
+# Must run before any ``app.*`` import: ``app.db``/``app.config`` build their engine once from
+# ``DATABASE_URL`` at first import, and ``execute_booking_durable`` (DBOS can't take an injected
+# session) reads that same module-level engine directly, bypassing the FastAPI dependency
+# override below entirely — so the test DB has to be correct at the source, not just at the DI
+# seam.
+os.environ.setdefault("DATABASE_URL", TEST_DATABASE_URL)
 
 _ALL_TABLES = (
     "booking_transition, execution_event, agent_run_step, agent_run, hitl_booking_log, "
@@ -40,7 +47,13 @@ def _truncate_between_tests() -> None:
 
 @dataclass
 class BookingOptionsFetchSpy:
-    """Stands in for the real SearchApi booking-options call and counts invocations."""
+    """Stands in for the real SearchApi ``FlightProvider`` and counts booking-options calls.
+
+    Shaped as a ``FlightProvider`` (not the old ``BookingOptionsFetcher`` closure) because
+    ``execute_booking_durable``'s DBOS step resolves its provider via ``get_flight_provider``,
+    the same seam ``test_flight_provider_strategy.py`` already exercises — not an injected
+    closure, which DBOS workflow args can't carry.
+    """
 
     options: list[dict] = field(
         default_factory=lambda: [
@@ -50,7 +63,7 @@ class BookingOptionsFetchSpy:
     calls: int = 0
     should_fail: bool = False
 
-    async def __call__(self, flight_search_result) -> list[dict]:
+    async def fetch_booking_options(self, booking_token: str) -> list[dict]:
         self.calls += 1
         if self.should_fail:
             raise RuntimeError("simulated upstream failure")
@@ -63,12 +76,11 @@ def booking_options_spy() -> BookingOptionsFetchSpy:
 
 
 @pytest.fixture
-def client(booking_options_spy: BookingOptionsFetchSpy):
+def client(booking_options_spy: BookingOptionsFetchSpy, monkeypatch: pytest.MonkeyPatch):
     from starlette.testclient import TestClient
 
-    from app.db import get_session
+    from app.db import get_engine, get_session
     from app.main import app
-    from app.routes.booking import get_booking_options_fetcher
 
     app_engine = create_async_engine(TEST_DATABASE_URL, pool_pre_ping=True)
     app_session_factory = async_sessionmaker(app_engine, expire_on_commit=False)
@@ -77,12 +89,14 @@ def client(booking_options_spy: BookingOptionsFetchSpy):
         async with app_session_factory() as session:
             yield session
 
-    def _override_fetcher() -> Callable:
-        return booking_options_spy
-
     app.dependency_overrides[get_session] = _override_get_session
-    app.dependency_overrides[get_booking_options_fetcher] = _override_fetcher
+    monkeypatch.setattr("app.dbos_runtime.get_flight_provider", lambda settings: booking_options_spy)
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
     asyncio.run(app_engine.dispose())
+    # execute_booking_durable can't take a Depends-injected session (DBOS args must be
+    # serializable), so it opens one from app.db's own module-level engine directly — that
+    # engine's pooled connections would otherwise outlive this test's TestClient portal loop and
+    # get reused on the next test's (different) loop, which asyncpg rejects outright.
+    asyncio.run(get_engine().dispose())

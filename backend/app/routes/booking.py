@@ -9,12 +9,10 @@ from typing import Any
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.flights_searchapi import get_flight_provider
-from app.config import get_settings
 from app.db import get_session
-from app.models import BookingTransition, FlightSearchResult, HITLBookingLog
+from app.dbos_runtime import execute_booking_durable
+from app.models import BookingTransition, HITLBookingLog
 from app.repositories import booking_repository as repository
-from app.repositories.booking_repository import BookingOptionsFetcher
 from app.schemas import BookingLogOut, BookingRequestCreate, BookingTransitionOut, ProblemDetail
 
 router = APIRouter(prefix="/api", tags=["booking"])
@@ -29,18 +27,6 @@ _EXECUTE_RESPONSES: dict[int | str, dict[str, Any]] = {
     409: {"model": ProblemDetail},
     502: {"model": ProblemDetail},
 }
-
-
-def get_booking_options_fetcher() -> BookingOptionsFetcher:
-    """The Strategy-selected flight provider's real booking-options call — live SearchApi or a
-    replayed cassette per ``USE_LIVE_FLIGHT_API``. Tests override this dependency with a
-    counting spy so they never hit the real API or a cassette file."""
-    provider = get_flight_provider(get_settings())
-
-    async def _fetch(flight_search_result: FlightSearchResult) -> list[dict]:
-        return await provider.fetch_booking_options(flight_search_result.booking_token)
-
-    return _fetch
 
 
 def _to_out(
@@ -85,13 +71,8 @@ async def confirm_booking(
 @router.post(
     "/bookings/{log_id}/execute", response_model=BookingLogOut, responses=_EXECUTE_RESPONSES
 )
-async def execute_booking(
-    log_id: int,
-    session: AsyncSession = Depends(get_session),
-    fetch_options: BookingOptionsFetcher = Depends(get_booking_options_fetcher),
-) -> BookingLogOut:
-    booking = await repository.execute_booking(session, log_id, fetch_options)
-    return _to_out(booking)
+async def execute_booking(log_id: int) -> BookingLogOut:
+    return await execute_booking_durable(log_id)
 
 
 @router.post(

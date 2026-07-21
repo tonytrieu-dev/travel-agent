@@ -29,3 +29,9 @@ async def get_session() -> AsyncIterator[AsyncSession]:
 def get_engine():
     """Expose the engine for lifespan startup checks and tests."""
     return _engine
+
+
+def get_session_factory() -> async_sessionmaker[AsyncSession]:
+    """For callers that can't take a ``Depends``-injected session — currently only DBOS
+    workflows, whose arguments must be serializable and so can't carry a live session."""
+    return _session_factory
