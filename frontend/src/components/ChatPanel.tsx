@@ -2,8 +2,7 @@ interface ChatPanelProps {
   onGoToForm: () => void
 }
 
-// Conversational mode has no backend endpoint yet (the agent is driven by the structured trip
-// form). This is an honest preview of the interface, not a stub that fabricates agent replies.
+// No backend chat endpoint yet — honest preview, no fabricated replies.
 export function ChatPanel({ onGoToForm }: ChatPanelProps) {
   return (
     <section className="flex h-full flex-col">

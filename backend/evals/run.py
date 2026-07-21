@@ -19,7 +19,7 @@ from app.adapters.flights_searchapi import get_flight_provider
 from app.agent.execution_log import execution_context
 from app.agent.planner import PlannerDeps, agent, default_usage_limits
 from app.agent.prompts import load_system_prompt
-from app.config import GEMINI_MODEL, get_settings
+from app.config import GROQ_MODEL, get_settings
 from app.db import get_session_factory
 from app.models import TripRequest, User
 from app.schemas import ClarificationOut, ItineraryOut
@@ -108,7 +108,7 @@ def build_fingerprint() -> dict[str, str]:
     """Everything needed to tell whether two eval runs are comparable: same model, same system
     prompt, same dataset, and the exact commit the agent/eval code ran at."""
     return {
-        "model": GEMINI_MODEL,
+        "model": GROQ_MODEL,
         "system_prompt_sha256": hashlib.sha256(load_system_prompt().encode()).hexdigest(),
         "dataset_sha256": _dataset_fingerprint(),
         "git_sha": _git_sha(),

@@ -193,7 +193,7 @@ async def seed_agent_run(
     agent_run = AgentRun(
         trip_request_id=trip_id,
         status="completed",
-        model="gemini-3-flash-preview",
+        model="llama-3.3-70b-versatile",
         total_input_tokens=total_input_tokens,
         total_output_tokens=total_output_tokens,
         total_ms=1500,
@@ -208,7 +208,7 @@ async def seed_agent_run(
             agent_run_id=agent_run.id,
             seq=1,
             kind=AgentStepKind.MODEL,
-            name="gemini-3-flash-preview",
+            name="llama-3.3-70b-versatile",
             status="completed",
             duration_ms=1500,
             output_summary="Here is your itinerary.",

@@ -12,7 +12,7 @@ from app.adapters.flights_searchapi import get_flight_provider
 from app.agent.execution_log import execution_context
 from app.agent.observability import persist_agent_run
 from app.agent.planner import PlannerDeps, agent, default_usage_limits
-from app.config import GEMINI_MODEL, get_settings
+from app.config import GROQ_MODEL, get_settings
 from app.db import get_session_factory
 from app.models import FlightSearchResult
 from app.rate_limit import acquire_agent_run_slot, release_agent_run_slot
@@ -55,7 +55,7 @@ async def _run_planner_workflow(trip_id: int, prompt: str) -> ItineraryOut | Cla
         await persist_agent_run(
             session,
             trip_request_id=trip_id,
-            model=GEMINI_MODEL,
+            model=GROQ_MODEL,
             message_history=result.all_messages(),
             usage=result.usage,
         )

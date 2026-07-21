@@ -11,9 +11,9 @@ from pathlib import Path
 from pydantic import SecretStr, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Google AI Studio free tier. Live-verified 2026-07-21: plain "gemini-3-flash" 404s,
-# "gemini-3.5-flash" is paid-only — this is the actual free model.
-GEMINI_MODEL = "gemini-3-flash-preview"
+# Groq free tier: 1K req/day, 12K tokens/min. Alternatives: openai/gpt-oss-120b (smarter, tighter
+# token/min), llama-3.1-8b-instant (14.4K req/day, weaker reasoning).
+GROQ_MODEL = "llama-3.3-70b-versatile"
 
 SEARCHAPI_BASE_URL = "https://www.searchapi.io/api/v1/search"
 
@@ -43,22 +43,19 @@ BOOKING_TTL_MINUTES = 30
 # revalidate even more often than this.
 FLIGHT_CACHE_TTL_MINUTES = 15
 
-# Gemini list prices (USD per million tokens) for the *estimated* cost shown in the execution
-# panel. Actual cost on the free tier is $0; the panel labels the estimate honestly.
-GEMINI_INPUT_PRICE_PER_MILLION_TOKENS = 0.50
-GEMINI_OUTPUT_PRICE_PER_MILLION_TOKENS = 3.00
+# Groq list prices (USD/M tokens) for the panel's estimated cost only; actual is $0 on free tier.
+LLM_INPUT_PRICE_PER_MILLION_TOKENS = 0.59
+LLM_OUTPUT_PRICE_PER_MILLION_TOKENS = 0.79
 
 # No auth yet: every request acts as this one fixed user. get_current_user() is the single seam
 # that will start resolving a real identity later — route handlers never read this directly.
 DEMO_USER_EMAIL = "demo@travel-agent.local"
 
-# Gemini's free tier is ~15 RPM — a handful of concurrent /plan runs would blow through that
-# instantly. Caps how many agent runs execute at once; excess requests queue behind the
-# semaphore rather than firing a request Gemini would just 429.
+# Cap concurrent agent runs so a burst can't blow through Groq's 30 RPM / 12K tokens-per-minute.
 MAX_CONCURRENT_AGENT_RUNS = 2
 
 # Per-IP request cap on the expensive routes (/plan, /flights/search) — both spend real,
-# scarce third-party quota (Gemini RPD, the one-time SearchApi search allotment).
+# scarce third-party quota (Groq RPD, the one-time SearchApi search allotment).
 RATE_LIMIT_MAX_REQUESTS = 10
 RATE_LIMIT_WINDOW_SECONDS = 60
 
@@ -68,7 +65,7 @@ class Settings(BaseSettings):
         env_file=(".env", "../.env"), env_file_encoding="utf-8", extra="ignore"
     )
 
-    gemini_api_key: SecretStr
+    groq_api_key: SecretStr
     searchapi_api_key: SecretStr
     tavily_api_key: SecretStr
     database_url: str

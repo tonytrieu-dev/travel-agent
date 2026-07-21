@@ -10,8 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.flights_searchapi import get_flight_provider
 from app.config import (
-    GEMINI_INPUT_PRICE_PER_MILLION_TOKENS,
-    GEMINI_OUTPUT_PRICE_PER_MILLION_TOKENS,
+    LLM_INPUT_PRICE_PER_MILLION_TOKENS,
+    LLM_OUTPUT_PRICE_PER_MILLION_TOKENS,
     MAX_CONTEXT_TOKENS,
     get_settings,
 )
@@ -116,8 +116,8 @@ def _to_panel_out(
         )
 
     estimated_cost_usd = (
-        agent_run.total_input_tokens * GEMINI_INPUT_PRICE_PER_MILLION_TOKENS
-        + agent_run.total_output_tokens * GEMINI_OUTPUT_PRICE_PER_MILLION_TOKENS
+        agent_run.total_input_tokens * LLM_INPUT_PRICE_PER_MILLION_TOKENS
+        + agent_run.total_output_tokens * LLM_OUTPUT_PRICE_PER_MILLION_TOKENS
     ) / 1_000_000
     budget_utilization_pct = (
         100 * (agent_run.total_input_tokens + agent_run.total_output_tokens) / MAX_CONTEXT_TOKENS

@@ -3,8 +3,8 @@
 """
 
 from app.config import (
-    GEMINI_INPUT_PRICE_PER_MILLION_TOKENS,
-    GEMINI_OUTPUT_PRICE_PER_MILLION_TOKENS,
+    LLM_INPUT_PRICE_PER_MILLION_TOKENS,
+    LLM_OUTPUT_PRICE_PER_MILLION_TOKENS,
     MAX_CONTEXT_TOKENS,
 )
 from tests.db_helpers import run_db, seed_agent_run, seed_execution_event, seed_trip
@@ -52,12 +52,12 @@ def test_execution_panel_reflects_a_real_agent_run_with_derived_cost_and_budget(
     assert len(body["events"]) == 1, f"expected the one seeded event, got {body['events']}"
 
     expected_cost = round(
-        (10_000 * GEMINI_INPUT_PRICE_PER_MILLION_TOKENS + 2_000 * GEMINI_OUTPUT_PRICE_PER_MILLION_TOKENS)
+        (10_000 * LLM_INPUT_PRICE_PER_MILLION_TOKENS + 2_000 * LLM_OUTPUT_PRICE_PER_MILLION_TOKENS)
         / 1_000_000,
         6,
     )
     assert body["estimated_cost_usd"] == expected_cost, (
-        f"cost must be derived from the real Gemini price table applied to the run's real "
+        f"cost must be derived from the real LLM price table applied to the run's real "
         f"tokens, not a placeholder; got {body['estimated_cost_usd']}, expected {expected_cost}"
     )
     expected_budget_pct = round(100 * 12_000 / MAX_CONTEXT_TOKENS, 2)

@@ -14,11 +14,11 @@ the mechanism `EvaluatorContext.attributes` itself documents for exactly this pu
 from dataclasses import dataclass
 from typing import Literal, TypedDict
 
-from pydantic_ai.models.google import GoogleModel
-from pydantic_ai.providers.google import GoogleProvider
+from pydantic_ai.models.groq import GroqModel
+from pydantic_ai.providers.groq import GroqProvider
 from pydantic_evals.evaluators import EvaluationReason, Evaluator, EvaluatorContext, LLMJudge
 
-from app.config import GEMINI_MODEL, get_settings
+from app.config import GROQ_MODEL, get_settings
 from app.schemas import ClarificationOut, ItineraryOut
 
 WEB_SEARCH_URLS_ATTRIBUTE = "web_search_urls"
@@ -79,8 +79,8 @@ class CitationGrounding(Evaluator[str, ItineraryOut | ClarificationOut, CaseMeta
 def build_fitness_appropriateness_judge() -> LLMJudge:
     """An LLMJudge scoring itinerary/fitness fit, on the same Gemini model the agent runs on."""
     settings = get_settings()
-    judge_model = GoogleModel(
-        GEMINI_MODEL, provider=GoogleProvider(api_key=settings.gemini_api_key.get_secret_value())
+    judge_model = GroqModel(
+        GROQ_MODEL, provider=GroqProvider(api_key=settings.groq_api_key.get_secret_value())
     )
     return LLMJudge(
         rubric=(

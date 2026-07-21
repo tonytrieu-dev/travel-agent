@@ -3,7 +3,6 @@ import { getTripExecution } from "../api/client"
 import type { ExecutionPanelOut } from "../api/types"
 
 const IDLE_POLL_MS = 4_000
-// Poll fast while the agent is mid-run so tool calls surface as they happen, not 4s late.
 const ACTIVE_POLL_MS = 1_200
 
 interface UseTripExecutionOptions {

@@ -109,7 +109,7 @@ class Itinerary(SQLModel, table=True):
     # days: list of {day_number, summary, activities: [{name, description, intensity,
     # source_url}]} — every activity carries the Tavily source_url that grounds it.
     days: list[dict[str, Any]] = Field(sa_column=Column(JSON))
-    generated_by: str = Field(default="gemini-3-flash")
+    generated_by: str = Field(default="llama-3.3-70b-versatile")
     created_at: datetime = Field(default_factory=utcnow)
 
 

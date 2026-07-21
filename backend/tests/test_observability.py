@@ -36,7 +36,7 @@ def _two_tool_call_history() -> list:
                 )
             ],
             usage=RequestUsage(input_tokens=120, output_tokens=15),
-            model_name="gemini-3-flash",
+            model_name="llama-3.3-70b-versatile",
             timestamp=t0 + timedelta(seconds=1),
         ),
         ModelRequest(
@@ -58,7 +58,7 @@ def _two_tool_call_history() -> list:
                 )
             ],
             usage=RequestUsage(input_tokens=180, output_tokens=20),
-            model_name="gemini-3-flash",
+            model_name="llama-3.3-70b-versatile",
             timestamp=t0 + timedelta(seconds=3),
         ),
         ModelRequest(
@@ -74,7 +74,7 @@ def _two_tool_call_history() -> list:
         ModelResponse(
             parts=[TextPart(content="Here is your day-by-day itinerary...")],
             usage=RequestUsage(input_tokens=300, output_tokens=250),
-            model_name="gemini-3-flash",
+            model_name="llama-3.3-70b-versatile",
             timestamp=t0 + timedelta(seconds=5),
         ),
     ]
@@ -93,7 +93,7 @@ def test_persisted_agent_run_sums_tokens_and_orders_one_step_per_tool_call() -> 
         agent_run = await persist_agent_run(
             session,
             trip_request_id=trip_id,
-            model="gemini-3-flash",
+            model="llama-3.3-70b-versatile",
             message_history=message_history,
             usage=run_usage,
         )

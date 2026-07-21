@@ -5,8 +5,8 @@ import time
 from dataclasses import asdict, dataclass
 
 from pydantic_ai import Agent, ModelRetry, RunContext
-from pydantic_ai.models.google import GoogleModel
-from pydantic_ai.providers.google import GoogleProvider
+from pydantic_ai.models.groq import GroqModel
+from pydantic_ai.providers.groq import GroqProvider
 from pydantic_ai.usage import UsageLimits
 
 from app.adapters.activities_tavily import TavilyActivityProvider
@@ -15,7 +15,7 @@ from app.agent.execution_log import record_event
 from app.agent.prompts import load_system_prompt, sanitize_web_content
 from app.agent.tool_gate import ToolClassification, register_tool
 from app.config import (
-    GEMINI_MODEL,
+    GROQ_MODEL,
     MAX_CONTEXT_TOKENS,
     MAX_REQUESTS_PER_RUN,
     MAX_TOOL_STEPS,
@@ -98,8 +98,8 @@ async def web_search(ctx: RunContext[PlannerDeps], query: str, max_results: int 
 
 def _build_agent() -> Agent[PlannerDeps, ItineraryOut | ClarificationOut]:
     settings = get_settings()
-    model = GoogleModel(
-        GEMINI_MODEL, provider=GoogleProvider(api_key=settings.gemini_api_key.get_secret_value())
+    model = GroqModel(
+        GROQ_MODEL, provider=GroqProvider(api_key=settings.groq_api_key.get_secret_value())
     )
     built_agent = Agent(
         model,

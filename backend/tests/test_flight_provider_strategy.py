@@ -55,7 +55,7 @@ async def test_live_provider_search_offers_unavailable_reason_includes_the_upstr
 
 def _settings(use_live_flight_api: bool) -> Settings:
     return Settings(
-        gemini_api_key="test-gemini-key",
+        groq_api_key="test-groq-key",
         searchapi_api_key="test-searchapi-key",
         tavily_api_key="test-tavily-key",
         database_url="postgresql+asyncpg://unused/unused",

@@ -5,7 +5,6 @@ interface LiveActivityProps {
   isRunActive: boolean
 }
 
-// Human-friendly labels for the agent's tool/step names as they stream in.
 const STEP_LABELS: Record<string, string> = {
   search_flights: "Searching flights",
   web_search: "Researching activities",
