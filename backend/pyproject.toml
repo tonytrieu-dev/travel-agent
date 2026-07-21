@@ -1,0 +1,35 @@
+[project]
+name = "travel-agent"
+version = "0.1.0"
+description = "AI Travel Agent with a strict Human-in-the-Loop booking gate"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "pydantic>=2.10",
+    "pydantic-settings>=2.7",
+    "pydantic-ai-slim[google]>=2.9",
+    "pydantic-evals>=2.9",
+    "dbos>=1.0",
+    "sqlmodel>=0.0.22",
+    "asyncpg>=0.30",
+    "alembic>=1.14",
+    "httpx>=0.28",
+    "tavily-python>=0.5",
+    "email-validator>=2.2",
+    "python-json-logger>=3.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.25",
+    "pyrefly>=0.16",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.pyrefly]
+project-includes = ["app", "evals", "tests"]

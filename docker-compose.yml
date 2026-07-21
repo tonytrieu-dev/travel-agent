@@ -1,0 +1,22 @@
+# PostgreSQL for reviewers who have Docker. One command: `docker compose up -d`.
+# (This machine ran Postgres via Homebrew instead — see README for both paths.)
+# DBOS reuses this same database for its durable-workflow system tables (own schema).
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: travel_agent
+      POSTGRES_PASSWORD: travel_agent
+      POSTGRES_DB: travel_agent
+    ports:
+      - "5432:5432"
+    volumes:
+      - travel_agent_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U travel_agent -d travel_agent"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  travel_agent_pgdata:

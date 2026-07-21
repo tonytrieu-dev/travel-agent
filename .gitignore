@@ -1,0 +1,21 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+backend/.venv/
+*.egg-info/
+.pytest_cache/
+.pyrefly/
+
+# Node / frontend
+node_modules/
+frontend/dist/
+
+# DBOS local state
+.dbos/
+
+# OS
+.DS_Store
