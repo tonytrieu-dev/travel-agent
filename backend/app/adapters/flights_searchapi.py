@@ -1,13 +1,6 @@
-"""SearchApi.io Google Flights adapter — the Strategy pattern seam for flight fetching.
-
-One ``FlightProvider`` Protocol, two interchangeable implementations selected once at
-composition by ``USE_LIVE_FLIGHT_API``: ``LiveSearchApiProvider`` calls the real API,
-``RecordedProvider`` replays a real-captured cassette. Callers (the booking route today; the
-flights route in Phase 6) depend on the Protocol and never branch on the toggle themselves.
-
-Tolerant + honest: an HTTP error, 429 quota exhaustion, or empty upstream result never raises
-into the request path — it returns an outcome with ``offers=[]`` and a specific
-``unavailable_reason``. Never a fabricated offer.
+"""SearchApi.io Google Flights adapter. Strategy pattern: FlightProvider Protocol, Live vs
+Recorded selected by USE_LIVE_FLIGHT_API. Tolerant — errors/empty results return
+unavailable_reason, never a fabricated offer.
 """
 
 import json
@@ -62,12 +55,9 @@ def cache_key(
 
 
 def _parse_offers(payload: dict[str, Any]) -> list[NormalizedFlightOffer]:
-    # Confirmed against a real captured payload: a one-way search returns booking_token
-    # directly, but a round-trip search returns departure_token instead — booking_token only
-    # appears after a second SearchApi call selects the return leg with that departure_token.
-    # ponytail: booking_token stores whichever token the search returned; resolving a
-    # departure_token to a real booking_token is deferred to the booking-selection point
-    # (Phase 6's request_booking), the natural place a user picks one offer to book.
+    # Round-trip offers carry departure_token, not booking_token (confirmed against a real
+    # payload). ponytail: resolving it to a real booking_token is deferred to Phase 6's
+    # request_booking, where a user picks one offer.
     offers: list[NormalizedFlightOffer] = []
     for raw_offer in [*payload.get("best_flights", []), *payload.get("other_flights", [])]:
         flights = raw_offer.get("flights", [])
@@ -91,8 +81,7 @@ def _parse_offers(payload: dict[str, Any]) -> list[NormalizedFlightOffer]:
 
 
 class LiveSearchApiProvider:
-    """Calls the real SearchApi.io Google Flights engine. Consumes the scarce one-time
-    100-search quota — only ever invoked when ``USE_LIVE_FLIGHT_API`` is true."""
+    """Calls the real SearchApi.io Google Flights engine (spends the one-time 100-search quota)."""
 
     def __init__(self, api_key: str) -> None:
         self._api_key = api_key
@@ -180,9 +169,7 @@ class LiveSearchApiProvider:
 
 
 class RecordedProvider:
-    """Replays a real-captured cassette (never a hand-fabricated shape) from
-    ``cassette_dir``. Used for dev-reloads, tests, and evals so they never touch the
-    scarce one-time SearchApi quota."""
+    """Replays a real-captured cassette — never a hand-fabricated shape."""
 
     def __init__(self, cassette_dir: Path) -> None:
         self._cassette_dir = cassette_dir
@@ -220,9 +207,7 @@ class RecordedProvider:
 
 
 def get_flight_provider(settings: Settings) -> FlightProvider:
-    """The Strategy selection point: the toggle is read exactly once, here — every caller
-    depends on the ``FlightProvider`` Protocol and never branches on ``use_live_flight_api``
-    itself."""
+    """Strategy selection: the toggle is read exactly once, here."""
     if settings.use_live_flight_api:
         return LiveSearchApiProvider(api_key=settings.searchapi_api_key.get_secret_value())
     return RecordedProvider(cassette_dir=FLIGHT_CASSETTE_DIR)

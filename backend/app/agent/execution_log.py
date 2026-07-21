@@ -1,13 +1,6 @@
-"""Automatic ExecutionEvent recorder for the Agent Execution Panel.
-
-A context-local binding (``contextvars``) holds the current run's session, trip_request_id,
-and next sequence number, so deep call-stack code (adapters, tools, protocol checkpoints) can
-call ``record_event`` without every function signature threading trip_request_id through. This
-is what makes recording automatic rather than a per-call-site opt-in — no code path can forget.
-
-Each event commits immediately rather than waiting for the end of the run: the append-only
-trigger on ``execution_event`` (Alembic migration) means once committed it can never be edited
-or deleted, so a run that later fails still leaves the events recorded up to that point.
+"""Context-local ExecutionEvent recorder — deep call-stack code records without threading
+trip_request_id through every signature. Commits immediately so a later failure still leaves
+prior events recorded.
 """
 
 from collections.abc import AsyncIterator
@@ -34,9 +27,8 @@ _current: ContextVar[_ExecutionContext | None] = ContextVar("execution_context",
 
 @asynccontextmanager
 async def execution_context(session: AsyncSession, trip_request_id: int) -> AsyncIterator[None]:
-    """Bind ``session``/``trip_request_id`` for the duration of one agent run. ``seq`` resumes
-    from this trip's highest existing value, since a trip can be re-planned across multiple
-    runs and every event for a trip must sort into one continuous, gap-free timeline."""
+    """Bind session/trip_request_id for one run. seq resumes from the trip's max so re-planned
+    runs share one continuous timeline."""
     result = await session.execute(
         select(func.max(ExecutionEvent.seq)).where(
             col(ExecutionEvent.trip_request_id) == trip_request_id

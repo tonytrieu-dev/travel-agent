@@ -1,9 +1,5 @@
-"""One-time, quota-aware capture of a real SearchApi.io Google Flights response into
-``tests/fixtures/recorded/flights/`` for RecordedProvider to replay in dev/tests/evals.
-
-Manual CLI, never run by pytest or CI — the 100-search quota is one-time and non-renewable.
-Requires a real SEARCHAPI_API_KEY in .env regardless of USE_LIVE_FLIGHT_API (this script always
-calls the live API; that's its only purpose).
+"""Manual, quota-spending capture of a real SearchApi response into tests/fixtures/recorded/.
+Never run by pytest/CI.
 
 Usage:
     uv run python -m scripts.capture_flight_cassette JFK CDG 2026-08-01 \\

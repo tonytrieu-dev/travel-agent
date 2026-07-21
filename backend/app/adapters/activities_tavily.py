@@ -1,10 +1,4 @@
-"""Tavily activity-research adapter — one low-level ``web_search`` primitive for the agent.
-
-No fitness/age business logic lives here; the agent forms the intent-bearing query and does
-all personalization reasoning itself (see planner.py, Phase 5). Tolerant + honest: a Tavily
-error or empty result never raises into the request path — it returns an empty list, recorded
-as an honest event, never a fabricated activity.
-"""
+"""Tavily activity-research adapter. Tolerant: errors/empty results return [], never fabricated."""
 
 import asyncio
 import logging

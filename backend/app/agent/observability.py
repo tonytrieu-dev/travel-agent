@@ -1,7 +1,5 @@
-"""Derives AgentRun/AgentRunStep rows from a real Pydantic AI message history + usage — the
-data the Agent Execution Panel renders. A transformation of real run data, never fabricated:
-a field that isn't in the history (e.g. a tool call with no matching return yet) is left null.
-"""
+"""Derives AgentRun/AgentRunStep rows from a real message history + usage — never fabricated;
+a missing field is left null."""
 
 import json
 
