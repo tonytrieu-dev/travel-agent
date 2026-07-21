@@ -1,1 +1,121 @@
-# travel-agent
+# Travel Agent
+
+An AI travel-planning agent: give it an origin, destination, dates, age, and fitness level, and
+it searches real flights, researches real activities, and builds a fitness-tailored day-by-day
+itinerary — asking clarifying questions instead of guessing when it's missing what it needs. A
+strict **human-in-the-loop** gate sits between any plan and any booking write: nothing books
+without an explicit confirm-then-execute click from a person.
+
+## What it does
+
+1. **Plan a trip** — origin/destination/dates are required; age and fitness are optional. If
+   they're missing, the agent asks rather than assumes.
+2. **Search real flights** — Google Flights results via SearchApi.io, cached by route+date to
+   protect a one-time search quota.
+3. **Get a real itinerary** — the agent researches activities via Tavily web search and returns
+   a day-by-day plan where every activity cites the real source URL it came from. No invented
+   activities, no fabricated data.
+4. **Book with a human in the loop** — request a booking, confirm it, then execute it, as three
+   separate explicit steps. The write only happens after the second confirmation; a 30-minute
+   price-staleness window expires stale requests automatically.
+5. **Watch the agent work** — an execution panel shows the run's tool calls, token usage,
+   context-budget utilization, and timing, live.
+
+## Stack
+
+- **Backend:** FastAPI, Pydantic AI, SQLModel/asyncpg, PostgreSQL 16, Alembic, DBOS (durable
+  workflow execution, reuses the same Postgres instance).
+- **LLM:** Gemini `gemini-3-flash-preview` (free tier, Google AI Studio).
+- **Flights:** SearchApi.io Google Flights (structured JSON, 100 free searches).
+- **Activities:** Tavily web search (1,000 free credits/month).
+- **Frontend:** React 19 + Vite + Tailwind CSS v4, TypeScript.
+- **Evals:** `pydantic-evals` — deterministic + LLM-judged scoring of agent quality, separate
+  from the pytest suite that gates system correctness.
+
+All three external services are free tier, no credit card required.
+
+## Running it
+
+### 1. Database
+
+Either Docker or a local Postgres install works.
+
+```bash
+# Docker
+docker compose up -d
+```
+
+or, if you'd rather run Postgres natively (e.g. via Homebrew on macOS), just make sure a
+`travel_agent` database exists and matches the `DATABASE_URL` you set in `.env` below.
+
+### 2. Environment
+
+```bash
+cp .env.example .env
+```
+
+Fill in `GEMINI_API_KEY`, `SEARCHAPI_API_KEY`, and `TAVILY_API_KEY` (links to get each one are
+in the file's comments). Adjust `DATABASE_URL` if you're not using the Docker default.
+
+### 3. Backend
+
+```bash
+cd backend
+uv sync
+uv run alembic upgrade head
+uv run uvicorn app.main:app --reload
+```
+
+Backend serves on `http://localhost:8000`; interactive docs at `/docs`.
+
+### 4. Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend serves on `http://localhost:5173` (already whitelisted by the backend's CORS config).
+
+### 5. Tests
+
+```bash
+cd backend
+uv run pytest -q
+uv run pyrefly check
+```
+
+### 6. Evals
+
+```bash
+cd backend
+uv run python -m evals.run --repeat 3
+```
+
+Scores the agent (not just the system) against a small dataset: does it ask when it's missing
+info, are itineraries fitness-appropriate, are all cited activities grounded in real search
+results. Runs against the real Gemini free tier, so it spends real (free) quota — mind the daily
+request cap on that tier before running repeatedly.
+
+## Key decisions
+
+- **HITL is a REST state machine, not an agent tool.** Booking moves through
+  `PENDING_USER_CONFIRMATION → CONFIRMED → EXECUTED` (or `CANCELLED`/`EXPIRED`) driven entirely
+  by explicit human clicks against `/bookings/*` routes. The agent can plan and search but never
+  writes a booking — this makes "a human must click before the write" a structural guarantee,
+  not a prompt-dependent one.
+- **Ask, don't assume.** The planner's output type is a union of `Itinerary | ClarificationOut`;
+  missing trip details produce real clarifying questions instead of a guessed itinerary.
+- **Real data only, honestly degraded.** Flight and activity adapters never fabricate results.
+  On a quota/rate-limit/empty response they return cached real data if available, or an honest
+  "unavailable" reason — never invented offers or activities.
+- **Durable execution via DBOS.** The planner and booking-execution flows are wrapped as DBOS
+  workflows so a crash mid-run resumes rather than silently losing state, reusing the same
+  Postgres instance (no extra infrastructure).
+- **Append-only audit trail enforced at the database.** Booking transitions and execution events
+  are protected by DB triggers that reject `UPDATE`/`DELETE`, not just application-level
+  convention.
+- **Rate limiting protects scarce third-party quota.** Per-IP request caps and a global
+  concurrency cap on `/plan` and `/flights/search` keep the app from burning through Gemini's
+  daily request limit or SearchApi's one-time search allotment.
