@@ -54,3 +54,24 @@ class BookingLogOut(BaseModel):
     executed_at: datetime | None = None
     created_at: datetime
     transitions: list[BookingTransitionOut] = []
+
+
+class ActivityOut(BaseModel):
+    name: str
+    description: str
+    intensity: str
+    source_url: str
+
+
+class ItineraryDayOut(BaseModel):
+    day_number: int
+    summary: str
+    activities: list[ActivityOut]
+
+
+class ItineraryOut(BaseModel):
+    days: list[ItineraryDayOut]
+
+
+class ClarificationOut(BaseModel):
+    questions: list[str]
