@@ -1,5 +1,5 @@
 """Phase 5's last piece: the agent run executes durably through DBOS, not as a bare coroutine.
-A ``TestModel`` swap keeps this fast/deterministic — real-Gemini behavior is already covered by
+A ``TestModel`` swap keeps this fast/deterministic — real-model behavior is already covered by
 manual verification; this guards the DBOS wiring itself (a plain call would raise before
 ``DBOS.launch()``, per the library's own contract)."""
 

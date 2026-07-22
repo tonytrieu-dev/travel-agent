@@ -1,6 +1,6 @@
 """Eval runner entry point.
 
-Run for real once the Gemini free-tier quota has reset:
+Run for real once the Groq quota has reset:
     uv run python -m evals.run --repeat 3
 """
 

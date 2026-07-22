@@ -77,7 +77,7 @@ class CitationGrounding(Evaluator[str, ItineraryOut | ClarificationOut, CaseMeta
 
 
 def build_fitness_appropriateness_judge() -> LLMJudge:
-    """An LLMJudge scoring itinerary/fitness fit, on the same Gemini model the agent runs on."""
+    """An LLMJudge scoring itinerary/fitness fit, on the same model the agent runs on."""
     settings = get_settings()
     judge_model = GroqModel(
         GROQ_MODEL, provider=GroqProvider(api_key=settings.groq_api_key.get_secret_value())

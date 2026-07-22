@@ -117,7 +117,7 @@ class FlightSearchSpy:
 
 @dataclass
 class PlannerRunSpy:
-    """Stands in for ``run_planner_durable`` so trip-planning tests never spend real Gemini
+    """Stands in for ``run_planner_durable`` so trip-planning tests never spend real Groq
     quota, and counts calls so an idempotent /plan can assert the agent ran at most once."""
 
     output: ItineraryOut | ClarificationOut = field(

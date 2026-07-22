@@ -12,6 +12,7 @@ from typing import Any
 from sqlalchemy import JSON, Column, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
+from app.config import GROQ_MODEL
 from app.state import BookingState
 
 
@@ -101,7 +102,7 @@ class FlightSearchResult(SQLModel, table=True):
 class Itinerary(SQLModel, table=True):
     __tablename__ = "itinerary"
     # One itinerary per trip: the DB blocks a concurrent second generation from burning a second
-    # Gemini run.
+    # LLM run.
     __table_args__ = (UniqueConstraint("trip_request_id", name="uq_itinerary_trip_request"),)
 
     id: int | None = Field(default=None, primary_key=True)
@@ -109,7 +110,7 @@ class Itinerary(SQLModel, table=True):
     # days: list of {day_number, summary, activities: [{name, description, intensity,
     # source_url}]} — every activity carries the Tavily source_url that grounds it.
     days: list[dict[str, Any]] = Field(sa_column=Column(JSON))
-    generated_by: str = Field(default="llama-3.3-70b-versatile")
+    generated_by: str = Field(default=GROQ_MODEL)
     created_at: datetime = Field(default_factory=utcnow)
 
 

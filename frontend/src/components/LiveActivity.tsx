@@ -8,7 +8,6 @@ interface LiveActivityProps {
 const STEP_LABELS: Record<string, string> = {
   search_flights: "Searching flights",
   web_search: "Researching activities",
-  model: "Reasoning",
 }
 
 function labelFor(name: string): string {

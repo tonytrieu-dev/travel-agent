@@ -1,5 +1,5 @@
 """Rate limiting for the two quota-spending routes (/plan, /flights/search): a per-IP request
-cap, and a global concurrency cap on real Gemini calls specifically.
+cap, and a global concurrency cap on real LLM calls specifically.
 """
 
 import asyncio
@@ -46,7 +46,7 @@ async def enforce_request_rate_limit(request: Request) -> None:
 
 async def acquire_agent_run_slot() -> None:
     """Non-blocking: an already-full concurrency cap rejects immediately (429) instead of
-    queuing the request behind an indefinite wait for a real Gemini call.
+    queuing the request behind an indefinite wait for a real LLM call.
 
     A plain lock-guarded counter, not asyncio.Semaphore: ``asyncio.wait_for(sem.acquire(),
     timeout=0)`` is a known asyncio footgun — the zero-timeout callback can fire before the
