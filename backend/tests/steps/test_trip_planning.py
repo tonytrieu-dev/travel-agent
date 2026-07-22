@@ -33,6 +33,8 @@ def _trip_payload(**overrides: object) -> dict:
         "destination": "Paris",
         "destination_airport": "CDG",
         "depart_date": "2026-08-01",
+        "age": 30,
+        "fitness_level": "moderate",
     }
     payload.update(overrides)
     return payload
@@ -51,6 +53,14 @@ def _past_depart_date(bag: dict) -> None:
 @given("a trip request whose return date is before its depart date")
 def _return_before_depart(bag: dict) -> None:
     bag["payload"] = _trip_payload(depart_date="2026-09-10", return_date="2026-09-01")
+
+
+@given("a trip request missing age and fitness level")
+def _missing_age_and_fitness(bag: dict) -> None:
+    payload = _trip_payload()
+    del payload["age"]
+    del payload["fitness_level"]
+    bag["payload"] = payload
 
 
 @when("the trip is created")

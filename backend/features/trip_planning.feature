@@ -17,6 +17,11 @@ Feature: Trip planning — create, update, search flights, and generate an itine
     When the trip is created
     Then the response is 422 with error code "validation_error"
 
+  Scenario: A trip cannot be created without age or fitness level
+    Given a trip request missing age and fitness level
+    When the trip is created
+    Then the response is 422 with error code "validation_error"
+
   Scenario: Updating a trip's budget leaves its dates unchanged
     Given an existing trip
     When the trip is updated with only a new budget

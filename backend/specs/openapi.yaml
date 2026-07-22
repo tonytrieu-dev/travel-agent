@@ -331,18 +331,15 @@ components:
 
     TripRequestCreate:
       type: object
-      required: [origin, destination, destination_airport, depart_date]
+      required: [origin, destination, destination_airport, depart_date, age, fitness_level]
       properties:
         origin: { type: string, description: 'IATA code, e.g. JFK' }
         destination: { type: string, description: Free-text place name used for activity research }
         destination_airport: { type: string, description: 'IATA code for the flight search' }
         depart_date: { type: string, format: date }
         return_date: { type: [string, 'null'], format: date }
-        age: { type: [integer, 'null'] }
-        fitness_level:
-          oneOf:
-            - { $ref: '#/components/schemas/FitnessLevel' }
-            - type: 'null'
+        age: { type: integer }
+        fitness_level: { $ref: '#/components/schemas/FitnessLevel' }
         budget_usd: { type: [number, 'null'] }
 
     TripRequestUpdate:

@@ -104,8 +104,8 @@ class TripRequestCreate(BaseModel):
     destination_airport: str
     depart_date: str
     return_date: str | None = None
-    age: int | None = None
-    fitness_level: FitnessLevel | None = None
+    age: int
+    fitness_level: FitnessLevel
     budget_usd: float | None = None
 
     @model_validator(mode="after")

@@ -8,8 +8,8 @@ without an explicit confirm-then-execute click from a person.
 
 ## What it does
 
-1. **Plan a trip** — origin/destination/dates are required; age and fitness are optional. If
-   they're missing, the agent asks rather than assumes.
+1. **Plan a trip** — origin, destination, dates, age, and fitness level are all required at
+   intake, so the agent always has what it needs to pace the itinerary and never has to ask.
 2. **Search real flights** — Google Flights results via SearchApi.io, cached by route+date to
    protect a one-time search quota.
 3. **Get a real itinerary** — the agent researches activities via Tavily web search and returns
