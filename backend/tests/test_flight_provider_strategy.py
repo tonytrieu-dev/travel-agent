@@ -31,7 +31,39 @@ async def test_live_provider_booking_options_error_includes_the_upstream_respons
     provider = LiveSearchApiProvider(api_key="test-key")
 
     with pytest.raises(RuntimeError, match="booking_token has expired"):
-        await provider.fetch_booking_options("some-token")
+        await provider.fetch_booking_options(
+            "some-token", departure_id="JFK", arrival_id="CDG", outbound_date="2026-08-15"
+        )
+
+
+async def test_live_provider_booking_options_sends_route_and_date_params(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression guard: SearchApi's booking-options engine 400s "Missing required parameter
+    departure_id" when only booking_token is sent (observed against the live API during a demo).
+    departure_id/arrival_id/outbound_date must be forwarded too. Fails red if they're dropped."""
+    captured_params: dict[str, object] = {}
+
+    async def _fake_get(self, url, params=None, headers=None) -> httpx.Response:
+        captured_params.update(params or {})
+        return httpx.Response(200, json={"booking_options": []})
+
+    monkeypatch.setattr(httpx.AsyncClient, "get", _fake_get)
+    provider = LiveSearchApiProvider(api_key="test-key")
+
+    await provider.fetch_booking_options(
+        "tok-123", departure_id="JFK", arrival_id="CDG", outbound_date="2026-08-15"
+    )
+
+    assert captured_params.get("departure_id") == "JFK", (
+        f"fetch_booking_options must forward departure_id to SearchApi, got params={captured_params}"
+    )
+    assert captured_params.get("arrival_id") == "CDG", (
+        f"fetch_booking_options must forward arrival_id to SearchApi, got params={captured_params}"
+    )
+    assert captured_params.get("outbound_date") == "2026-08-15", (
+        f"fetch_booking_options must forward outbound_date to SearchApi, got params={captured_params}"
+    )
 
 
 async def test_live_provider_search_offers_unavailable_reason_includes_the_upstream_response_body(

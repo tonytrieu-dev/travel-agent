@@ -94,6 +94,22 @@ def _provider_never_called(booking_options_spy: BookingOptionsFetchSpy) -> None:
     )
 
 
+@then("the booking-options provider receives the flight's route and outbound date")
+def _provider_receives_route_and_date(booking_options_spy: BookingOptionsFetchSpy) -> None:
+    """Regression guard: SearchApi's booking-options engine 400s "Missing required parameter
+    departure_id" when the DBOS step forwards only booking_token — these must be pulled from
+    the booked flight's raw_offer, not dropped on the way from _fetch_booking_options_step."""
+    assert booking_options_spy.last_call_params == {
+        "booking_token": "tok-abc",
+        "departure_id": "JFK",
+        "arrival_id": "CDG",
+        "outbound_date": "2026-08-01",
+    }, (
+        f"expected departure_id/arrival_id/outbound_date derived from the seeded flight's "
+        f"raw_offer, got {booking_options_spy.last_call_params}"
+    )
+
+
 @then("the booking ends EXECUTED with exactly one transition into EXECUTED")
 def _one_executed_transition(log_id: int) -> None:
     booking = run_db(lambda session: get_booking(session, log_id))

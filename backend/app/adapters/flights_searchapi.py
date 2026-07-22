@@ -45,7 +45,9 @@ class FlightProvider(Protocol):
         return_date: str | None,
     ) -> FlightSearchOutcome: ...
 
-    async def fetch_booking_options(self, booking_token: str) -> list[dict[str, Any]]: ...
+    async def fetch_booking_options(
+        self, booking_token: str, *, departure_id: str, arrival_id: str, outbound_date: str
+    ) -> list[dict[str, Any]]: ...
 
 
 def cache_key(
@@ -156,8 +158,17 @@ class LiveSearchApiProvider:
             )
         return FlightSearchOutcome(offers=offers)
 
-    async def fetch_booking_options(self, booking_token: str) -> list[dict[str, Any]]:
-        params = {"engine": "google_flights", "booking_token": booking_token, "currency": "USD"}
+    async def fetch_booking_options(
+        self, booking_token: str, *, departure_id: str, arrival_id: str, outbound_date: str
+    ) -> list[dict[str, Any]]:
+        params = {
+            "engine": "google_flights",
+            "booking_token": booking_token,
+            "departure_id": departure_id,
+            "arrival_id": arrival_id,
+            "outbound_date": outbound_date,
+            "currency": "USD",
+        }
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
                 response = await client.get(
@@ -209,7 +220,9 @@ class RecordedProvider:
             )
         return FlightSearchOutcome(offers=offers)
 
-    async def fetch_booking_options(self, booking_token: str) -> list[dict[str, Any]]:
+    async def fetch_booking_options(
+        self, booking_token: str, *, departure_id: str, arrival_id: str, outbound_date: str
+    ) -> list[dict[str, Any]]:
         cassette_path = self._cassette_path(f"booking_{booking_token}")
         if not cassette_path.exists():
             raise RuntimeError(f"no recorded booking-options cassette at {cassette_path}")

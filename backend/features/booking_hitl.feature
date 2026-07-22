@@ -8,6 +8,7 @@ Feature: Human-in-the-loop booking gate
     When execute is called twice concurrently
     Then both execute responses return 200 with the same booking reference
     And the booking-options provider is called exactly once
+    And the booking-options provider receives the flight's route and outbound date
     And the booking ends EXECUTED with exactly one transition into EXECUTED
 
   Scenario: Execute is rejected before the human confirms

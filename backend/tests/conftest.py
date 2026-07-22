@@ -75,9 +75,18 @@ class BookingOptionsFetchSpy:
     )
     calls: int = 0
     should_fail: bool = False
+    last_call_params: dict[str, str] | None = None
 
-    async def fetch_booking_options(self, booking_token: str) -> list[dict]:
+    async def fetch_booking_options(
+        self, booking_token: str, *, departure_id: str, arrival_id: str, outbound_date: str
+    ) -> list[dict]:
         self.calls += 1
+        self.last_call_params = {
+            "booking_token": booking_token,
+            "departure_id": departure_id,
+            "arrival_id": arrival_id,
+            "outbound_date": outbound_date,
+        }
         if self.should_fail:
             raise RuntimeError("simulated upstream failure")
         return self.options
@@ -111,7 +120,9 @@ class FlightSearchSpy:
         self.calls += 1
         return FlightSearchOutcome(offers=self.offers)
 
-    async def fetch_booking_options(self, booking_token: str) -> list[dict]:
+    async def fetch_booking_options(
+        self, booking_token: str, *, departure_id: str, arrival_id: str, outbound_date: str
+    ) -> list[dict]:
         raise NotImplementedError("FlightSearchSpy only stands in for search_offers")
 
 

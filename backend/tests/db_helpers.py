@@ -80,7 +80,14 @@ async def seed_booking(
         arrive_at="2026-08-01T21:30:00",
         stops=0,
         booking_token="tok-abc",
-        raw_offer={"price": 512.0},
+        raw_offer={
+            "flights": [
+                {
+                    "departure_airport": {"id": "JFK", "date": "2026-08-01", "time": "09:00"},
+                    "arrival_airport": {"id": "CDG", "date": "2026-08-01", "time": "21:30"},
+                }
+            ]
+        },
     )
     session.add(flight)
     await session.flush()

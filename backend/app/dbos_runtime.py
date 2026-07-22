@@ -33,7 +33,13 @@ def shutdown_dbos() -> None:
 @DBOS.step(name="fetch_booking_options")
 async def _fetch_booking_options_step(flight: FlightSearchResult) -> list[dict]:
     provider = get_flight_provider(get_settings())
-    return await provider.fetch_booking_options(flight.booking_token)
+    flights = flight.raw_offer["flights"]
+    return await provider.fetch_booking_options(
+        flight.booking_token,
+        departure_id=flights[0]["departure_airport"]["id"],
+        arrival_id=flights[-1]["arrival_airport"]["id"],
+        outbound_date=flights[0]["departure_airport"]["date"],
+    )
 
 
 @DBOS.workflow(name="execute_booking")
