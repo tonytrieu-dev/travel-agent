@@ -111,6 +111,8 @@ class LiveSearchApiProvider:
         }
         if return_date:
             params["return_date"] = return_date
+        else:
+            params["type"] = "2"  # one-way; SearchApi defaults to round-trip and 400s without return_date
 
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:

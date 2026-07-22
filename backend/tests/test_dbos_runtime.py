@@ -31,7 +31,9 @@ async def _seed_trip_id() -> int:
 async def test_run_planner_durable_executes_the_agent_through_a_dbos_workflow(client) -> None:
     trip_id = await _seed_trip_id()
 
-    with planner_agent.override(model=TestModel(call_tools=[])):
+    # Empty itinerary: this test guards DBOS wiring, not grounding, so give the output validator
+    # nothing to ground (a dummy itinerary with activities would trip reject_ungrounded_itinerary).
+    with planner_agent.override(model=TestModel(call_tools=[], custom_output_args={"days": []})):
         output = await run_planner_durable(trip_id, "Plan me a trip to Paris.")
 
     assert isinstance(output, ItineraryOut | ClarificationOut), (
@@ -44,7 +46,9 @@ async def test_run_planner_durable_persists_a_real_agent_run_for_the_panel(clien
     (tokens + model from the actual run), not just return output with no observability trail."""
     trip_id = await _seed_trip_id()
 
-    with planner_agent.override(model=TestModel(call_tools=[])):
+    # Empty itinerary: this test guards DBOS wiring, not grounding, so give the output validator
+    # nothing to ground (a dummy itinerary with activities would trip reject_ungrounded_itinerary).
+    with planner_agent.override(model=TestModel(call_tools=[], custom_output_args={"days": []})):
         await run_planner_durable(trip_id, "Plan me a trip to Paris.")
 
     engine = create_async_engine(TEST_DATABASE_URL)

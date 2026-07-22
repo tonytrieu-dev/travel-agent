@@ -11,25 +11,25 @@ from pathlib import Path
 from pydantic import SecretStr, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Groq free tier: 1K req/day, 12K tokens/min. Alternatives: openai/gpt-oss-120b (smarter, tighter
-# token/min), llama-3.1-8b-instant (14.4K req/day, weaker reasoning).
-GROQ_MODEL = "llama-3.3-70b-versatile"
+# Groq free tier: 1K req/day. gpt-oss-120b does clean JSON tool-calls (llama-3.3-70b intermittently
+# emits its native <function=...> text format, which pydantic-ai can't parse). Alternative:
+# llama-3.1-8b-instant (14.4K req/day, weaker reasoning).
+GROQ_MODEL = "openai/gpt-oss-120b"
 
 SEARCHAPI_BASE_URL = "https://www.searchapi.io/api/v1/search"
 
 # RecordedProvider replays real-captured payloads from here; never hand-fabricated.
 FLIGHT_CASSETTE_DIR = Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "recorded" / "flights"
 
-# Agent guardrails. We self-impose a context budget far below the model's real 1M window so
-# runs never approach the region where answer quality degrades, and a hard tool-call ceiling
-# so the ReAct loop cannot spin forever.
+# Agent guardrails: a per-run cumulative token budget and a tool-call ceiling so the ReAct loop
+# can't spin forever. Kept well under the model's ~131K window and Groq's 8K tokens/min throttle.
 MAX_TOOL_STEPS = 8
-MAX_CONTEXT_TOKENS = 100_000
+MAX_CONTEXT_TOKENS = 30_000
 MAX_REQUESTS_PER_RUN = MAX_TOOL_STEPS + 3
 
-# A single tool result is truncated to this many characters before it enters the message
-# history, so one oversized web page cannot flood the context window ("clamp at the door").
-MAX_TOOL_RESULT_CHARS = 6_000
+# A single web result is truncated to this many characters before it enters the message history,
+# so several results can't blow the model's per-minute token budget (Groq free tier: 8K/min).
+MAX_TOOL_RESULT_CHARS = 1_500
 
 # A flight offer is only bookable for a short window because airfares are volatile. After this,
 # the booking is marked EXPIRED and the user must re-search rather than book a stale price.

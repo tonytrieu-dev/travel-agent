@@ -25,10 +25,11 @@ without an explicit confirm-then-execute click from a person.
 
 - **Backend:** FastAPI, Pydantic AI, SQLModel/asyncpg, PostgreSQL 16, Alembic, DBOS (durable
   workflow execution, reuses the same Postgres instance).
-- **LLM:** Gemini `gemini-3-flash-preview` (free tier, Google AI Studio).
+- **LLM:** Groq `openai/gpt-oss-120b` (free tier, 1,000 requests/day) via Pydantic AI.
 - **Flights:** SearchApi.io Google Flights (structured JSON, 100 free searches).
 - **Activities:** Tavily web search (1,000 free credits/month).
-- **Frontend:** React 19 + Vite + Tailwind CSS v4, TypeScript.
+- **Frontend:** React 19 + Vite + Tailwind CSS v4, TypeScript. Sidebar layout with three tabs
+  (trip form, chat, agent-execution) and a live tool-call view during a run.
 - **Evals:** `pydantic-evals` — deterministic + LLM-judged scoring of agent quality, separate
   from the pytest suite that gates system correctness.
 
@@ -54,7 +55,7 @@ or, if you'd rather run Postgres natively (e.g. via Homebrew on macOS), just mak
 cp .env.example .env
 ```
 
-Fill in `GEMINI_API_KEY`, `SEARCHAPI_API_KEY`, and `TAVILY_API_KEY` (links to get each one are
+Fill in `GROQ_API_KEY`, `SEARCHAPI_API_KEY`, and `TAVILY_API_KEY` (links to get each one are
 in the file's comments). Adjust `DATABASE_URL` if you're not using the Docker default.
 
 ### 3. Backend
@@ -95,7 +96,7 @@ uv run python -m evals.run --repeat 3
 
 Scores the agent (not just the system) against a small dataset: does it ask when it's missing
 info, are itineraries fitness-appropriate, are all cited activities grounded in real search
-results. Runs against the real Gemini free tier, so it spends real (free) quota — mind the daily
+results. Runs against the real Groq free tier, so it spends real (free) quota — mind the daily
 request cap on that tier before running repeatedly.
 
 ## Key decisions
@@ -117,5 +118,5 @@ request cap on that tier before running repeatedly.
   are protected by DB triggers that reject `UPDATE`/`DELETE`, not just application-level
   convention.
 - **Rate limiting protects scarce third-party quota.** Per-IP request caps and a global
-  concurrency cap on `/plan` and `/flights/search` keep the app from burning through Gemini's
+  concurrency cap on `/plan` and `/flights/search` keep the app from burning through Groq's
   daily request limit or SearchApi's one-time search allotment.

@@ -2,9 +2,10 @@
 
 import re
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 
 from pydantic_ai import Agent, ModelRetry, RunContext
+from pydantic_ai.messages import ModelMessage, ToolReturnPart
 from pydantic_ai.models.groq import GroqModel
 from pydantic_ai.providers.groq import GroqProvider
 from pydantic_ai.usage import UsageLimits
@@ -68,7 +69,19 @@ async def search_flights(
         duration_ms,
     )
     return {
-        "offers": [asdict(offer) for offer in outcome.offers],
+        # Only the fields the model reasons over — not raw_offer/booking_token, which are bulky,
+        # internal (DB + booking use them), and would flood the model's per-minute token budget.
+        "offers": [
+            {
+                "carrier": offer.carrier,
+                "price_usd": offer.price_usd,
+                "currency": offer.currency,
+                "depart_at": offer.depart_at,
+                "arrive_at": offer.arrive_at,
+                "stops": offer.stops,
+            }
+            for offer in outcome.offers
+        ],
         "unavailable_reason": outcome.unavailable_reason,
     }
 
@@ -114,3 +127,43 @@ def _build_agent() -> Agent[PlannerDeps, ItineraryOut | ClarificationOut]:
 
 
 agent = _build_agent()
+
+
+def _web_search_urls(messages: list[ModelMessage]) -> set[str]:
+    urls: set[str] = set()
+    for message in messages:
+        for part in message.parts:
+            if not isinstance(part, ToolReturnPart) or part.tool_name != "web_search":
+                continue
+            if isinstance(part.content, list):
+                urls.update(
+                    result["url"]
+                    for result in part.content
+                    if isinstance(result, dict) and result.get("url")
+                )
+    return urls
+
+
+@agent.output_validator
+def reject_ungrounded_itinerary(
+    ctx: RunContext[PlannerDeps], output: ItineraryOut | ClarificationOut
+) -> ItineraryOut | ClarificationOut:
+    """Every activity's source_url must be a URL web_search actually returned this run — the
+    structural enforcement of "never fabricate an activity" (the prompt alone doesn't hold)."""
+    if not isinstance(output, ItineraryOut):
+        return output
+    grounded = _web_search_urls(ctx.messages)
+    ungrounded = [
+        activity.source_url
+        for day in output.days
+        for activity in day.activities
+        if activity.source_url not in grounded
+    ]
+    if ungrounded:
+        raise ModelRetry(
+            f"{len(ungrounded)} activity source_url(s) were not returned by web_search: "
+            f"{ungrounded}. Call web_search to research real activities for this destination, then "
+            "set every activity's source_url to a URL web_search actually returned. Never invent "
+            "an activity or a URL, and never use a flight search as an activity."
+        )
+    return output

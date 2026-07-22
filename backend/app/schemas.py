@@ -4,14 +4,20 @@ These mirror the authored contract in specs/openapi.yaml; test_openapi_contract 
 runtime schema FastAPI generates from them stays in sync with that file.
 """
 
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, model_validator
 
 from app.models import AgentStepKind, ExecutionEventKind, FitnessLevel, TripStatus
 from app.state import BookingState
+
+# Server timestamps are stored naive-UTC; serialize them with a +00:00 offset so a client doesn't
+# misread them as local time (which skewed the booking countdown by the viewer's UTC offset).
+UtcDatetime = Annotated[
+    datetime, PlainSerializer(lambda value: value.replace(tzinfo=UTC).isoformat(), return_type=str)
+]
 
 
 class ErrorCode(StrEnum):
@@ -52,7 +58,7 @@ class BookingTransitionOut(BaseModel):
     to_state: BookingState
     reason: str
     actor_user_id: int | None = None
-    created_at: datetime
+    created_at: UtcDatetime
 
 
 class BookingLogOut(BaseModel):
@@ -64,10 +70,10 @@ class BookingLogOut(BaseModel):
     state: BookingState
     booking_reference: str | None = None
     booking_options: list[dict[str, Any]] | None = None
-    expires_at: datetime
-    confirmed_at: datetime | None = None
-    executed_at: datetime | None = None
-    created_at: datetime
+    expires_at: UtcDatetime
+    confirmed_at: UtcDatetime | None = None
+    executed_at: UtcDatetime | None = None
+    created_at: UtcDatetime
     transitions: list[BookingTransitionOut] = []
 
 
@@ -133,7 +139,7 @@ class TripRequestOut(BaseModel):
     fitness_level: FitnessLevel | None = None
     budget_usd: float | None = None
     status: TripStatus
-    created_at: datetime
+    created_at: UtcDatetime
 
 
 class FlightOfferOut(BaseModel):
@@ -192,8 +198,8 @@ class AgentRunOut(BaseModel):
     total_input_tokens: int
     total_output_tokens: int
     total_ms: int
-    started_at: datetime
-    finished_at: datetime | None = None
+    started_at: UtcDatetime
+    finished_at: UtcDatetime | None = None
     steps: list[AgentRunStepOut] = []
 
 
@@ -206,7 +212,7 @@ class ExecutionEventOut(BaseModel):
     status: str
     detail: str
     duration_ms: int | None = None
-    created_at: datetime
+    created_at: UtcDatetime
 
 
 class ExecutionPanelOut(BaseModel):
