@@ -117,7 +117,7 @@ paths:
         '429':
           description: >-
             Per-IP rate limit exceeded, or the global concurrent-agent-run cap is full (both
-            protect the scarce Gemini quota).
+            protect the scarce Groq quota).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetail' }

@@ -12,7 +12,7 @@ flowchart LR
     Agent -->|web_search| Tavily[TavilyActivityProvider]
     Flights --> SearchApi[(SearchApi.io)]
     Tavily --> TavilyAPI[(Tavily API)]
-    Agent --> Groq[(Groq llama-3.3-70b-versatile)]
+    Agent --> Groq[(Groq openai/gpt-oss-120b)]
     Agent -.->|run_planner_durable| DBOS[DBOS workflow]
     Repo -.->|execute_booking_durable| DBOS
     DBOS --> DB
@@ -27,7 +27,7 @@ over REST; there is no server-rendered coupling between them.
 
 | API | Role | Adapter |
 |---|---|---|
-| Groq (`llama-3.3-70b-versatile`) | The planner LLM — reasoning, tool selection, structured output. | Pydantic AI `GroqModel`/`GroqProvider` in `planner.py`. |
+| Groq (`openai/gpt-oss-120b`) | The planner LLM — reasoning, tool selection, structured output. | Pydantic AI `GroqModel`/`GroqProvider` in `planner.py`. |
 | SearchApi.io Google Flights | Real flight offers + booking options. | `flights_searchapi.py` (Live vs Recorded strategy). |
 | Tavily | Real, source-attributed activity research. | `activities_tavily.py`. |
 

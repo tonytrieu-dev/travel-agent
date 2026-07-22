@@ -10,9 +10,20 @@ confirmed first" a prompt-dependent hope; a state machine outside the agent make
 the agent has no tool that can move booking state.
 
 ## Agent output is a union: `Itinerary | ClarificationOut`
-Missing age/fitness produces real clarifying questions, not a guessed itinerary. **Alternative:**
-always return an itinerary and let the prompt beg the model to ask. **Rejected** — "ask, don't
-assume" as a type is enforced by validation; as prose it's optional.
+A genuinely ambiguous input (e.g. a destination name that could mean more than one place) produces
+real clarifying questions, not a guessed itinerary. **Alternative:** always return an itinerary and
+let the prompt beg the model to ask. **Rejected** — "ask, don't assume" as a type is enforced by
+validation; as prose it's optional. Age/fitness level used to be the main trigger for this path
+until they became mandatory at trip intake (see the "mandatory intake fields" note below) — the
+union stays for whatever's still genuinely ambiguous.
+
+## Age and fitness level are mandatory intake fields
+`TripRequestCreate.age`/`.fitness_level` are required, not optional-then-clarified. **Alternative:**
+keep them optional and let the agent's `ClarificationOut` path ask when missing (the original
+design). **Rejected** — every itinerary needs them to pace activities, so the clarify-then-resubmit
+round trip was guaranteed on nearly every real trip; validating at intake removes that round trip
+entirely instead of just making it reliable. Scoped to the API boundary only: `TripRequest.age`/
+`.fitness_level` stay nullable in the DB so existing incomplete rows keep reading fine.
 
 ## Two read-only tools + a fail-closed tool gate
 Only `search_flights` and `web_search`, both `READ_ONLY`. Registration requires a classification;
@@ -41,15 +52,20 @@ acquire uses a lock-guarded counter, not `asyncio.wait_for(sem.acquire(), timeou
 spuriously time out even uncontended.
 
 ## Groq over Gemini
-`llama-3.3-70b-versatile`: 1,000 requests/day vs Gemini free tier's 20, with strong tool-calling
-and the highest per-minute token headroom of Groq's capable models. Swap the model in
-`config.py::GROQ_MODEL`.
+Groq's free tier: 1,000 requests/day vs Gemini's 20. Model within Groq: `openai/gpt-oss-120b`, not
+the initially-chosen `llama-3.3-70b-versatile`. **Rejected llama-3.3-70b** — observed live, it
+intermittently emitted its native `<function=...>` text format instead of a JSON tool call, which
+pydantic-ai can't parse and crashes with "Exceeded maximum output retries." `gpt-oss-120b` parses
+cleanly. Swap the model in `config.py::GROQ_MODEL`.
 
 ## Real data only, honest degradation
 Adapters never fabricate. On quota/rate-limit/empty they return cached real data if present, or an
-honest `unavailable_reason` — never an invented offer or activity. Booking-options for round-trip
-fares (which need a second SearchApi call to resolve a `departure_token`) currently fail honestly
-rather than spend the one-time search quota on a feature beyond the assignment's "strong plus."
+honest `unavailable_reason` — never an invented offer or activity. One-way booking-options fetches
+(`departure_id`/`arrival_id`/`outbound_date` forwarded alongside `booking_token`, all derived from
+the flight's stored `raw_offer`) work end-to-end. Round-trip fares still fail honestly — resolving
+their `departure_token` into a real `booking_token` needs a second SearchApi call, which stays
+deferred rather than spend the one-time search quota on a feature beyond the assignment's "strong
+plus."
 
 ## Deferred by design
 Episodic/semantic/procedural agent memory, full auth (only `get_current_user` changes), and
