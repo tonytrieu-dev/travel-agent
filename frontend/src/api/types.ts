@@ -33,8 +33,8 @@ export interface TripRequestCreate {
   destination_airport: string
   depart_date: string
   return_date?: string | null
-  age?: number | null
-  fitness_level?: FitnessLevel | null
+  age: number
+  fitness_level: FitnessLevel
   budget_usd?: number | null
 }
 

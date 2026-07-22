@@ -28,8 +28,8 @@ without an explicit confirm-then-execute click from a person.
 - **LLM:** Groq `openai/gpt-oss-120b` (free tier, 1,000 requests/day) via Pydantic AI.
 - **Flights:** SearchApi.io Google Flights (structured JSON, 100 free searches).
 - **Activities:** Tavily web search (1,000 free credits/month).
-- **Frontend:** React 19 + Vite + Tailwind CSS v4, TypeScript. Sidebar layout with three tabs
-  (trip form, chat, agent-execution) and a live tool-call view during a run.
+- **Frontend:** React 19 + Vite + Tailwind CSS v4, TypeScript. A structured trip form drives the
+  agent; a sidebar streams its tool calls live, no tab click needed.
 - **Evals:** `pydantic-evals` — deterministic + LLM-judged scoring of agent quality, separate
   from the pytest suite that gates system correctness.
 
