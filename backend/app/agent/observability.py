@@ -93,8 +93,6 @@ async def persist_agent_run(
     model: str,
     message_history: list[ModelMessage],
     usage: RunUsage,
-    dbos_workflow_id: str | None = None,
-    status: str = "completed",
 ) -> AgentRun:
     """Persist the derived AgentRun + its ordered AgentRunStep rows in one transaction."""
     steps = derive_steps(message_history)
@@ -105,8 +103,7 @@ async def persist_agent_run(
 
     agent_run = AgentRun(
         trip_request_id=trip_request_id,
-        dbos_workflow_id=dbos_workflow_id,
-        status=status,
+        status="completed",
         model=model,
         total_input_tokens=usage.input_tokens,
         total_output_tokens=usage.output_tokens,

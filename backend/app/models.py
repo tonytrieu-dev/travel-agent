@@ -12,7 +12,6 @@ from typing import Any
 from sqlalchemy import JSON, Column, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
-from app.config import GROQ_MODEL
 from app.state import BookingState
 
 
@@ -60,7 +59,6 @@ class User(SQLModel, table=True):
     # Nullable so a right-to-erasure request can null the email (anonymize) while leaving the
     # append-only audit rows, which reference user_id only, fully intact.
     email: str | None = Field(default=None, unique=True, index=True)
-    is_anonymized: bool = Field(default=False)
     created_at: datetime = Field(default_factory=utcnow)
 
 
@@ -110,7 +108,6 @@ class Itinerary(SQLModel, table=True):
     # days: list of {day_number, summary, activities: [{name, description, intensity,
     # source_url}]} — every activity carries the Tavily source_url that grounds it.
     days: list[dict[str, Any]] = Field(sa_column=Column(JSON))
-    generated_by: str = Field(default=GROQ_MODEL)
     created_at: datetime = Field(default_factory=utcnow)
 
 
@@ -179,7 +176,6 @@ class AgentRun(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     trip_request_id: int = Field(foreign_key="trip_request.id", index=True)
-    dbos_workflow_id: str | None = None
     status: str
     model: str
     total_input_tokens: int = 0

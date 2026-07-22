@@ -72,7 +72,6 @@ class Settings(BaseSettings):
 
     use_live_flight_api: bool = True
     frontend_origin: str = "http://localhost:5173"
-    logfire_token: SecretStr | None = None
 
     @computed_field
     @property

@@ -47,10 +47,5 @@ ALLOWED_TRANSITIONS: dict[BookingState, set[BookingState]] = {
     BookingState.EXPIRED: set(),  # terminal
 }
 
-TERMINAL_STATES = frozenset(
-    state for state, successors in ALLOWED_TRANSITIONS.items() if not successors
-)
-
-
 def is_transition_allowed(from_state: BookingState, to_state: BookingState) -> bool:
     return to_state in ALLOWED_TRANSITIONS[from_state]
