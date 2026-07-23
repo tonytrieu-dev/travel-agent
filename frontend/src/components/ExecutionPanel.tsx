@@ -1,8 +1,129 @@
 import { useTripExecution } from "../hooks/useTripExecution"
+import type { AgentRunOut, AgentRunStepOut } from "../api/types"
 
 interface ExecutionPanelProps {
   tripId: number
   isRunActive: boolean
+}
+
+const STEP_KIND_STYLES: Record<string, string> = {
+  model: "bg-slate-100 text-slate-700",
+  tool: "bg-indigo-100 text-indigo-700",
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  ok: "Successful",
+  completed: "Completed",
+  failed: "Failed",
+  no_result: "No result",
+  unavailable: "Unavailable",
+}
+
+function statusLabel(status: string): string {
+  return STATUS_LABELS[status] ?? status
+}
+
+function statusStyles(status: string): string {
+  if (status === "ok" || status === "completed") return "bg-emerald-100 text-emerald-700"
+  if (status === "failed") return "bg-red-100 text-red-700"
+  if (status === "no_result" || status === "unavailable") return "bg-amber-100 text-amber-700"
+  return "bg-slate-100 text-slate-700"
+}
+
+function countByKind(steps: AgentRunStepOut[], kind: string): number {
+  return steps.filter((step) => step.kind === kind).length
+}
+
+function MetricTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg bg-slate-50 p-3">
+      <p className="text-xs uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="font-medium text-slate-900">{value}</p>
+    </div>
+  )
+}
+
+function AgentRunCard({ run }: { run: AgentRunOut }) {
+  return (
+    <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="font-semibold text-slate-900">Run #{run.id}</p>
+          <p className="text-xs text-slate-500">{new Date(run.started_at).toLocaleString()}</p>
+        </div>
+        <span
+          className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusStyles(run.status)}`}
+        >
+          {statusLabel(run.status)}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+        <MetricTile label="Model" value={run.model} />
+        <MetricTile label="Tool calls" value={String(countByKind(run.steps, "tool"))} />
+        <MetricTile label="Model calls" value={String(countByKind(run.steps, "model"))} />
+        <MetricTile label="Total time" value={`${run.total_ms} ms`} />
+        <MetricTile
+          label="Tokens in / out"
+          value={`${run.total_input_tokens} / ${run.total_output_tokens}`}
+        />
+        <MetricTile
+          label="Budget used"
+          value={run.budget_utilization_pct != null ? `${run.budget_utilization_pct.toFixed(1)}%` : "—"}
+        />
+        <MetricTile
+          label="Est. cost"
+          value={run.estimated_cost_usd != null ? `$${run.estimated_cost_usd.toFixed(4)}` : "—"}
+        />
+        <MetricTile label="Total steps" value={String(run.steps.length)} />
+      </div>
+
+      <div>
+        <h4 className="text-sm font-semibold text-slate-900">Steps</h4>
+        <ol className="mt-2 space-y-2">
+          {run.steps.map((step) => (
+            <li key={step.seq} className="rounded-lg border border-slate-200 bg-white p-2 text-sm">
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400">{step.seq}.</span>
+                  <span
+                    className={`rounded px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide ${
+                      STEP_KIND_STYLES[step.kind] ?? "bg-slate-100 text-slate-700"
+                    }`}
+                  >
+                    {step.kind}
+                  </span>
+                  <span className="font-medium text-slate-900">{step.name}</span>
+                </span>
+                <span
+                  className={`rounded px-1.5 py-0.5 text-xs font-medium ${statusStyles(step.status)}`}
+                >
+                  {statusLabel(step.status)}
+                </span>
+              </div>
+              {(step.duration_ms != null || step.tokens != null) && (
+                <p className="mt-1 text-xs text-slate-500">
+                  {step.duration_ms != null && `${step.duration_ms} ms`}
+                  {step.duration_ms != null && step.tokens != null && " · "}
+                  {step.tokens != null && `${step.tokens} tokens`}
+                </p>
+              )}
+              {step.input_summary && (
+                <pre className="mt-1 overflow-x-auto rounded bg-slate-50 p-2 text-xs whitespace-pre-wrap text-slate-600">
+                  {step.input_summary}
+                </pre>
+              )}
+              {step.output_summary && (
+                <pre className="mt-1 overflow-x-auto rounded bg-slate-50 p-2 text-xs whitespace-pre-wrap text-slate-600">
+                  {step.output_summary}
+                </pre>
+              )}
+            </li>
+          ))}
+        </ol>
+      </div>
+    </div>
+  )
 }
 
 export function ExecutionPanel({ tripId, isRunActive }: ExecutionPanelProps) {
@@ -12,15 +133,15 @@ export function ExecutionPanel({ tripId, isRunActive }: ExecutionPanelProps) {
     isRunActive,
   })
 
-  const agentRun = panelData?.agent_run ?? null
+  const runs = panelData?.agent_runs ?? []
 
   return (
     <section className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900">Agent execution</h2>
+          <h2 className="text-lg font-semibold text-slate-900">Agent execution history</h2>
           <p className="text-sm text-slate-500">
-            Live trace of every model and tool step for this trip.
+            Every planner run for this trip, newest first — model/tool steps, tokens, timing, cost.
           </p>
         </div>
         <button
@@ -38,69 +159,15 @@ export function ExecutionPanel({ tripId, isRunActive }: ExecutionPanelProps) {
         </p>
       )}
 
-      {!agentRun && (
+      {runs.length === 0 && (
         <p className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">
           No planner run yet for this trip. Generate an itinerary to see the agent work here.
         </p>
       )}
 
-      {agentRun && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
-            <MetricTile label="Status" value={agentRun.status} />
-            <MetricTile label="Model" value={agentRun.model} />
-            <MetricTile
-              label="Tokens in / out"
-              value={`${agentRun.total_input_tokens} / ${agentRun.total_output_tokens}`}
-            />
-            <MetricTile label="Total time" value={`${agentRun.total_ms} ms`} />
-            <MetricTile label="Tool steps" value={String(agentRun.steps.length)} />
-            <MetricTile
-              label="Budget used"
-              value={
-                panelData?.budget_utilization_pct != null
-                  ? `${panelData.budget_utilization_pct.toFixed(1)}%`
-                  : "—"
-              }
-            />
-          </div>
-
-          <div className="rounded-lg border border-slate-200 bg-white p-3 text-sm">
-            <p className="text-xs uppercase tracking-wide text-slate-400">Estimated cost</p>
-            <p className="font-medium text-slate-900">
-              {panelData?.estimated_cost_usd != null
-                ? `$${panelData.estimated_cost_usd.toFixed(4)} estimated — actual $0, free tier`
-                : "actual $0 — free tier"}
-            </p>
-          </div>
-
-          <div>
-            <h3 className="text-sm font-semibold text-slate-900">Steps</h3>
-            <ol className="mt-2 space-y-2">
-              {agentRun.steps.map((step) => (
-                <li key={step.seq} className="rounded-lg border border-slate-200 bg-white p-2 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-slate-900">
-                      {step.seq}. [{step.kind}] {step.name}
-                    </span>
-                    <span className="text-xs text-slate-500">{step.status}</span>
-                  </div>
-                  {(step.duration_ms != null || step.tokens != null) && (
-                    <p className="mt-0.5 text-xs text-slate-500">
-                      {step.duration_ms != null && `${step.duration_ms} ms`}
-                      {step.duration_ms != null && step.tokens != null && " · "}
-                      {step.tokens != null && `${step.tokens} tokens`}
-                    </p>
-                  )}
-                  {step.output_summary && (
-                    <p className="mt-1 text-xs text-slate-600">{step.output_summary}</p>
-                  )}
-                </li>
-              ))}
-            </ol>
-          </div>
-        </div>
-      )}
+      {runs.map((run) => (
+        <AgentRunCard key={run.id} run={run} />
+      ))}
 
       <div>
         <h3 className="text-sm font-semibold text-slate-900">Events</h3>
@@ -114,25 +181,30 @@ export function ExecutionPanel({ tripId, isRunActive }: ExecutionPanelProps) {
                 <span className="font-medium text-slate-900">
                   {event.seq}. [{event.kind}] {event.name}
                 </span>
-                <span className="text-xs text-slate-500">{event.status}</span>
+                <span
+                  className={`rounded px-1.5 py-0.5 text-xs font-medium ${statusStyles(event.status)}`}
+                >
+                  {statusLabel(event.status)}
+                </span>
               </div>
               <p className="mt-0.5 text-xs text-slate-600">{event.detail}</p>
               {event.duration_ms != null && (
                 <p className="mt-0.5 text-xs text-slate-500">{event.duration_ms} ms</p>
+              )}
+              {event.data != null && (
+                <details className="mt-1">
+                  <summary className="cursor-pointer text-xs text-slate-500 hover:text-slate-700">
+                    Raw event data
+                  </summary>
+                  <pre className="mt-1 overflow-x-auto rounded bg-slate-50 p-2 text-xs whitespace-pre-wrap text-slate-600">
+                    {JSON.stringify(event.data, null, 2)}
+                  </pre>
+                </details>
               )}
             </li>
           ))}
         </ol>
       </div>
     </section>
-  )
-}
-
-function MetricTile({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg bg-slate-50 p-3">
-      <p className="text-xs uppercase tracking-wide text-slate-400">{label}</p>
-      <p className="font-medium text-slate-900">{value}</p>
-    </div>
   )
 }

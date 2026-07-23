@@ -113,11 +113,18 @@ class FlightSearchSpy:
         ]
     )
     calls: int = 0
+    last_search_params: dict[str, str | None] | None = None
 
     async def search_offers(
         self, departure_id: str, arrival_id: str, outbound_date: str, return_date: str | None
     ) -> FlightSearchOutcome:
         self.calls += 1
+        self.last_search_params = {
+            "departure_id": departure_id,
+            "arrival_id": arrival_id,
+            "outbound_date": outbound_date,
+            "return_date": return_date,
+        }
         return FlightSearchOutcome(offers=self.offers)
 
     async def fetch_booking_options(
@@ -128,7 +135,7 @@ class FlightSearchSpy:
 
 @dataclass
 class PlannerRunSpy:
-    """Stands in for ``run_planner_durable`` so trip-planning tests never spend real Groq
+    """Stands in for ``run_planner_durable`` so trip-planning tests never spend real LLM
     quota, and counts calls so an idempotent /plan can assert the agent ran at most once."""
 
     output: ItineraryOut | ClarificationOut = field(

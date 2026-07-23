@@ -12,6 +12,7 @@ import pytest
 from app.adapters.flights_searchapi import (
     LiveSearchApiProvider,
     RecordedProvider,
+    derive_flight_legs,
     get_flight_provider,
 )
 from app.config import FLIGHT_CASSETTE_DIR, Settings
@@ -87,7 +88,7 @@ async def test_live_provider_search_offers_unavailable_reason_includes_the_upstr
 
 def _settings(use_live_flight_api: bool) -> Settings:
     return Settings(
-        groq_api_key="test-groq-key",
+        cerebras_api_key="test-cerebras-key",
         searchapi_api_key="test-searchapi-key",
         tavily_api_key="test-tavily-key",
         database_url="postgresql+asyncpg://unused/unused",
@@ -145,6 +146,24 @@ async def test_recorded_provider_parses_a_real_captured_round_trip_cassette() ->
     )
     assert all(offer.booking_token for offer in outcome.offers), (
         "every parsed offer must carry a non-empty token (booking_token or departure_token)"
+    )
+
+
+async def test_derive_flight_legs_carries_one_entry_per_flown_segment() -> None:
+    """The frontend expand-to-see-stops feature needs the real per-leg breakdown, not just the
+    aggregate stops count — this must come from the real captured payload's flights array."""
+    provider = RecordedProvider(cassette_dir=FLIGHT_CASSETTE_DIR)
+    outcome = await provider.search_offers("JFK", "CDG", "2026-08-15", "2026-08-22")
+    assert outcome.offers, "cassette must yield offers for this assertion to be meaningful"
+    raw_offer = outcome.offers[0].raw_offer
+
+    legs = derive_flight_legs(raw_offer)
+
+    assert len(legs) == len(raw_offer["flights"]), (
+        f"expected one leg per flown segment ({len(raw_offer['flights'])}), got {len(legs)}"
+    )
+    assert legs[0]["departure_airport"] == raw_offer["flights"][0]["departure_airport"]["id"], (
+        f"leg departure_airport must come from the real segment data, got {legs[0]}"
     )
 
 

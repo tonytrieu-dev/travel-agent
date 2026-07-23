@@ -47,6 +47,10 @@ export function createTrip(tripRequestCreate: TripRequestCreate): Promise<TripRe
   })
 }
 
+export function getTrip(tripId: number): Promise<TripRequestOut> {
+  return request<TripRequestOut>(`/trips/${tripId}`)
+}
+
 export function updateTrip(
   tripId: number,
   tripRequestUpdate: TripRequestUpdate,

@@ -1,12 +1,13 @@
 """Eval runner entry point.
 
-Run for real once the Groq quota has reset:
+Run for real once the Cerebras quota has reset:
     uv run python -m evals.run --repeat 3
 """
 
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 from pathlib import Path
 
@@ -19,9 +20,9 @@ from app.adapters.flights_searchapi import get_flight_provider
 from app.agent.execution_log import execution_context
 from app.agent.planner import PlannerDeps, agent, default_usage_limits
 from app.agent.prompts import load_system_prompt
-from app.config import GROQ_MODEL, get_settings
+from app.config import CEREBRAS_MODEL, get_settings
 from app.db import get_session_factory
-from app.models import TripRequest, User
+from app.models import FitnessLevel, TripRequest, User
 from app.schemas import ClarificationOut, ItineraryOut
 from evals.dataset import dataset
 from evals.evaluators import WEB_SEARCH_URLS_ATTRIBUTE
@@ -71,12 +72,27 @@ async def _open_eval_trip(session: AsyncSession) -> int:
     return trip.id
 
 
+def _fitness_level_from_prompt(prompt: str) -> FitnessLevel | None:
+    """`evals.dataset` embeds fitness level as prompt text ("Fitness level: low."), the same
+    convention `_build_planner_prompt` uses for a real trip — parsed back out here because
+    pydantic_evals' task callable only receives the prompt string, not case metadata, so this is
+    the only way `reject_unsafe_intensity` gets exercised against real eval cases at all."""
+    match = re.search(r"Fitness level: (\w+)\.", prompt)
+    if match is None:
+        return None
+    try:
+        return FitnessLevel(match.group(1).lower())
+    except ValueError:
+        return None
+
+
 async def task(prompt: str) -> ItineraryOut | ClarificationOut:
     """The task pydantic_evals runs per case: a real agent.run against real dependencies."""
     settings = get_settings()
     deps = PlannerDeps(
         flight_provider=get_flight_provider(settings),
         activity_provider=TavilyActivityProvider(settings.tavily_api_key.get_secret_value()),
+        fitness_level=_fitness_level_from_prompt(prompt),
     )
     async with get_session_factory()() as session:
         trip_id = await _open_eval_trip(session)
@@ -108,7 +124,7 @@ def build_fingerprint() -> dict[str, str]:
     """Everything needed to tell whether two eval runs are comparable: same model, same system
     prompt, same dataset, and the exact commit the agent/eval code ran at."""
     return {
-        "model": GROQ_MODEL,
+        "model": CEREBRAS_MODEL,
         "system_prompt_sha256": hashlib.sha256(load_system_prompt().encode()).hexdigest(),
         "dataset_sha256": _dataset_fingerprint(),
         "git_sha": _git_sha(),
@@ -118,7 +134,10 @@ def build_fingerprint() -> dict[str, str]:
 def main(*, repeat: int = 1) -> None:
     fingerprint = build_fingerprint()
     print(f"Run fingerprint: {json.dumps(fingerprint, indent=2)}")
-    report = dataset.evaluate_sync(task, repeat=repeat, metadata=fingerprint)
+    # Cases share one LLM account's rate limits; run them one at a time instead of
+    # pydantic_evals' default unbounded concurrency, which fanned every case+repeat out at once
+    # and blew straight through it.
+    report = dataset.evaluate_sync(task, repeat=repeat, metadata=fingerprint, max_concurrency=1)
     report.print()
 
 

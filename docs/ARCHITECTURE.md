@@ -12,7 +12,7 @@ flowchart LR
     Agent -->|web_search| Tavily[TavilyActivityProvider]
     Flights --> SearchApi[(SearchApi.io)]
     Tavily --> TavilyAPI[(Tavily API)]
-    Agent --> Groq[(Groq openai/gpt-oss-120b)]
+    Agent --> Cerebras[(Cerebras gpt-oss-120b)]
     Agent -.->|run_planner_durable| DBOS[DBOS workflow]
     Repo -.->|execute_booking_durable| DBOS
     DBOS --> DB
@@ -27,7 +27,7 @@ over REST; there is no server-rendered coupling between them.
 
 | API | Role | Adapter |
 |---|---|---|
-| Groq (`openai/gpt-oss-120b`) | The planner LLM — reasoning, tool selection, structured output. | Pydantic AI `GroqModel`/`GroqProvider` in `planner.py`. |
+| Cerebras (`gpt-oss-120b`) | The planner LLM — reasoning, tool selection, structured output. | Pydantic AI `CerebrasModel`/`CerebrasProvider` in `planner.py`. |
 | SearchApi.io Google Flights | Real flight offers + booking options. | `flights_searchapi.py` (Live vs Recorded strategy). |
 | Tavily | Real, source-attributed activity research. | `activities_tavily.py`. |
 
@@ -41,9 +41,10 @@ over REST; there is no server-rendered coupling between them.
   bound the loop so it can't spin or blow the context budget.
 - **Prompt-injection guardrail** — `sanitize_web_content` wraps untrusted Tavily text in a delimited,
   escaped block before it reaches the prompt, so embedded instructions read as data.
-- **Fail-closed tool gate** — every tool is registered with a classification; a `BOUNDARY_CROSSING`
-  tool with no approver channel is denied, never executed. Guards against a write tool ever being
-  wired into the agent.
+- **Fail-closed tool gate** — every tool is registered with a classification; today the only
+  classification is `READ_ONLY`, and registering a tool without one raises `TypeError` at import.
+  Guards against a write tool ever being wired into the agent without deliberately adding a new
+  classification for it.
 - **Durable steps (DBOS)** — the planner run and booking execute are checkpointed workflows that
   resume after a crash.
 - **Observability** — `AgentRun`/`AgentRunStep` rows are derived from the real message history and
@@ -64,9 +65,9 @@ over REST; there is no server-rendered coupling between them.
    `MAX_CONCURRENT_AGENT_RUNS`), then invokes the actual `@DBOS.workflow`-wrapped planner run.
 4. Inside the workflow: an `execution_context` is opened (binds a `trip_request_id` so every
    tool call downstream can call `record_event` without threading an ID through every
-   signature), then `agent.run(...)` executes the real Pydantic AI agent — a ReAct-style loop
-   over `search_flights` and `web_search`, capped by `MAX_TOOL_STEPS` / `MAX_CONTEXT_TOKENS`
-   (`UsageLimits`, see `default_usage_limits()`).
+   signature), then `agent.iter(...)` drives the real Pydantic AI agent — a ReAct-style,
+   node-by-node async iteration loop over `search_flights` and `web_search`, capped by
+   `MAX_TOOL_STEPS` / `MAX_CONTEXT_TOKENS` (`UsageLimits`, see `default_usage_limits()`).
 5. The agent's `output_type` is a union: `ItineraryOut | ClarificationOut`. The model resolves
    to whichever is appropriate — a `ClarificationOut` is returned to the client as a set of
    questions and **nothing is persisted**; an `ItineraryOut` is persisted (`Itinerary` row,

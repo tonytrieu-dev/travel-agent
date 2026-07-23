@@ -30,6 +30,22 @@ paths:
               schema: { $ref: '#/components/schemas/ProblemDetail' }
 
   /api/trips/{trip_id}:
+    get:
+      operationId: get_trip
+      summary: Fetch a single trip by id (the frontend recovers a trip after a page refresh).
+      parameters:
+        - { name: trip_id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: The trip, in the same shape POST /api/trips returns.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TripRequestOut' }
+        '404':
+          description: No such trip.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
     patch:
       operationId: update_trip
       summary: Update one or more trip fields. Only fields present in the body are changed.
@@ -117,7 +133,7 @@ paths:
         '429':
           description: >-
             Per-IP rate limit exceeded, or the global concurrent-agent-run cap is full (both
-            protect the scarce Groq quota).
+            protect scarce LLM quota).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetail' }
@@ -377,6 +393,18 @@ components:
         status: { $ref: '#/components/schemas/TripStatus' }
         created_at: { type: string, format: date-time }
 
+    FlightLegOut:
+      type: object
+      required: [airline, departure_airport, depart_at, arrival_airport, arrive_at]
+      properties:
+        airline: { type: string }
+        flight_number: { type: [string, 'null'] }
+        departure_airport: { type: string }
+        depart_at: { type: string }
+        arrival_airport: { type: string }
+        arrive_at: { type: string }
+        duration_minutes: { type: [integer, 'null'] }
+
     FlightOfferOut:
       type: object
       required: [id, offer_index, carrier, price_usd, currency, depart_at, arrive_at, stops, source]
@@ -390,6 +418,9 @@ components:
         arrive_at: { type: string }
         stops: { type: integer }
         source: { type: string, enum: [live, cached] }
+        legs:
+          type: array
+          items: { $ref: '#/components/schemas/FlightLegOut' }
 
     FlightSearchOut:
       type: object
@@ -479,6 +510,8 @@ components:
         steps:
           type: array
           items: { $ref: '#/components/schemas/AgentRunStepOut' }
+        estimated_cost_usd: { type: [number, 'null'] }
+        budget_utilization_pct: { type: [number, 'null'] }
 
     ExecutionEventOut:
       type: object
@@ -490,19 +523,17 @@ components:
         status: { type: string }
         detail: { type: string }
         duration_ms: { type: [integer, 'null'] }
+        data: { type: [object, 'null'] }
         created_at: { type: string, format: date-time }
 
     ExecutionPanelOut:
       type: object
-      required: [trip_request_id, events]
+      required: [trip_request_id]
       properties:
         trip_request_id: { type: integer }
-        agent_run:
-          oneOf:
-            - { $ref: '#/components/schemas/AgentRunOut' }
-            - type: 'null'
+        agent_runs:
+          type: array
+          items: { $ref: '#/components/schemas/AgentRunOut' }
         events:
           type: array
           items: { $ref: '#/components/schemas/ExecutionEventOut' }
-        estimated_cost_usd: { type: [number, 'null'] }
-        budget_utilization_pct: { type: [number, 'null'] }

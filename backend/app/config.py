@@ -11,10 +11,8 @@ from pathlib import Path
 from pydantic import SecretStr, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Groq free tier: 1K req/day. gpt-oss-120b does clean JSON tool-calls (llama-3.3-70b intermittently
-# emits its native <function=...> text format, which pydantic-ai can't parse). Alternative:
-# llama-3.1-8b-instant (14.4K req/day, weaker reasoning).
-GROQ_MODEL = "openai/gpt-oss-120b"
+# Cerebras runs gpt-oss-120b directly and keeps clean JSON tool-calls for Pydantic AI.
+CEREBRAS_MODEL = "gpt-oss-120b"
 
 SEARCHAPI_BASE_URL = "https://www.searchapi.io/api/v1/search"
 
@@ -22,14 +20,34 @@ SEARCHAPI_BASE_URL = "https://www.searchapi.io/api/v1/search"
 FLIGHT_CASSETTE_DIR = Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "recorded" / "flights"
 
 # Agent guardrails: a per-run cumulative token budget and a tool-call ceiling so the ReAct loop
-# can't spin forever. Kept well under the model's ~131K window and Groq's 8K tokens/min throttle.
+# can't spin forever. Kept well under the model's large context window and provider rate limits.
 MAX_TOOL_STEPS = 8
 MAX_CONTEXT_TOKENS = 30_000
 MAX_REQUESTS_PER_RUN = MAX_TOOL_STEPS + 3
 
-# A single web result is truncated to this many characters before it enters the message history,
-# so several results can't blow the model's per-minute token budget (Groq free tier: 8K/min).
-MAX_TOOL_RESULT_CHARS = 1_500
+# pydantic-ai's default is 1 retry, too little room for the model to self-correct.
+MAX_OUTPUT_RETRIES = 3
+
+# 400 chars x 5 results/call still overfilled the provider budget after 4 web_search calls in
+# one run (redundant queries the prompt now forbids, e.g. re-searching flight info by name).
+MAX_TOOL_RESULT_CHARS = 300
+
+# The char budget above assumes 5 results/call, but nothing enforced that ceiling — the model can
+# (and did: 9, 10) ask web_search for more, still blowing past the 8K tokens/min throttle.
+MAX_WEB_SEARCH_RESULTS = 3
+
+# Forums/social platforms are user opinion, not vetted travel information. Excluded at the
+# Tavily API level (deterministic) rather than trusted to the model to self-filter.
+EXCLUDED_ACTIVITY_SEARCH_DOMAINS = [
+    "reddit.com",
+    "quora.com",
+    "pinterest.com",
+    "facebook.com",
+    "twitter.com",
+    "x.com",
+    "tiktok.com",
+    "instagram.com",
+]
 
 # A flight offer is only bookable for a short window because airfares are volatile. After this,
 # the booking is marked EXPIRED and the user must re-search rather than book a stale price.
@@ -43,7 +61,7 @@ BOOKING_TTL_MINUTES = 30
 # revalidate even more often than this.
 FLIGHT_CACHE_TTL_MINUTES = 15
 
-# Groq list prices (USD/M tokens) for the panel's estimated cost only; actual is $0 on free tier.
+# Cerebras list prices (USD/M tokens) for the panel's estimated cost only.
 LLM_INPUT_PRICE_PER_MILLION_TOKENS = 0.59
 LLM_OUTPUT_PRICE_PER_MILLION_TOKENS = 0.79
 
@@ -51,11 +69,11 @@ LLM_OUTPUT_PRICE_PER_MILLION_TOKENS = 0.79
 # that will start resolving a real identity later — route handlers never read this directly.
 DEMO_USER_EMAIL = "demo@travel-agent.local"
 
-# Cap concurrent agent runs so a burst can't blow through Groq's 30 RPM / 12K tokens-per-minute.
+# Cap concurrent agent runs so a burst can't blow through the LLM provider's rate limits.
 MAX_CONCURRENT_AGENT_RUNS = 2
 
 # Per-IP request cap on the expensive routes (/plan, /flights/search) — both spend real,
-# scarce third-party quota (Groq RPD, the one-time SearchApi search allotment).
+# scarce third-party quota (LLM requests, the one-time SearchApi search allotment).
 RATE_LIMIT_MAX_REQUESTS = 10
 RATE_LIMIT_WINDOW_SECONDS = 60
 
@@ -65,7 +83,7 @@ class Settings(BaseSettings):
         env_file=(".env", "../.env"), env_file_encoding="utf-8", extra="ignore"
     )
 
-    groq_api_key: SecretStr
+    cerebras_api_key: SecretStr
     searchapi_api_key: SecretStr
     tavily_api_key: SecretStr
     database_url: str

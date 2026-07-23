@@ -15,43 +15,46 @@ function labelFor(name: string): string {
 }
 
 // Always polling once a trip exists (not just while a run is active) so this reads as a live
-// activity log in the sidebar, not a banner that vanishes between runs.
+// activity log, not a banner that vanishes between runs.
 export function LiveActivity({ tripId, isRunActive }: LiveActivityProps) {
   const { panelData } = useTripExecution({ tripId, enabled: true, isRunActive })
 
   const events = panelData?.events ?? []
-  const recent = events.slice(-10).reverse()
+  const recent = [...events].reverse()
 
   return (
-    <section aria-live="polite" className="flex-1 overflow-y-auto border-t border-slate-200 p-3">
-      <div className="flex items-center gap-2 px-2">
+    <section
+      aria-live="polite"
+      className="space-y-3 rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
+    >
+      <div className="flex items-center gap-2">
         {isRunActive ? (
-          <span className="relative flex h-2 w-2">
+          <span className="relative flex h-2.5 w-2.5">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-75" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-indigo-500" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-indigo-500" />
           </span>
         ) : (
-          <span className="h-2 w-2 rounded-full bg-slate-300" />
+          <span className="h-2.5 w-2.5 rounded-full bg-slate-300" />
         )}
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <h2 className="text-lg font-semibold text-slate-900">
           {isRunActive ? "Agent working…" : "Agent activity"}
-        </p>
+        </h2>
       </div>
 
       {recent.length === 0 ? (
-        <p className="mt-2 px-2 text-xs text-slate-400">
+        <p className="text-sm text-slate-500">
           Nothing yet — tool calls will appear here once the agent runs.
         </p>
       ) : (
-        <ol className="mt-2 space-y-1.5">
+        <ol className="max-h-72 space-y-1.5 overflow-y-auto">
           {recent.map((event) => (
-            <li key={event.seq} className="rounded-md px-2 py-1 text-xs text-slate-700 hover:bg-slate-50">
-              <div className="flex items-center gap-1.5">
+            <li key={event.seq} className="rounded-md px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50">
+              <div className="flex items-center gap-2">
                 <span className="text-indigo-400">→</span>
                 <span className="font-medium text-slate-900">{labelFor(event.name)}</span>
-                <span className="text-slate-400">{event.status}</span>
+                <span className="text-xs text-slate-400">{event.status}</span>
               </div>
-              <p className="pl-4 text-slate-500">{event.detail}</p>
+              <p className="pl-5 text-xs text-slate-500">{event.detail}</p>
             </li>
           ))}
         </ol>

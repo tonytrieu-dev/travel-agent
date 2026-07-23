@@ -21,6 +21,7 @@ interface QuestionnaireProps {
 }
 
 export function Questionnaire({ onSubmit, isSubmitting, errorMessage }: QuestionnaireProps) {
+  const [tripType, setTripType] = useState<"round-trip" | "one-way">("round-trip")
   const [origin, setOrigin] = useState("")
   const [destination, setDestination] = useState("")
   const [destinationAirport, setDestinationAirport] = useState("")
@@ -39,11 +40,11 @@ export function Questionnaire({ onSubmit, isSubmitting, errorMessage }: Question
     const normalizedDestinationAirport = destinationAirport.trim().toUpperCase()
 
     if (!IATA_CODE_PATTERN.test(normalizedOrigin)) {
-      setValidationMessage("Origin must be a 3-letter IATA airport code, e.g. JFK.")
+      setValidationMessage("Origin must be a 3-letter airport code, e.g. JFK.")
       return
     }
     if (!IATA_CODE_PATTERN.test(normalizedDestinationAirport)) {
-      setValidationMessage("Destination airport must be a 3-letter IATA airport code, e.g. NRT.")
+      setValidationMessage("Destination airport must be a 3-letter airport code, e.g. NRT.")
       return
     }
     if (!destination.trim()) {
@@ -52,6 +53,10 @@ export function Questionnaire({ onSubmit, isSubmitting, errorMessage }: Question
     }
     if (!departDate) {
       setValidationMessage("Departure date is required.")
+      return
+    }
+    if (tripType === "round-trip" && !returnDate) {
+      setValidationMessage("Return date is required for a round-trip.")
       return
     }
     if (!age) {
@@ -81,9 +86,25 @@ export function Questionnaire({ onSubmit, isSubmitting, errorMessage }: Question
     <form onSubmit={handleSubmit} className="space-y-5 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <h2 className="text-lg font-semibold text-slate-900">Plan a trip</h2>
 
+      <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+        Trip type
+        <select
+          value={tripType}
+          onChange={(event) => {
+            const value = event.target.value as "round-trip" | "one-way"
+            setTripType(value)
+            if (value === "one-way") setReturnDate("")
+          }}
+          className="rounded-md border border-slate-300 py-2 pl-3 pr-8 text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+        >
+          <option value="round-trip">Round-trip</option>
+          <option value="one-way">One-way</option>
+        </select>
+      </label>
+
       <div className="grid grid-cols-2 gap-4">
         <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-          Origin airport (IATA)
+          Depart
           <input
             type="text"
             value={origin}
@@ -96,7 +117,7 @@ export function Questionnaire({ onSubmit, isSubmitting, errorMessage }: Question
         </label>
 
         <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-          Destination airport (IATA)
+          Arrive
           <input
             type="text"
             value={destinationAirport}
@@ -121,7 +142,7 @@ export function Questionnaire({ onSubmit, isSubmitting, errorMessage }: Question
         />
       </label>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className={`grid gap-4 ${tripType === "one-way" ? "grid-cols-1" : "grid-cols-2"}`}>
         <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
           Depart date
           <input
@@ -133,18 +154,21 @@ export function Questionnaire({ onSubmit, isSubmitting, errorMessage }: Question
           />
         </label>
 
-        <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-          Return date (optional)
-          <input
-            type="date"
-            value={returnDate}
-            onChange={(event) => setReturnDate(event.target.value)}
-            className="rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-          />
-        </label>
+        {tripType === "round-trip" && (
+          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+            Return date
+            <input
+              type="date"
+              value={returnDate}
+              onChange={(event) => setReturnDate(event.target.value)}
+              required
+              className="rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+          </label>
+        )}
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
           Age
           <input
@@ -154,7 +178,7 @@ export function Questionnaire({ onSubmit, isSubmitting, errorMessage }: Question
             value={age}
             onChange={(event) => setAge(event.target.value)}
             required
-            className="rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            className="rounded-md border border-slate-300 px-3 py-2 text-slate-900 [appearance:textfield] focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           />
         </label>
 
@@ -164,7 +188,7 @@ export function Questionnaire({ onSubmit, isSubmitting, errorMessage }: Question
             value={fitnessLevel}
             onChange={(event) => setFitnessLevel(event.target.value as FitnessLevel | "")}
             required
-            className="rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            className="rounded-md border border-slate-300 py-2 pl-3 pr-8 text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           >
             <option value="">—</option>
             <option value="low">Low</option>
@@ -178,7 +202,7 @@ export function Questionnaire({ onSubmit, isSubmitting, errorMessage }: Question
           <select
             value={budgetLabel}
             onChange={(event) => setBudgetLabel(event.target.value)}
-            className="rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            className="rounded-md border border-slate-300 py-2 pl-3 pr-8 text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           >
             {BUDGET_BANDS.map((band) => (
               <option key={band.label} value={band.label}>

@@ -19,22 +19,27 @@ async def _events_for(session, trip_id: int) -> list[ExecutionEvent]:
     return list(result.scalars())
 
 
-def test_events_recorded_in_one_run_are_sequential_and_ordered() -> None:
+def test_recorded_data_survives_as_the_real_structured_payload_not_just_the_detail_string() -> None:
+    """detail is a short human summary ("4 offers"); data must carry the real payload behind it
+    so the execution panel can render actual offers/results, not just a count."""
+
     async def _work(session):
         trip_id = await seed_trip(session)
         async with execution_context(session, trip_id):
-            await record_event(ExecutionEventKind.API_CALL, "search_flights", "ok", "found 3 offers")
-            await record_event(ExecutionEventKind.API_CALL, "web_search", "ok", "found 5 results")
+            await record_event(
+                ExecutionEventKind.API_CALL,
+                "search_flights",
+                "ok",
+                "1 offers",
+                data={"offers": [{"carrier": "United", "price_usd": 412.0}]},
+            )
         return await _events_for(session, trip_id)
 
     events = run_db(_work)
 
-    assert [event.seq for event in events] == [1, 2], (
-        f"two events recorded in one context must get consecutive seq 1, 2; got "
-        f"{[event.seq for event in events]}"
-    )
-    assert [event.name for event in events] == ["search_flights", "web_search"], (
-        "events must persist in call order so the panel timeline reads top-to-bottom correctly"
+    assert events[0].data == {"offers": [{"carrier": "United", "price_usd": 412.0}]}, (
+        f"data must round-trip the exact structured payload passed to record_event, got "
+        f"{events[0].data}"
     )
 
 

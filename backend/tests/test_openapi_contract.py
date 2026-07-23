@@ -35,6 +35,31 @@ def test_runtime_implements_every_contracted_route_and_status() -> None:
             )
 
 
+def test_runtime_component_schemas_match_contract_properties() -> None:
+    """Beyond paths/statuses, every authored component schema must exist at runtime with the same
+    property set — the drift guard that would have caught FlightOfferOut.legs and the agent_run →
+    agent_runs rename shipping in the routes while the spec still described the old shape.
+
+    Property NAMES (not `required`) are compared: Pydantic omits fields that carry a default from
+    JSON-Schema `required` (e.g. the discriminator `status` literals), so an exact required-set
+    comparison would flag those as false drift while telling a client nothing useful.
+    """
+    contract = _contract()
+    runtime = app.openapi()
+    runtime_schemas = runtime["components"]["schemas"]
+    for schema_name, contract_schema in contract["components"]["schemas"].items():
+        assert schema_name in runtime_schemas, (
+            f"contract schema {schema_name} is not generated at runtime"
+        )
+        contract_properties = set((contract_schema.get("properties") or {}).keys())
+        runtime_properties = set((runtime_schemas[schema_name].get("properties") or {}).keys())
+        assert contract_properties == runtime_properties, (
+            f"{schema_name} property drift between contract and runtime: "
+            f"only-in-contract={contract_properties - runtime_properties}, "
+            f"only-in-runtime={runtime_properties - contract_properties}"
+        )
+
+
 def test_runtime_error_code_enum_matches_contract() -> None:
     contract = _contract()
     runtime = app.openapi()

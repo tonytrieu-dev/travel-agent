@@ -64,6 +64,16 @@ export interface TripRequestOut {
   created_at: string
 }
 
+export interface FlightLegOut {
+  airline: string
+  flight_number?: string | null
+  departure_airport: string
+  depart_at: string
+  arrival_airport: string
+  arrive_at: string
+  duration_minutes?: number | null
+}
+
 export interface FlightOfferOut {
   id: number
   offer_index: number
@@ -74,6 +84,7 @@ export interface FlightOfferOut {
   arrive_at: string
   stops: number
   source: "live" | "cached"
+  legs: FlightLegOut[]
 }
 
 export interface FlightSearchOut {
@@ -135,6 +146,8 @@ export interface AgentRunOut {
   started_at: string
   finished_at?: string | null
   steps: AgentRunStepOut[]
+  estimated_cost_usd?: number | null
+  budget_utilization_pct?: number | null
 }
 
 export interface ExecutionEventOut {
@@ -144,15 +157,14 @@ export interface ExecutionEventOut {
   status: string
   detail: string
   duration_ms?: number | null
+  data?: Record<string, unknown> | null
   created_at: string
 }
 
 export interface ExecutionPanelOut {
   trip_request_id: number
-  agent_run: AgentRunOut | null
+  agent_runs: AgentRunOut[]
   events: ExecutionEventOut[]
-  estimated_cost_usd?: number | null
-  budget_utilization_pct?: number | null
 }
 
 export interface BookingRequestCreate {

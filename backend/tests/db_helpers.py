@@ -248,6 +248,32 @@ async def get_trip(session: AsyncSession, trip_id: int) -> TripRequest:
     return trip
 
 
+async def get_flight_search_results(
+    session: AsyncSession, trip_id: int
+) -> list[FlightSearchResult]:
+    return list(
+        await session.scalars(
+            select(FlightSearchResult).where(col(FlightSearchResult.trip_request_id) == trip_id)
+        )
+    )
+
+
+async def get_itinerary(session: AsyncSession, trip_id: int) -> Itinerary | None:
+    return await session.scalar(
+        select(Itinerary).where(col(Itinerary.trip_request_id) == trip_id)
+    )
+
+
+async def get_execution_events(session: AsyncSession, trip_id: int) -> list[ExecutionEvent]:
+    return list(
+        await session.scalars(
+            select(ExecutionEvent)
+            .where(col(ExecutionEvent.trip_request_id) == trip_id)
+            .order_by(col(ExecutionEvent.seq))
+        )
+    )
+
+
 async def get_booking(session: AsyncSession, log_id: int) -> HITLBookingLog:
     booking = await session.get(HITLBookingLog, log_id)
     assert booking is not None, f"booking log {log_id} vanished from the DB"

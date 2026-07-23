@@ -206,7 +206,7 @@ export function BookingModule({ trip, selectedOffer, onSearchAgain }: BookingMod
           {bookingLog.booking_options && bookingLog.booking_options.length > 0 && (
             <ul className="space-y-1">
               {bookingLog.booking_options.map((option, index) => {
-                const link = typeof option.link === "string" ? option.link : typeof option.url === "string" ? option.url : null
+                const link = typeof option.booking_url === "string" ? option.booking_url : typeof option.link === "string" ? option.link : typeof option.url === "string" ? option.url : null
                 const label = typeof option.book_with === "string" ? option.book_with : typeof option.name === "string" ? option.name : `Option ${index + 1}`
                 return (
                   <li key={index}>

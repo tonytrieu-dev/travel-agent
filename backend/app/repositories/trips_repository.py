@@ -4,18 +4,22 @@ Mirrors booking_repository's shape (a domain error carrying code/status/detail, 
 taking an already-open session) so the two repositories read the same way.
 """
 
+import time
+from collections import defaultdict
 from collections.abc import Awaitable, Callable
 from datetime import timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, select
 
-from app.adapters.flights_searchapi import FlightProvider
+from app.adapters.flights_searchapi import FlightProvider, NormalizedFlightOffer
+from app.agent.execution_log import record_event
 from app.config import FLIGHT_CACHE_TTL_MINUTES
 from app.models import (
     AgentRun,
     AgentRunStep,
     ExecutionEvent,
+    ExecutionEventKind,
     FlightResultSource,
     FlightSearchResult,
     Itinerary,
@@ -52,11 +56,40 @@ async def create_trip(session: AsyncSession, user_id: int, data: TripRequestCrea
     return trip
 
 
+async def get_trip(session: AsyncSession, trip_id: int) -> TripRequest:
+    """Fetch a persisted trip so the frontend can recover it after a page refresh."""
+    trip = await session.get(TripRequest, trip_id)
+    if trip is None:
+        raise TripError(ErrorCode.TRIP_NOT_FOUND, 404, f"No trip {trip_id}.")
+    return trip
+
+
+# Changing any of these invalidates a trip's flight search and itinerary: the stored offers were
+# priced for the old route/dates, and the itinerary was researched for the old destination.
+_CRITERIA_FIELDS = ("origin", "destination", "destination_airport", "depart_date", "return_date")
+
+
+async def _invalidate_trip_derived_data(session: AsyncSession, trip_id: int) -> None:
+    """Drop cached flight offers and any generated itinerary so a later /flights/search or /plan
+    can't hand back data computed for the trip's previous criteria."""
+    stale_flight_results = await session.scalars(
+        select(FlightSearchResult).where(col(FlightSearchResult.trip_request_id) == trip_id)
+    )
+    for flight_result in stale_flight_results:
+        await session.delete(flight_result)
+    stale_itinerary = await session.scalar(
+        select(Itinerary).where(col(Itinerary.trip_request_id) == trip_id)
+    )
+    if stale_itinerary is not None:
+        await session.delete(stale_itinerary)
+
+
 async def update_trip(session: AsyncSession, trip_id: int, data: TripRequestUpdate) -> TripRequest:
     trip = await session.get(TripRequest, trip_id)
     if trip is None:
         raise TripError(ErrorCode.TRIP_NOT_FOUND, 404, f"No trip {trip_id}.")
 
+    criteria_before = {field_name: getattr(trip, field_name) for field_name in _CRITERIA_FIELDS}
     for field_name, value in data.model_dump(exclude_unset=True).items():
         setattr(trip, field_name, value)
 
@@ -65,6 +98,13 @@ async def update_trip(session: AsyncSession, trip_id: int, data: TripRequestUpda
     except ValueError as error:
         await session.rollback()
         raise TripError(ErrorCode.VALIDATION_ERROR, 422, str(error)) from error
+
+    criteria_changed = any(
+        getattr(trip, field_name) != criteria_before[field_name] for field_name in _CRITERIA_FIELDS
+    )
+    if criteria_changed:
+        await _invalidate_trip_derived_data(session, trip_id)
+        trip.status = TripStatus.CREATED
 
     await session.commit()
     return trip
@@ -88,6 +128,55 @@ def _to_flight_result(
     )
 
 
+def _cheapest_first(offers: list[FlightSearchResult]) -> list[FlightSearchResult]:
+    """The take-home requires surfacing the cheapest flights, and the frontend derives its
+    "Cheapest" badge from the first offer — so ascending price order is a backend guarantee, held
+    on every path (fresh live search, own-trip reuse, cross-trip cache) so all three agree."""
+    return sorted(offers, key=lambda offer: offer.price_usd)
+
+
+def offer_summary(offer: FlightSearchResult | NormalizedFlightOffer) -> dict:
+    return {
+        "carrier": offer.carrier,
+        "price_usd": offer.price_usd,
+        "currency": offer.currency,
+        "depart_at": offer.depart_at,
+        "arrive_at": offer.arrive_at,
+        "stops": offer.stops,
+    }
+
+
+async def _record_search_flights_event(
+    status: str,
+    detail: str,
+    offers: list[FlightSearchResult] | list[NormalizedFlightOffer],
+    duration_ms: int | None = None,
+) -> None:
+    await record_event(
+        ExecutionEventKind.API_CALL,
+        "search_flights",
+        status,
+        detail,
+        duration_ms,
+        data={"offers": [offer_summary(offer) for offer in offers]},
+    )
+
+
+async def get_recent_flight_results(session: AsyncSession, trip_id: int) -> list[FlightSearchResult]:
+    """Extracted so the planner agent's search_flights tool can reuse this same cache check."""
+    cutoff = utcnow() - timedelta(minutes=FLIGHT_CACHE_TTL_MINUTES)
+    return _cheapest_first(
+        list(
+            await session.scalars(
+                select(FlightSearchResult).where(
+                    col(FlightSearchResult.trip_request_id) == trip_id,
+                    col(FlightSearchResult.created_at) >= cutoff,
+                )
+            )
+        )
+    )
+
+
 async def search_flights(
     session: AsyncSession, trip_id: int, provider: FlightProvider
 ) -> tuple[list[FlightSearchResult], str | None]:
@@ -100,15 +189,13 @@ async def search_flights(
     # A repeat call on this same trip within the TTL is a safe retry, not a new search: return
     # what's already stored instead of appending another duplicate batch (POST here must be
     # idempotent within the TTL window, or every retry would multiply the trip's stored offers).
-    own_recent_results = list(
-        await session.scalars(
-            select(FlightSearchResult).where(
-                col(FlightSearchResult.trip_request_id) == trip_id,
-                col(FlightSearchResult.created_at) >= cutoff,
-            )
-        )
-    )
+    own_recent_results = await get_recent_flight_results(session, trip_id)
     if own_recent_results:
+        await _record_search_flights_event(
+            "ok",
+            f"{len(own_recent_results)} offers (reused, already searched within TTL)",
+            own_recent_results,
+        )
         return own_recent_results, None
 
     cache_source_trip_id = await session.scalar(
@@ -145,11 +232,16 @@ async def search_flights(
         session.add_all(results)
         trip.status = TripStatus.FLIGHTS_SEARCHED
         await session.commit()
-        return results, None
+        await _record_search_flights_event(
+            "ok", f"{len(results)} offers (cached from an identical route/date search)", results
+        )
+        return _cheapest_first(results), None
 
+    started_at = time.monotonic()
     outcome = await provider.search_offers(
         trip.origin, trip.destination_airport, trip.depart_date, trip.return_date
     )
+    duration_ms = round((time.monotonic() - started_at) * 1000)
     results = [
         FlightSearchResult(
             trip_request_id=trip_id,
@@ -170,7 +262,13 @@ async def search_flights(
     if results:
         trip.status = TripStatus.FLIGHTS_SEARCHED
     await session.commit()
-    return results, outcome.unavailable_reason
+    await _record_search_flights_event(
+        "ok" if outcome.unavailable_reason is None else "unavailable",
+        f"{len(results)} offers" if outcome.unavailable_reason is None else outcome.unavailable_reason,
+        outcome.offers,
+        duration_ms,
+    )
+    return _cheapest_first(results), outcome.unavailable_reason
 
 
 def _build_planner_prompt(trip: TripRequest) -> str:
@@ -215,28 +313,32 @@ async def get_or_create_itinerary(
 
 async def get_execution_panel(
     session: AsyncSession, trip_id: int
-) -> tuple[AgentRun | None, list[AgentRunStep], list[ExecutionEvent]]:
-    """The latest agent run (if `/plan` has ever executed for this trip) plus its ordered steps,
-    and the trip's full ExecutionEvent timeline (tool/API calls recorded during that run)."""
+) -> tuple[list[tuple[AgentRun, list[AgentRunStep]]], list[ExecutionEvent]]:
+    """Every agent run for this trip (newest first, so a reviewer sees run history, not just the
+    latest attempt), each paired with its ordered steps, plus the trip's full ExecutionEvent
+    timeline (tool/API calls recorded across all runs)."""
     trip = await session.get(TripRequest, trip_id)
     if trip is None:
         raise TripError(ErrorCode.TRIP_NOT_FOUND, 404, f"No trip {trip_id}.")
 
-    agent_run = await session.scalar(
-        select(AgentRun)
-        .where(col(AgentRun.trip_request_id) == trip_id)
-        .order_by(col(AgentRun.started_at).desc())
-        .limit(1)
-    )
-    steps: list[AgentRunStep] = []
-    if agent_run is not None:
-        steps = list(
-            await session.scalars(
-                select(AgentRunStep)
-                .where(col(AgentRunStep.agent_run_id) == agent_run.id)
-                .order_by(col(AgentRunStep.seq))
-            )
+    agent_runs = list(
+        await session.scalars(
+            select(AgentRun)
+            .where(col(AgentRun.trip_request_id) == trip_id)
+            .order_by(col(AgentRun.started_at).desc())
         )
+    )
+    all_steps = list(
+        await session.scalars(
+            select(AgentRunStep)
+            .where(col(AgentRunStep.agent_run_id).in_([run.id for run in agent_runs]))
+            .order_by(col(AgentRunStep.seq))
+        )
+    )
+    steps_by_run_id: dict[int, list[AgentRunStep]] = defaultdict(list)
+    for step in all_steps:
+        steps_by_run_id[step.agent_run_id].append(step)
+    runs_with_steps = [(run, steps_by_run_id[run.id]) for run in agent_runs if run.id]
 
     events = list(
         await session.scalars(
@@ -245,4 +347,4 @@ async def get_execution_panel(
             .order_by(col(ExecutionEvent.seq))
         )
     )
-    return agent_run, steps, events
+    return runs_with_steps, events

@@ -14,11 +14,11 @@ the mechanism `EvaluatorContext.attributes` itself documents for exactly this pu
 from dataclasses import dataclass
 from typing import Literal, TypedDict
 
-from pydantic_ai.models.groq import GroqModel
-from pydantic_ai.providers.groq import GroqProvider
+from pydantic_ai.models.cerebras import CerebrasModel
+from pydantic_ai.providers.cerebras import CerebrasProvider
 from pydantic_evals.evaluators import EvaluationReason, Evaluator, EvaluatorContext, LLMJudge
 
-from app.config import GROQ_MODEL, get_settings
+from app.config import CEREBRAS_MODEL, get_settings
 from app.schemas import ClarificationOut, ItineraryOut
 
 WEB_SEARCH_URLS_ATTRIBUTE = "web_search_urls"
@@ -28,8 +28,8 @@ WEB_SEARCH_URLS_ATTRIBUTE = "web_search_urls"
 
 class CaseMetadata(TypedDict):
     """Per-case expectation: which member of the agent's `output_type` union this prompt should
-    resolve to. Ask-don't-assume means a prompt missing age/fitness must produce ClarificationOut,
-    never a guessed ItineraryOut."""
+    resolve to. `ClarificationOut` is still a valid resolution for a genuinely ambiguous input
+    (age/fitness/dates are mandatory at trip intake now, so they're never the trigger)."""
 
     expects: Literal["clarification", "itinerary"]
 
@@ -79,8 +79,9 @@ class CitationGrounding(Evaluator[str, ItineraryOut | ClarificationOut, CaseMeta
 def build_fitness_appropriateness_judge() -> LLMJudge:
     """An LLMJudge scoring itinerary/fitness fit, on the same model the agent runs on."""
     settings = get_settings()
-    judge_model = GroqModel(
-        GROQ_MODEL, provider=GroqProvider(api_key=settings.groq_api_key.get_secret_value())
+    judge_model = CerebrasModel(
+        CEREBRAS_MODEL,
+        provider=CerebrasProvider(api_key=settings.cerebras_api_key.get_secret_value()),
     )
     return LLMJudge(
         rubric=(

@@ -26,10 +26,12 @@ entirely instead of just making it reliable. Scoped to the API boundary only: `T
 `.fitness_level` stay nullable in the DB so existing incomplete rows keep reading fine.
 
 ## Two read-only tools + a fail-closed tool gate
-Only `search_flights` and `web_search`, both `READ_ONLY`. Registration requires a classification;
-a `BOUNDARY_CROSSING` tool with no approver channel is denied, never executed. **Alternative:**
-register tools directly on the agent. **Rejected** — the gate makes wiring a write tool fail
-closed and keeps a regression test (`test_tool_gate.py`) honest.
+Only `search_flights` and `web_search`, both `READ_ONLY` — the only classification the gate
+currently defines. Registration requires a classification; an unclassified tool raises `TypeError`
+at import instead of silently registering. **Alternative:** register tools directly on the agent.
+**Rejected** — the gate makes wiring a future write tool fail closed by construction (it can't be
+registered without deliberately adding a classification for it) and keeps a regression test
+(`test_tool_gate.py`) honest.
 
 ## Audit tables are append-only at the database
 `booking_transition` and `execution_event` have `BEFORE UPDATE/DELETE` triggers that raise.
@@ -51,12 +53,15 @@ re-enters the workflow body during replay, so mutating in-process state *inside*
 acquire uses a lock-guarded counter, not `asyncio.wait_for(sem.acquire(), timeout=0)`, which can
 spuriously time out even uncontended.
 
-## Groq over Gemini
-Groq's free tier: 1,000 requests/day vs Gemini's 20. Model within Groq: `openai/gpt-oss-120b`, not
-the initially-chosen `llama-3.3-70b-versatile`. **Rejected llama-3.3-70b** — observed live, it
-intermittently emitted its native `<function=...>` text format instead of a JSON tool call, which
-pydantic-ai can't parse and crashes with "Exceeded maximum output retries." `gpt-oss-120b` parses
-cleanly. Swap the model in `config.py::GROQ_MODEL`.
+## Cerebras over Groq (over Gemini)
+Cerebras runs `gpt-oss-120b` directly through Pydantic AI's native `CerebrasModel`/
+`CerebrasProvider`. The model name lives in `config.py::CEREBRAS_MODEL`, and the app reads
+`CEREBRAS_API_KEY` from settings. **Alternative 1:** Groq, also serving `gpt-oss-120b`.
+**Rejected** — Groq's free tier caps at 8,000 tokens/minute, which crashed multi-tool-call planner
+runs with HTTP 413 "request too large" rate-limit errors; Cerebras's free tier gives 30,000
+tokens/minute for the same model, so itinerary generation completes end-to-end. **Alternative 2:**
+`llama-3.3-70b-versatile`. **Rejected** — it emits its native `<function=...>` text format instead
+of JSON tool calls, which Pydantic AI can't parse.
 
 ## Real data only, honest degradation
 Adapters never fabricate. On quota/rate-limit/empty they return cached real data if present, or an

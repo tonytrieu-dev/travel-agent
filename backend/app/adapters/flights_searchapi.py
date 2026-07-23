@@ -67,6 +67,24 @@ def _airport_datetime(airport: dict[str, Any]) -> str:
     return time or date
 
 
+def derive_flight_legs(raw_offer: dict[str, Any]) -> list[dict[str, Any]]:
+    """One entry per flown segment, in order — the connecting airport between two legs is the
+    stop a traveler would ask "what is this layover?" about. Derived at read time from the same
+    stored raw_offer every other offer field comes from, never a separate persisted shape."""
+    return [
+        {
+            "airline": leg.get("airline", "Unknown"),
+            "flight_number": leg.get("flight_number"),
+            "departure_airport": leg.get("departure_airport", {}).get("id", ""),
+            "depart_at": _airport_datetime(leg.get("departure_airport", {})),
+            "arrival_airport": leg.get("arrival_airport", {}).get("id", ""),
+            "arrive_at": _airport_datetime(leg.get("arrival_airport", {})),
+            "duration_minutes": leg.get("duration"),
+        }
+        for leg in raw_offer.get("flights", [])
+    ]
+
+
 def _parse_offers(payload: dict[str, Any]) -> list[NormalizedFlightOffer]:
     # Round-trip offers carry departure_token, not booking_token (confirmed against a real payload).
     offers: list[NormalizedFlightOffer] = []

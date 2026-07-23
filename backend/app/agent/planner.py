@@ -6,23 +6,26 @@ from dataclasses import dataclass
 
 from pydantic_ai import Agent, ModelRetry, RunContext
 from pydantic_ai.messages import ModelMessage, ToolReturnPart
-from pydantic_ai.models.groq import GroqModel
-from pydantic_ai.providers.groq import GroqProvider
+from pydantic_ai.models.cerebras import CerebrasModel
+from pydantic_ai.providers.cerebras import CerebrasProvider
 from pydantic_ai.usage import UsageLimits
 
 from app.adapters.activities_tavily import TavilyActivityProvider
 from app.adapters.flights_searchapi import FlightProvider
-from app.agent.execution_log import record_event
+from app.agent.execution_log import current_trip, record_event
 from app.agent.prompts import load_system_prompt, sanitize_web_content
 from app.agent.tool_gate import ToolClassification, register_tool
 from app.config import (
-    GROQ_MODEL,
+    CEREBRAS_MODEL,
     MAX_CONTEXT_TOKENS,
+    MAX_OUTPUT_RETRIES,
     MAX_REQUESTS_PER_RUN,
     MAX_TOOL_STEPS,
+    MAX_WEB_SEARCH_RESULTS,
     get_settings,
 )
-from app.models import ExecutionEventKind
+from app.models import ExecutionEventKind, FitnessLevel, TripRequest
+from app.repositories.trips_repository import get_recent_flight_results, offer_summary
 from app.schemas import ClarificationOut, ItineraryOut
 
 _IATA_CODE_PATTERN = re.compile(r"^[A-Z]{3}$")
@@ -32,6 +35,7 @@ _IATA_CODE_PATTERN = re.compile(r"^[A-Z]{3}$")
 class PlannerDeps:
     flight_provider: FlightProvider
     activity_provider: TavilyActivityProvider
+    fitness_level: FitnessLevel | None = None
 
 
 def default_usage_limits() -> UsageLimits:
@@ -55,9 +59,34 @@ async def search_flights(
             f"departure_id and arrival_id must be 3-letter IATA codes (e.g. JFK), got "
             f"departure_id={departure_id!r} arrival_id={arrival_id!r}"
         )
+
+    # Route/dates never change mid-plan — reuse an existing search instead of repeating it.
+    session, trip_id = current_trip("search_flights")
+    cached_offers = await get_recent_flight_results(session, trip_id)
+    if cached_offers:
+        await record_event(
+            ExecutionEventKind.API_CALL,
+            "search_flights",
+            "ok",
+            f"{len(cached_offers)} offers (reused from this trip's earlier search)",
+            data={"offers": [offer_summary(offer) for offer in cached_offers]},
+        )
+        return {
+            "offers": [offer_summary(offer) for offer in cached_offers],
+            "unavailable_reason": None,
+            "source": "cached",
+        }
+
+    # Trust boundary: on a cache miss, search the STORED trip's own route/dates — never the
+    # model-supplied tool arguments. Those arguments are validated for shape above, but a model
+    # that passes a different (well-formed) departure_id/arrival_id must not be able to redirect
+    # the search away from the trip the user actually created.
+    trip = await session.get(TripRequest, trip_id)
+    if trip is None:
+        raise ModelRetry(f"trip {trip_id} is gone; cannot search flights for it")
     started_at = time.monotonic()
     outcome = await ctx.deps.flight_provider.search_offers(
-        departure_id, arrival_id, outbound_date, return_date
+        trip.origin, trip.destination_airport, trip.depart_date, trip.return_date
     )
     duration_ms = round((time.monotonic() - started_at) * 1000)
     await record_event(
@@ -67,29 +96,24 @@ async def search_flights(
         f"{len(outcome.offers)} offers" if outcome.unavailable_reason is None
         else outcome.unavailable_reason,
         duration_ms,
+        data={"offers": [offer_summary(offer) for offer in outcome.offers]},
     )
     return {
-        # Only the fields the model reasons over — not raw_offer/booking_token, which are bulky,
-        # internal (DB + booking use them), and would flood the model's per-minute token budget.
-        "offers": [
-            {
-                "carrier": offer.carrier,
-                "price_usd": offer.price_usd,
-                "currency": offer.currency,
-                "depart_at": offer.depart_at,
-                "arrive_at": offer.arrive_at,
-                "stops": offer.stops,
-            }
-            for offer in outcome.offers
-        ],
+        "offers": [offer_summary(offer) for offer in outcome.offers],
         "unavailable_reason": outcome.unavailable_reason,
+        "source": "live",
     }
 
 
-async def web_search(ctx: RunContext[PlannerDeps], query: str, max_results: int = 5) -> list[dict]:
+async def web_search(
+    ctx: RunContext[PlannerDeps], query: str, max_results: int = MAX_WEB_SEARCH_RESULTS
+) -> list[dict]:
     """Research real, source-attributed activities or information."""
     started_at = time.monotonic()
-    results = await ctx.deps.activity_provider.search(query, max_results=max_results)
+    # Clamp both ends: the ceiling protects the provider token budget, and the floor of 1 keeps a
+    # model-supplied 0 or negative from reaching Tavily (which would waste the call on no results).
+    clamped_max_results = max(1, min(max_results, MAX_WEB_SEARCH_RESULTS))
+    results = await ctx.deps.activity_provider.search(query, max_results=clamped_max_results)
     duration_ms = round((time.monotonic() - started_at) * 1000)
     await record_event(
         ExecutionEventKind.API_CALL,
@@ -97,6 +121,7 @@ async def web_search(ctx: RunContext[PlannerDeps], query: str, max_results: int 
         "ok",
         f"{len(results)} results for query={query!r}",
         duration_ms,
+        data={"results": [{"title": result.title, "url": result.url} for result in results]},
     )
     return [
         {
@@ -111,14 +136,16 @@ async def web_search(ctx: RunContext[PlannerDeps], query: str, max_results: int 
 
 def _build_agent() -> Agent[PlannerDeps, ItineraryOut | ClarificationOut]:
     settings = get_settings()
-    model = GroqModel(
-        GROQ_MODEL, provider=GroqProvider(api_key=settings.groq_api_key.get_secret_value())
+    model = CerebrasModel(
+        CEREBRAS_MODEL,
+        provider=CerebrasProvider(api_key=settings.cerebras_api_key.get_secret_value()),
     )
     built_agent = Agent(
         model,
         deps_type=PlannerDeps,
         output_type=[ItineraryOut, ClarificationOut],
         system_prompt=load_system_prompt(),
+        retries={"output": MAX_OUTPUT_RETRIES},
     )
     built_agent.instrument = True
     register_tool(built_agent, search_flights, classification=ToolClassification.READ_ONLY)
@@ -165,5 +192,38 @@ def reject_ungrounded_itinerary(
             f"{ungrounded}. Call web_search to research real activities for this destination, then "
             "set every activity's source_url to a URL web_search actually returned. Never invent "
             "an activity or a URL, and never use a flight search as an activity."
+        )
+    return output
+
+
+# A low-fitness traveler must not be handed a strenuous activity. The model labels intensity in
+# free text, so match on normalized substrings — casing ("High"), phrasing ("very high"), and
+# synonyms ("strenuous") all describe the same unsafe level and must all be caught.
+_UNSAFE_INTENSITY_TERMS = ("high", "strenuous", "extreme", "vigorous", "intense")
+
+
+def _is_unsafe_intensity(intensity: str) -> bool:
+    normalized = intensity.strip().lower()
+    return any(term in normalized for term in _UNSAFE_INTENSITY_TERMS)
+
+
+@agent.output_validator
+def reject_unsafe_intensity(
+    ctx: RunContext[PlannerDeps], output: ItineraryOut | ClarificationOut
+) -> ItineraryOut | ClarificationOut:
+    """Structural enforcement of "match intensity to fitness" — the prompt alone doesn't hold,
+    same reasoning as reject_ungrounded_itinerary above."""
+    if not isinstance(output, ItineraryOut) or ctx.deps.fitness_level != FitnessLevel.LOW:
+        return output
+    unsafe = [
+        activity.name
+        for day in output.days
+        for activity in day.activities
+        if _is_unsafe_intensity(activity.intensity)
+    ]
+    if unsafe:
+        raise ModelRetry(
+            f"Traveler fitness level is {ctx.deps.fitness_level.value}, but these activities are "
+            f"too high intensity: {unsafe}. Replace them with gentler, shorter-distance options."
         )
     return output

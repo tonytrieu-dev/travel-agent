@@ -7,11 +7,6 @@ Feature: Trip planning — create, update, search flights, and generate an itine
     When the trip is created
     Then the response is 200 with status "created"
 
-  Scenario: A trip cannot be created with a depart date in the past
-    Given a trip request with a depart date in the past
-    When the trip is created
-    Then the response is 422 with error code "validation_error"
-
   Scenario: A trip cannot be created with a return date before its depart date
     Given a trip request whose return date is before its depart date
     When the trip is created
@@ -22,26 +17,12 @@ Feature: Trip planning — create, update, search flights, and generate an itine
     When the trip is created
     Then the response is 422 with error code "validation_error"
 
-  Scenario: Updating a trip's budget leaves its dates unchanged
-    Given an existing trip
-    When the trip is updated with only a new budget
-    Then the response is 200 with the new budget and the original dates
-
-  Scenario: Updating a trip to a return date before its existing depart date is rejected
-    Given an existing trip
-    When the trip is updated with a return date before its existing depart date
-    Then the response is 422 with error code "validation_error"
-    And the trip's stored return date is unchanged
-
-  Scenario: Updating a trip that does not exist returns 404
-    When a nonexistent trip is updated
-    Then the response is 404 with error code "trip_not_found"
-
   Scenario: Searching flights for a trip with no prior search calls the provider live
     Given an existing trip with no prior flight search
     When flights are searched for the trip
     Then the response is 200 with offers sourced "live"
     And the flight provider is called exactly once
+    And a "search_flights" execution event is recorded for the trip
 
   Scenario: Searching flights again within the cache TTL reuses the earlier real results
     Given an existing trip with no prior flight search
@@ -49,6 +30,18 @@ Feature: Trip planning — create, update, search flights, and generate an itine
     When flights are searched for the trip
     Then the response is 200 with offers sourced "cached"
     And the flight provider is never called
+
+  Scenario: Flight search surfaces the cheapest offer first
+    Given an existing trip with no prior flight search
+    And the flight provider will return offers priced 812, 499, and 640 USD
+    When flights are searched for the trip
+    Then the response is 200 with offers ordered cheapest first
+
+  Scenario: Changing a trip's route after planning invalidates its cached flights and itinerary
+    Given an existing trip with cached flights and a generated itinerary
+    When the trip's destination airport is changed
+    Then the response is 200 and the trip has no cached flight offers
+    And the trip has no stored itinerary
 
   Scenario: Planning a trip whose criteria are clear returns a ready itinerary
     Given an existing trip

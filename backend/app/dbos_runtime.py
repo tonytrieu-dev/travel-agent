@@ -6,18 +6,34 @@ change from the plain, already-tested versions of the functions they call.
 """
 
 from dbos import DBOS, DBOSConfig
+from pydantic_ai import AgentRun, UnexpectedModelBehavior
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.activities_tavily import TavilyActivityProvider
 from app.adapters.flights_searchapi import get_flight_provider
 from app.agent.execution_log import execution_context
 from app.agent.observability import persist_agent_run
 from app.agent.planner import PlannerDeps, agent, default_usage_limits
-from app.config import GROQ_MODEL, get_settings
+from app.config import CEREBRAS_MODEL, get_settings
 from app.db import get_session_factory
-from app.models import FlightSearchResult
+from app.models import FlightSearchResult, TripRequest
 from app.rate_limit import acquire_agent_run_slot, release_agent_run_slot
 from app.repositories import booking_repository as repository
 from app.schemas import BookingLogOut, ClarificationOut, ItineraryOut
+
+
+async def _persist_failed_run(
+    session: AsyncSession, trip_id: int, agent_run: AgentRun[PlannerDeps, ItineraryOut | ClarificationOut]
+) -> None:
+    # Keeps whatever tool calls ran before the crash on the execution panel, not just successes.
+    await persist_agent_run(
+        session,
+        trip_request_id=trip_id,
+        model=CEREBRAS_MODEL,
+        message_history=agent_run.ctx.state.message_history,
+        usage=agent_run.ctx.state.usage,
+        status="failed",
+    )
 
 
 def launch_dbos() -> None:
@@ -52,19 +68,40 @@ async def execute_booking_durable(log_id: int) -> BookingLogOut:
 @DBOS.workflow(name="run_planner")
 async def _run_planner_workflow(trip_id: int, prompt: str) -> ItineraryOut | ClarificationOut:
     settings = get_settings()
-    deps = PlannerDeps(
-        flight_provider=get_flight_provider(settings),
-        activity_provider=TavilyActivityProvider(settings.tavily_api_key.get_secret_value()),
-    )
     async with get_session_factory()() as session, execution_context(session, trip_id):
-        result = await agent.run(prompt, deps=deps, usage_limits=default_usage_limits())
-        await persist_agent_run(
-            session,
-            trip_request_id=trip_id,
-            model=GROQ_MODEL,
-            message_history=result.all_messages(),
-            usage=result.usage,
+        trip = await session.get(TripRequest, trip_id)
+        deps = PlannerDeps(
+            flight_provider=get_flight_provider(settings),
+            activity_provider=TavilyActivityProvider(settings.tavily_api_key.get_secret_value()),
+            fitness_level=trip.fitness_level if trip is not None else None,
         )
+        async with agent.iter(prompt, deps=deps, usage_limits=default_usage_limits()) as agent_run:
+            try:
+                async for node in agent_run:
+                    pass
+            except Exception as error:
+                await _persist_failed_run(session, trip_id, agent_run)
+                if not isinstance(error, UnexpectedModelBehavior):
+                    raise
+                # The model exhausted its retries without producing a valid itinerary (e.g. no
+                # groundable activities) — ask the user instead of crashing the request.
+                return ClarificationOut(
+                    questions=[
+                        "I couldn't find enough verified activity information to complete this "
+                        "itinerary. Could you narrow the destination or share specific interests "
+                        "to search for?"
+                    ]
+                )
+
+            result = agent_run.result
+            assert result is not None, "agent_run finished iterating without producing a result"
+            await persist_agent_run(
+                session,
+                trip_request_id=trip_id,
+                model=CEREBRAS_MODEL,
+                message_history=result.all_messages(),
+                usage=result.usage,
+            )
     return result.output
 
 

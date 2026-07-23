@@ -1,59 +1,74 @@
-"""Test 10 (plan test strategy): the tool classification/approval-gate registry is fail-closed.
-Guards (a) every registered tool carries an explicit classification and today's real tools are
-both READ_ONLY, (b) an unclassified registration is a startup error, (c) a BOUNDARY_CROSSING
-tool with no approver channel is denied, never executed.
-"""
+"""Planner tools stay read-only and compatible with the configured model protocol."""
 
 import pytest
-from pydantic_ai import Agent, RunContext, UserError
+from pydantic_ai import Agent, RunContext
+from pydantic_ai.models import Model, ModelRequestParameters
 from pydantic_ai.models.test import TestModel
 
-from app.agent.tool_gate import ToolClassification, classifications, register_tool, require_approval
-
-
-def test_every_real_planner_tool_is_classified_and_read_only() -> None:
-    from app.agent.planner import agent as planner_agent
-
-    registered_tool_names = set(planner_agent._function_toolset.tools.keys())  # noqa: SLF001
-    classified_tool_names = set(classifications().keys())
-
-    assert registered_tool_names == classified_tool_names, (
-        f"every tool on the planner agent must be classified and vice versa (drift guard); "
-        f"agent tools={registered_tool_names}, classified tools={classified_tool_names}"
-    )
-    assert {classifications()[name] for name in registered_tool_names} == {
-        ToolClassification.READ_ONLY
-    }, (
-        f"today's tools must both be READ_ONLY - wiring a write tool into the agent must go "
-        f"red immediately; got {classifications()}"
-    )
+from app.agent.tool_gate import ToolClassification, classifications, register_tool
 
 
 def test_registering_a_tool_without_classification_is_a_startup_typeerror() -> None:
+    """register_tool takes no default classification, so wiring a tool without one fails loud at
+    import time instead of silently registering an unclassified (possibly write) tool — the
+    fail-closed guarantee DECISIONS.md relies on. A default kwarg here would erode it silently."""
     probe_agent = Agent(TestModel())
 
-    def unclassified_tool(ctx: RunContext) -> str:
+    def unclassified_tool(context: RunContext) -> str:
         return "should never register"
 
     with pytest.raises(TypeError):
         register_tool(probe_agent, unclassified_tool)  # type: ignore[call-arg]
 
 
-def test_boundary_crossing_tool_with_no_approver_is_denied_not_executed() -> None:
-    executed_calls: list[bool] = []
-    probe_agent = Agent(TestModel(call_tools=["probe_write"]))
+def test_every_real_planner_tool_is_classified_and_read_only() -> None:
+    # Importing the planner runs register_tool for each tool — the only registration path, which
+    # records the classification in this public registry. Assert that surface, not the agent's
+    # private toolset internals.
+    import app.agent.planner  # noqa: F401  (import triggers tool registration as a side effect)
 
-    def probe_write(ctx: RunContext) -> str:
-        require_approval(ctx, "probe_write")
-        executed_calls.append(True)
-        return "should never execute"
+    registry = classifications()
 
-    register_tool(probe_agent, probe_write, classification=ToolClassification.BOUNDARY_CROSSING)
+    assert set(registry) == {"search_flights", "web_search"}, (
+        f"the planner must register exactly its two tools through register_tool (the fail-closed "
+        f"path); a tool added outside it, or a renamed tool, shows up here as drift — got {registry}"
+    )
+    assert set(registry.values()) == {ToolClassification.READ_ONLY}, (
+        f"today's tools must both be READ_ONLY - wiring a write tool into the agent must go "
+        f"red immediately; got {registry}"
+    )
 
-    with pytest.raises(UserError):
-        probe_agent.run_sync("call probe_write")
 
-    assert executed_calls == [], (
-        f"a denied boundary-crossing call must never run past the approval check, but ran "
-        f"{len(executed_calls)} time(s)"
+def test_cerebras_request_tools_have_uniform_strict_mode() -> None:
+    """Cerebras rejects a mixed strict request. Pydantic AI infers the final-output tools as
+    strict-compatible, so planner function tools must opt into strict mode too."""
+    from app.agent.planner import agent as planner_agent
+
+    output_toolset = planner_agent._output_toolset  # noqa: SLF001
+    assert output_toolset is not None
+    model = planner_agent.model
+    assert isinstance(model, Model)
+
+    _, request_parameters = model.prepare_request(
+        None,
+        ModelRequestParameters(
+            function_tools=[
+                tool.tool_def for tool in planner_agent._function_toolset.tools.values()  # noqa: SLF001
+            ],
+            output_tools=output_toolset._tool_defs,  # noqa: SLF001
+            output_mode="tool",
+            allow_text_output=False,
+        ),
+    )
+
+    strict_values = {
+        tool_definition.strict
+        for tool_definition in [
+            *request_parameters.function_tools,
+            *request_parameters.output_tools,
+        ]
+    }
+    assert strict_values == {True}, (
+        f"all Cerebras tools must resolve to strict=True before the request is sent; "
+        f"got {strict_values}"
     )

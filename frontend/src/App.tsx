@@ -1,5 +1,5 @@
-import { useState } from "react"
-import { ApiError, createTrip, planTrip, searchTripFlights, updateTrip } from "./api/client"
+import { useEffect, useState } from "react"
+import { ApiError, createTrip, getTrip, planTrip, searchTripFlights, updateTrip } from "./api/client"
 import type {
   FlightOfferOut,
   FlightSearchOut,
@@ -19,7 +19,18 @@ function extractErrorMessage(error: unknown): string {
   return error instanceof ApiError ? error.message : "Something went wrong. Please try again."
 }
 
+const ACTIVE_TRIP_ID_STORAGE_KEY = "travel-agent.activeTripId"
+
+type TabKey = "trip" | "execution"
+
+const TABS: { key: TabKey; label: string }[] = [
+  { key: "trip", label: "Plan a trip" },
+  { key: "execution", label: "Agent execution history" },
+]
+
 function App() {
+  const [activeTab, setActiveTab] = useState<TabKey>("trip")
+
   const [trip, setTrip] = useState<TripRequestOut | null>(null)
   const [isCreatingTrip, setIsCreatingTrip] = useState(false)
   const [createTripError, setCreateTripError] = useState<string | null>(null)
@@ -35,11 +46,23 @@ function App() {
 
   const isRunActive = isSearchingFlights || isPlanning
 
+  // Restore the active trip after a hard refresh so the execution history survives — React state
+  // alone would lose the trip id and leave the ExecutionPanel with nothing to re-fetch.
+  useEffect(() => {
+    const storedTripId = localStorage.getItem(ACTIVE_TRIP_ID_STORAGE_KEY)
+    if (!storedTripId) return
+    getTrip(Number(storedTripId))
+      .then(setTrip)
+      .catch(() => localStorage.removeItem(ACTIVE_TRIP_ID_STORAGE_KEY))
+  }, [])
+
   const handleCreateTrip = async (tripRequestCreate: TripRequestCreate) => {
     setIsCreatingTrip(true)
     setCreateTripError(null)
     try {
-      setTrip(await createTrip(tripRequestCreate))
+      const createdTrip = await createTrip(tripRequestCreate)
+      setTrip(createdTrip)
+      localStorage.setItem(ACTIVE_TRIP_ID_STORAGE_KEY, String(createdTrip.id))
     } catch (error) {
       setCreateTripError(extractErrorMessage(error))
     } finally {
@@ -66,7 +89,9 @@ function App() {
     setIsPlanning(true)
     setPlanError(null)
     try {
-      setPlanResult(await planTrip(trip.id))
+      const planOutcome = await planTrip(trip.id)
+      setPlanResult(planOutcome)
+      if (planOutcome.status === "needs_clarification") clearFlightAndBookingState()
     } catch (error) {
       setPlanError(extractErrorMessage(error))
     } finally {
@@ -81,7 +106,10 @@ function App() {
     try {
       const updatedTrip = await updateTrip(trip.id, answers)
       setTrip(updatedTrip)
-      setPlanResult(await planTrip(trip.id))
+      localStorage.setItem(ACTIVE_TRIP_ID_STORAGE_KEY, String(updatedTrip.id))
+      const planOutcome = await planTrip(trip.id)
+      setPlanResult(planOutcome)
+      if (planOutcome.status === "needs_clarification") clearFlightAndBookingState()
     } catch (error) {
       setPlanError(extractErrorMessage(error))
     } finally {
@@ -93,78 +121,114 @@ function App() {
     setSelectedOffer(null)
   }
 
+  // When a re-plan comes back needing clarification, the trip has effectively changed — drop any
+  // flight results, selection, and (via BookingModule's remount key) booking state so the UI never
+  // shows offers or a booking tied to the now-stale trip.
+  const clearFlightAndBookingState = () => {
+    setFlightSearchResult(null)
+    setSelectedOffer(null)
+    setFlightSearchError(null)
+  }
+
   return (
-    <div className="flex min-h-screen bg-slate-50 text-slate-900">
-      <aside className="sticky top-0 flex h-screen w-72 shrink-0 flex-col border-r border-slate-200 bg-white">
-        <div className="border-b border-slate-200 px-5 py-5">
-          <p className="text-base font-semibold text-slate-900">Travel Agent</p>
-          <p className="text-xs text-slate-500">AI trip planner with human-in-the-loop booking</p>
+    <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900 md:flex-row">
+      <aside className="flex w-full shrink-0 flex-col border-b border-slate-200 bg-white md:sticky md:top-0 md:h-screen md:w-80 md:border-b-0 md:border-r">
+        <div className="border-b border-slate-200 px-6 py-6">
+          <h1
+            title={`Build ${__GIT_SHA__}`}
+            className="cursor-default text-3xl font-bold tracking-tight text-slate-900"
+          >
+            Travel Agent
+          </h1>
+          <p className="mt-1.5 text-sm text-slate-500">
+            AI trip planner with human-in-the-loop booking
+          </p>
         </div>
 
-        {trip ? (
-          <LiveActivity tripId={trip.id} isRunActive={isRunActive} />
-        ) : (
-          <div className="flex-1 p-3">
-            <p className="px-2 text-xs text-slate-400">
-              Create a trip to watch the agent work here, live.
-            </p>
-          </div>
-        )}
+        <nav className="space-y-1 p-3" aria-label="Primary">
+          {TABS.map((tab) => {
+            const isActive = activeTab === tab.key
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                aria-current={isActive ? "page" : undefined}
+                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition ${
+                  isActive
+                    ? "bg-indigo-50 text-indigo-700"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                }`}
+              >
+                {tab.label}
+                {tab.key === "execution" && isRunActive && (
+                  <span className="relative flex h-2 w-2" aria-label="run in progress">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-75" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-indigo-500" />
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </nav>
 
-        {trip && (
-          <div className="border-t border-slate-200 px-5 py-4 text-xs text-slate-500">
-            <p className="font-medium text-slate-700">Trip #{trip.id}</p>
-            <p>
-              {trip.origin} → {trip.destination_airport}
-            </p>
-            <p>
-              {trip.depart_date}
-              {trip.return_date ? ` – ${trip.return_date}` : ""}
-            </p>
-          </div>
-        )}
+        <div className="flex-1" />
       </aside>
 
       <div className="flex min-h-screen flex-1 flex-col">
         <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 px-6 py-8">
-          {!trip && (
-            <Questionnaire
-              onSubmit={handleCreateTrip}
-              isSubmitting={isCreatingTrip}
-              errorMessage={createTripError}
-            />
-          )}
-
-          {trip && (
+          {activeTab === "trip" && (
             <>
-              <FlightSearch
-                searchResult={flightSearchResult}
-                isLoading={isSearchingFlights}
-                errorMessage={flightSearchError}
-                selectedOfferId={selectedOffer?.id ?? null}
-                onSearch={handleSearchFlights}
-                onSelectOffer={setSelectedOffer}
-              />
+              {!trip && (
+                <Questionnaire
+                  onSubmit={handleCreateTrip}
+                  isSubmitting={isCreatingTrip}
+                  errorMessage={createTripError}
+                />
+              )}
 
-              <BookingModule
-                key={selectedOffer ? selectedOffer.id : "none"}
-                trip={trip}
-                selectedOffer={selectedOffer}
-                onSearchAgain={handleSearchAgain}
-              />
+              {trip && (
+                <>
+                  <FlightSearch
+                    trip={trip}
+                    searchResult={flightSearchResult}
+                    isLoading={isSearchingFlights}
+                    errorMessage={flightSearchError}
+                    selectedOfferId={selectedOffer?.id ?? null}
+                    onSearch={handleSearchFlights}
+                    onSelectOffer={setSelectedOffer}
+                  />
 
-              <ItineraryPanel
-                trip={trip}
-                planResult={planResult}
-                isLoading={isPlanning}
-                errorMessage={planError}
-                onRequestPlan={handleRequestPlan}
-                onAnswerClarification={handleAnswerClarification}
-              />
+                  <BookingModule
+                    key={selectedOffer ? selectedOffer.id : "none"}
+                    trip={trip}
+                    selectedOffer={selectedOffer}
+                    onSearchAgain={handleSearchAgain}
+                  />
 
-              <ExecutionPanel tripId={trip.id} isRunActive={isRunActive} />
+                  <ItineraryPanel
+                    trip={trip}
+                    planResult={planResult}
+                    isLoading={isPlanning}
+                    errorMessage={planError}
+                    onRequestPlan={handleRequestPlan}
+                    onAnswerClarification={handleAnswerClarification}
+                  />
+
+                  <LiveActivity tripId={trip.id} isRunActive={isRunActive} />
+                </>
+              )}
             </>
           )}
+
+          {activeTab === "execution" &&
+            (trip ? (
+              <ExecutionPanel tripId={trip.id} isRunActive={isRunActive} />
+            ) : (
+              <p className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">
+                Create a trip first — the agent's execution trace will appear here once it runs.
+              </p>
+            ))}
         </main>
 
         <Footer />

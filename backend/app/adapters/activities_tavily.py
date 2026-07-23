@@ -6,6 +6,8 @@ from dataclasses import dataclass
 
 from tavily import TavilyClient
 
+from app.config import EXCLUDED_ACTIVITY_SEARCH_DOMAINS
+
 logger = logging.getLogger(__name__)
 
 
@@ -28,7 +30,11 @@ class TavilyActivityProvider:
     async def search(self, query: str, max_results: int = 5) -> list[NormalizedActivityResult]:
         try:
             response = await asyncio.to_thread(
-                self._client.search, query=query, max_results=max_results
+                self._client.search,
+                query=query,
+                max_results=max_results,
+                search_depth="advanced",
+                exclude_domains=EXCLUDED_ACTIVITY_SEARCH_DOMAINS,
             )
         except Exception as error:  # tavily-python raises its own exception hierarchy
             logger.warning("tavily web_search failed: %r for query=%r", error, query)

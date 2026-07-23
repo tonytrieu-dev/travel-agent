@@ -72,8 +72,10 @@ class TripRequest(SQLModel, table=True):
     destination_airport: str  # IATA code for the flight search
     depart_date: str  # ISO date (YYYY-MM-DD)
     return_date: str | None = None
-    age: int | None = None  # optional — the agent asks if it needs it
-    fitness_level: FitnessLevel | None = None  # optional — the agent asks if it needs it
+    # Required at the API boundary (TripRequestCreate); the column stays nullable so trips created
+    # before they became mandatory still load.
+    age: int | None = None
+    fitness_level: FitnessLevel | None = None
     budget_usd: float | None = None
     status: TripStatus = Field(default=TripStatus.CREATED)
     created_at: datetime = Field(default_factory=utcnow)
@@ -168,6 +170,7 @@ class ExecutionEvent(SQLModel, table=True):
     status: str
     detail: str
     duration_ms: int | None = None
+    data: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON))
     created_at: datetime = Field(default_factory=utcnow)
 
 

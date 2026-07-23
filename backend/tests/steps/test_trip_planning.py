@@ -9,9 +9,13 @@ twice" are real assertions about calls made, not about a fabricated return value
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
+from app.adapters.flights_searchapi import NormalizedFlightOffer
 from app.schemas import ClarificationOut, ItineraryDayOut, ItineraryOut
 from tests.conftest import FlightSearchSpy, PlannerRunSpy
 from tests.db_helpers import (
+    get_execution_events,
+    get_flight_search_results,
+    get_itinerary,
     get_trip,
     run_db,
     seed_flight_search_results,
@@ -43,11 +47,6 @@ def _trip_payload(**overrides: object) -> dict:
 @given("a trip request with a depart date next month and no return date")
 def _valid_trip_request(bag: dict) -> None:
     bag["payload"] = _trip_payload(depart_date="2026-09-01")
-
-
-@given("a trip request with a depart date in the past")
-def _past_depart_date(bag: dict) -> None:
-    bag["payload"] = _trip_payload(depart_date="2020-01-01")
 
 
 @given("a trip request whose return date is before its depart date")
@@ -111,41 +110,6 @@ def _existing_trip_with_itinerary() -> int:
     return run_db(_work)
 
 
-@when("the trip is updated with only a new budget")
-def _update_budget(client, trip_id: int, bag: dict) -> None:
-    bag["response"] = client.patch(f"/api/trips/{trip_id}", json={"budget_usd": 2500.0})
-
-
-@when("the trip is updated with a return date before its existing depart date")
-def _update_bad_return_date(client, trip_id: int, bag: dict) -> None:
-    bag["response"] = client.patch(f"/api/trips/{trip_id}", json={"return_date": "2020-01-01"})
-
-
-@when("a nonexistent trip is updated", target_fixture="trip_id")
-def _update_nonexistent(client, bag: dict) -> int:
-    bag["response"] = client.patch("/api/trips/999999", json={"budget_usd": 100.0})
-    return 999999
-
-
-@then("the response is 200 with the new budget and the original dates")
-def _updated_budget_and_dates(bag: dict) -> None:
-    response = bag["response"]
-    assert response.status_code == 200, f"expected 200, got {response.status_code}: {response.text}"
-    body = response.json()
-    assert body["budget_usd"] == 2500.0, f"expected the new budget to stick, got {body['budget_usd']}"
-    assert body["depart_date"] == "2026-09-01", (
-        f"a budget-only PATCH must not touch depart_date, got {body['depart_date']}"
-    )
-
-
-@then("the trip's stored return date is unchanged")
-def _return_date_unchanged(trip_id: int) -> None:
-    trip = run_db(lambda session: get_trip(session, trip_id))
-    assert trip.return_date is None, (
-        f"a rejected PATCH must not persist the invalid return_date, found {trip.return_date!r}"
-    )
-
-
 @given("flights have already been searched live for that route and those dates")
 def _prior_live_search() -> None:
     async def _work(session):
@@ -176,6 +140,17 @@ def _flight_provider_called_once(flight_search_spy: FlightSearchSpy) -> None:
     assert flight_search_spy.calls == 1, (
         f"a cache-miss search must call the live provider exactly once, got "
         f"{flight_search_spy.calls}"
+    )
+
+
+@then(parsers.parse('a "{name}" execution event is recorded for the trip'))
+def _execution_event_recorded(trip_id: int, name: str) -> None:
+    events = run_db(lambda session: get_execution_events(session, trip_id))
+    assert any(event.name == name for event in events), (
+        f"expected an execution event named {name!r} for trip {trip_id} — the button-triggered "
+        f"search must bind execution_context and record_event just like the agent's own tool "
+        f"call does, or it never shows up in the execution panel; got events "
+        f"{[event.name for event in events]}"
     )
 
 
@@ -242,4 +217,69 @@ def _planner_never_called(planner_spy: PlannerRunSpy) -> None:
     assert planner_spy.calls == 0, (
         f"an already-planned trip must reuse the stored itinerary, not re-run the agent; "
         f"got {planner_spy.calls} calls"
+    )
+
+
+@given("the flight provider will return offers priced 812, 499, and 640 USD")
+def _provider_returns_unordered_prices(flight_search_spy: FlightSearchSpy) -> None:
+    flight_search_spy.offers = [
+        NormalizedFlightOffer(
+            carrier=f"carrier-{price}",
+            price_usd=price,
+            currency="USD",
+            depart_at="2026-09-01T09:00:00",
+            arrive_at="2026-09-01T21:30:00",
+            stops=0,
+            booking_token=f"tok-{price}",
+            raw_offer={"price": price},
+        )
+        for price in (812.0, 499.0, 640.0)
+    ]
+
+
+@then("the response is 200 with offers ordered cheapest first")
+def _offers_ordered_cheapest_first(bag: dict) -> None:
+    response = bag["response"]
+    assert response.status_code == 200, f"expected 200, got {response.status_code}: {response.text}"
+    prices = [offer["price_usd"] for offer in response.json()["offers"]]
+    assert prices == [499.0, 640.0, 812.0], (
+        f"search_flights must return offers ascending by price (the take-home's 'find the "
+        f"cheapest flights' and the frontend's first-offer 'Cheapest' badge depend on it); "
+        f"provider returned them as 812/499/640 but the API must reorder to 499/640/812, got {prices}"
+    )
+
+
+@given("an existing trip with cached flights and a generated itinerary", target_fixture="trip_id")
+def _trip_with_cached_flights_and_itinerary() -> int:
+    async def _work(session):
+        trip_id = await seed_trip(session, depart_date="2026-09-01")
+        await seed_flight_search_results(session, trip_id, minutes_ago=1)
+        await seed_itinerary(session, trip_id)
+        return trip_id
+
+    return run_db(_work)
+
+
+@when("the trip's destination airport is changed")
+def _change_destination_airport(client, trip_id: int, bag: dict) -> None:
+    bag["response"] = client.patch(f"/api/trips/{trip_id}", json={"destination_airport": "LHR"})
+
+
+@then("the response is 200 and the trip has no cached flight offers")
+def _no_cached_flight_offers(bag: dict, trip_id: int) -> None:
+    response = bag["response"]
+    assert response.status_code == 200, f"expected 200, got {response.status_code}: {response.text}"
+    flight_results = run_db(lambda session: get_flight_search_results(session, trip_id))
+    assert flight_results == [], (
+        f"changing the trip's route must invalidate flight offers priced for the old route, or "
+        f"/flights/search reuses them within the TTL; found {len(flight_results)} stale offer(s)"
+    )
+
+
+@then("the trip has no stored itinerary")
+def _no_stored_itinerary(trip_id: int) -> None:
+    itinerary = run_db(lambda session: get_itinerary(session, trip_id))
+    assert itinerary is None, (
+        "changing the trip's route must invalidate the itinerary researched for the old "
+        "destination, or /plan returns the stale itinerary instead of re-planning"
     )

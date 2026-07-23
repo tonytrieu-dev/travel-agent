@@ -26,14 +26,14 @@ def _find_tool_return(
     return None
 
 
-def _summarize_args(args: object) -> str | None:
-    if args is None:
+def _summarize_value(value: object) -> str | None:
+    if value is None:
         return None
-    if isinstance(args, str):
-        return args
-    if isinstance(args, dict):
-        return json.dumps(args)
-    return str(args)
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict | list):
+        return json.dumps(value)
+    return str(value)
 
 
 def derive_steps(message_history: list[ModelMessage]) -> list[AgentRunStep]:
@@ -74,8 +74,8 @@ def derive_steps(message_history: list[ModelMessage]) -> list[AgentRunStep]:
                     duration_ms=_duration_ms(
                         message.timestamp, tool_return.timestamp if tool_return else None
                     ),
-                    input_summary=_summarize_args(part.args),
-                    output_summary=str(tool_return.content) if tool_return is not None else None,
+                    input_summary=_summarize_value(part.args),
+                    output_summary=_summarize_value(tool_return.content) if tool_return else None,
                     tokens=None,
                 )
             )
@@ -93,8 +93,14 @@ async def persist_agent_run(
     model: str,
     message_history: list[ModelMessage],
     usage: RunUsage,
+    status: str = "completed",
 ) -> AgentRun:
-    """Persist the derived AgentRun + its ordered AgentRunStep rows in one transaction."""
+    """Persist the derived AgentRun + its ordered AgentRunStep rows in one transaction.
+
+    Called on both success and failure (status="failed") — a run that 413'd partway through
+    still leaves whatever steps ran before the crash on the record, not just the eventual
+    success, so the execution panel shows the real run history rather than only the last win.
+    """
     steps = derive_steps(message_history)
     total_ms = _duration_ms(
         message_history[0].timestamp if message_history else None,
@@ -103,7 +109,7 @@ async def persist_agent_run(
 
     agent_run = AgentRun(
         trip_request_id=trip_request_id,
-        status="completed",
+        status=status,
         model=model,
         total_input_tokens=usage.input_tokens,
         total_output_tokens=usage.output_tokens,
