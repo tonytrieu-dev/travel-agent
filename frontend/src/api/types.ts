@@ -201,3 +201,12 @@ export interface BookingLogOut {
   created_at: string
   transitions: BookingTransitionOut[]
 }
+
+export interface ConnectorStatusOut {
+  configured: boolean
+  enabled: boolean
+}
+
+export interface ConnectorsOut {
+  slack: ConnectorStatusOut
+}

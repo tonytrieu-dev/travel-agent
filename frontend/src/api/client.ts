@@ -1,6 +1,7 @@
 import type {
   BookingLogOut,
   BookingRequestCreate,
+  ConnectorsOut,
   ExecutionPanelOut,
   FlightSearchOut,
   PlanOut,
@@ -110,4 +111,15 @@ export function executeBooking(logId: number): Promise<BookingLogOut> {
 
 export function cancelBooking(logId: number): Promise<BookingLogOut> {
   return request<BookingLogOut>(`/bookings/${logId}/cancel`, { method: "POST" })
+}
+
+export function getConnectors(): Promise<ConnectorsOut> {
+  return request<ConnectorsOut>("/connectors")
+}
+
+export function setSlackConnectorEnabled(enabled: boolean): Promise<ConnectorsOut> {
+  return request<ConnectorsOut>("/connectors/slack", {
+    method: "PATCH",
+    body: JSON.stringify({ enabled }),
+  })
 }
