@@ -71,6 +71,20 @@ options and picks the cheapest — the current UI has no separate return-flight-
 this is the same cheapest tie-break the rest of the app already uses. Any failure in that
 resolution degrades honestly to no booking links, same as the rest of the booking-options path.
 
+## Custom Slack HITL adapter over chat-sdk-python
+`app/adapters/slack_hitl.py` hand-rolls signature verification (stdlib `hmac`/`hashlib`) and Block
+Kit message building for one outbound POST and one signed callback. **Alternative:**
+[`chat-sdk-python`](https://github.com/Chinchill-AI/chat-sdk-python), a multi-platform (Slack,
+Discord, Teams, Telegram, WhatsApp, and more) async chat SDK — trustworthy prior art, built by our
+CTO (30+ years as a SWE, enterprise background), with its own tested Slack webhook verifier and
+cross-platform `Card`/`Button` model already covering this exact surface. **Rejected for this
+deliverable** — pulling in a 9-platform, alpha-status SDK for a single Slack button is more
+integration risk than the feature warrants, and hand-rolling the ~30-line HMAC check against
+Slack's own documented example is a clearer demonstration of understanding the protocol than
+depending on an abstraction over it. **Kept as the deliberate extension point:** `notify_pending_approval`/`resolve_approve`/`resolve_reject` are isolated behind `slack_hitl.py`'s
+narrow interface specifically so that a real multi-connector future (Discord, Teams, ...) is a
+module swap to `chat-sdk-python`, not a rewrite — see `docs/SLACK_SETUP.md`.
+
 ## Deferred by design
 Episodic/semantic/procedural agent memory, full auth (only `get_current_user` changes), and
 payment processing — each pays off across many sessions or needs infrastructure the take-home
