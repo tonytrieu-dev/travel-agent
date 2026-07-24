@@ -305,6 +305,59 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetail' }
 
+  /api/slack/interactions:
+    post:
+      operationId: slack_interactions
+      summary: >-
+        Slack's interactivity callback for the booking-approval message. Verifies the request
+        signature, then approves (confirm_booking) or rejects (cancel_booking) the booking named
+        by the clicked button's value. Never executes a booking from this path.
+      responses:
+        '200':
+          description: >-
+            The interaction was processed (or was a recognized-but-unactionable payload) —
+            the response body replaces the original Slack message.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SlackInteractionOut' }
+        '401':
+          description: Missing/invalid Slack signature, or Slack is not configured.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SlackAuthErrorOut' }
+
+  /api/connectors:
+    get:
+      operationId: get_connectors
+      summary: The configured/enabled status of each optional connector (currently just Slack).
+      responses:
+        '200':
+          description: Current connector status.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConnectorsOut' }
+
+  /api/connectors/slack:
+    patch:
+      operationId: set_slack_connector
+      summary: Enable or disable the Slack connector. 409 if Slack env vars aren't configured.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConnectorToggleUpdate' }
+      responses:
+        '200':
+          description: Updated connector status.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConnectorsOut' }
+        '409':
+          description: Slack is not configured on this deployment (missing env vars).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
 components:
   schemas:
     BookingState:
@@ -314,7 +367,7 @@ components:
     ErrorCode:
       type: string
       description: Machine-readable failure code; the human explanation is in `detail`.
-      enum: [booking_not_found, trip_not_found, flight_not_found, booking_expired, invalid_transition, validation_error, rate_limit_exceeded]
+      enum: [booking_not_found, trip_not_found, flight_not_found, booking_expired, invalid_transition, validation_error, rate_limit_exceeded, connector_not_configured]
 
     BookingRequestCreate:
       type: object
@@ -583,3 +636,38 @@ components:
         events:
           type: array
           items: { $ref: '#/components/schemas/ExecutionEventOut' }
+
+    SlackInteractionOut:
+      type: object
+      required: [replace_original, text, blocks]
+      properties:
+        replace_original: { type: boolean }
+        text: { type: string }
+        blocks:
+          type: array
+          items: { type: object, additionalProperties: true }
+
+    SlackAuthErrorOut:
+      type: object
+      required: [detail]
+      properties:
+        detail: { type: string }
+
+    ConnectorStatusOut:
+      type: object
+      required: [configured, enabled]
+      properties:
+        configured: { type: boolean }
+        enabled: { type: boolean }
+
+    ConnectorsOut:
+      type: object
+      required: [slack]
+      properties:
+        slack: { $ref: '#/components/schemas/ConnectorStatusOut' }
+
+    ConnectorToggleUpdate:
+      type: object
+      required: [enabled]
+      properties:
+        enabled: { type: boolean }

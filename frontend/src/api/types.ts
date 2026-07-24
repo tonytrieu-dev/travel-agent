@@ -20,6 +20,7 @@ export type ErrorCode =
   | "invalid_transition"
   | "validation_error"
   | "rate_limit_exceeded"
+  | "connector_not_configured"
 
 export interface ProblemDetail {
   code: ErrorCode
