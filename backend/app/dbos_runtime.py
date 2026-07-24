@@ -8,16 +8,13 @@ change from the plain, already-tested versions of the functions they call.
 from dbos import DBOS, DBOSConfig
 from pydantic_ai import AgentRun, UnexpectedModelBehavior
 from pydantic_ai.exceptions import UsageLimitExceeded
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.activities_tavily import TavilyActivityProvider
 from app.adapters.flights_searchapi import get_flight_provider
-from app.agent.execution_log import execution_context
-from app.agent.observability import persist_agent_run
+from app.agent.execution_log import ExecutionRun, ExecutionService
 from app.agent.planner import PlannerDeps, agent, default_usage_limits
 from app.config import CEREBRAS_MODEL, get_settings
 from app.db import get_session_factory
-from app.models import AgentRun as ObservedAgentRun
 from app.models import FlightSearchResult, TripRequest
 from app.rate_limit import acquire_agent_run_slot, release_agent_run_slot
 from app.repositories import booking_repository as repository
@@ -25,20 +22,14 @@ from app.schemas import BookingLogOut, ClarificationOut, ItineraryOut
 
 
 async def _persist_failed_run(
-    session: AsyncSession,
-    trip_id: int,
+    run: ExecutionRun,
     agent_run: AgentRun[PlannerDeps, ItineraryOut | ClarificationOut],
-    observed_run: ObservedAgentRun,
 ) -> None:
     # Keeps whatever tool calls ran before the crash on the execution panel, not just successes.
-    await persist_agent_run(
-        session,
-        trip_request_id=trip_id,
-        model=CEREBRAS_MODEL,
+    await run.persist_result(
         message_history=agent_run.ctx.state.message_history,
         usage=agent_run.ctx.state.usage,
         status="failed",
-        agent_run=observed_run,
     )
 
 
@@ -81,9 +72,8 @@ async def _run_planner_workflow(trip_id: int, prompt: str) -> ItineraryOut | Cla
     settings = get_settings()
     async with (
         get_session_factory()() as session,
-        execution_context(session, trip_id, run_model=CEREBRAS_MODEL) as observed_run,
+        ExecutionService(session).start_run(trip_id, model=CEREBRAS_MODEL) as run,
     ):
-        assert observed_run is not None
         trip = await session.get(TripRequest, trip_id)
         deps = PlannerDeps(
             flight_provider=get_flight_provider(settings),
@@ -95,7 +85,7 @@ async def _run_planner_workflow(trip_id: int, prompt: str) -> ItineraryOut | Cla
                 async for node in agent_run:
                     pass
             except Exception as error:
-                await _persist_failed_run(session, trip_id, agent_run, observed_run)
+                await _persist_failed_run(run, agent_run)
                 if isinstance(error, UsageLimitExceeded):
                     # A real, expected outcome on a research-heavy trip (see MAX_CONTEXT_TOKENS
                     # in config.py) — ask the user to narrow scope instead of crashing the request.
@@ -120,14 +110,7 @@ async def _run_planner_workflow(trip_id: int, prompt: str) -> ItineraryOut | Cla
 
             result = agent_run.result
             assert result is not None, "agent_run finished iterating without producing a result"
-            await persist_agent_run(
-                session,
-                trip_request_id=trip_id,
-                model=CEREBRAS_MODEL,
-                message_history=result.all_messages(),
-                usage=result.usage,
-                agent_run=observed_run,
-            )
+            await run.persist_result(message_history=result.all_messages(), usage=result.usage)
     return result.output
 
 
