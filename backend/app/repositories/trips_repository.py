@@ -11,7 +11,6 @@ from datetime import timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, select
 
-from app.adapters.flights_searchapi import FlightProvider, NormalizedFlightOffer
 from app.config import FLIGHT_CACHE_TTL_MINUTES
 from app.models import (
     AgentRun,
@@ -160,41 +159,6 @@ async def get_trip_snapshot(
         else False
     )
     return trip, _cheapest_first(offers), itinerary, is_stale
-
-
-def offer_summary(offer: FlightSearchResult | NormalizedFlightOffer) -> dict:
-    return {
-        "carrier": offer.carrier,
-        "price_usd": offer.price_usd,
-        "currency": offer.currency,
-        "depart_at": offer.depart_at,
-        "arrive_at": offer.arrive_at,
-        "stops": offer.stops,
-    }
-
-
-def flight_provider_name(provider: FlightProvider) -> str:
-    return {
-        "LiveSearchApiProvider": "SearchApi",
-        "RecordedProvider": "Recorded flights",
-    }.get(type(provider).__name__, type(provider).__name__)
-
-
-async def get_recent_flight_results(session: AsyncSession, trip_id: int) -> list[FlightSearchResult]:
-    """Extracted so the planner agent's search_flights tool can reuse this same cache check."""
-    cutoff = utcnow() - timedelta(minutes=FLIGHT_CACHE_TTL_MINUTES)
-    trip = await session.get(TripRequest, trip_id)
-    results = list(
-        await session.scalars(
-            select(FlightSearchResult).where(
-                col(FlightSearchResult.trip_request_id) == trip_id,
-                col(FlightSearchResult.created_at) >= cutoff,
-            )
-        )
-    )
-    return _cheapest_first(
-        _complete_flight_results(results, trip.return_date if trip is not None else None)
-    )
 
 
 def _build_planner_prompt(trip: TripRequest) -> str:
