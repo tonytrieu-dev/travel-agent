@@ -75,9 +75,10 @@ resolution degrades honestly to no booking links, same as the rest of the bookin
 `app/adapters/slack_hitl.py` hand-rolls signature verification (stdlib `hmac`/`hashlib`) and Block
 Kit message building for one outbound POST and one signed callback. **Alternative:**
 [`chat-sdk-python`](https://github.com/Chinchill-AI/chat-sdk-python), a multi-platform (Slack,
-Discord, Teams, Telegram, WhatsApp, and more) async chat SDK — trustworthy prior art, built by our
-CTO (30+ years as a SWE, enterprise background), with its own tested Slack webhook verifier and
-cross-platform `Card`/`Button` model already covering this exact surface. **Rejected for this
+Discord, Teams, Telegram, WhatsApp, and more) async chat SDK — trustworthy prior art, built by a
+former colleague (30+ years as a SWE, enterprise background) from a previous role, with its own
+tested Slack webhook verifier and cross-platform `Card`/`Button` model already covering this exact
+surface. **Rejected for this
 deliverable** — pulling in a 9-platform, alpha-status SDK for a single Slack button is more
 integration risk than the feature warrants, and hand-rolling the ~30-line HMAC check against
 Slack's own documented example is a clearer demonstration of understanding the protocol than
