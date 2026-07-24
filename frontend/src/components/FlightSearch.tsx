@@ -127,11 +127,7 @@ export function FlightSearch({
             return (
               <li key={offer.id}>
                 <label
-                  className={`flex items-center justify-between gap-4 rounded-lg border p-4 transition ${
-                    searchResult.is_stale
-                      ? "cursor-not-allowed opacity-60"
-                      : "cursor-pointer"
-                  } ${
+                  className={`flex cursor-pointer items-center justify-between gap-4 rounded-lg border p-4 transition ${
                     selectedOfferId === offer.id
                       ? "border-indigo-500 bg-indigo-50"
                       : "border-slate-200 hover:border-slate-300"
@@ -143,7 +139,6 @@ export function FlightSearch({
                       name="flight-offer"
                       checked={selectedOfferId === offer.id}
                       onChange={() => onSelectOffer(offer)}
-                      disabled={searchResult.is_stale}
                       className="h-4 w-4"
                     />
                     <div className="space-y-3">
