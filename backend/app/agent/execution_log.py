@@ -121,3 +121,31 @@ async def record_event(
         )
         context.next_seq += 1
         await context.session.commit()
+
+
+@dataclass
+class ExecutionRun:
+    """The narrow surface callers need once bound inside an ExecutionService run — everything
+    else (ContextVar plumbing, event-sequence allocation, per-run locking) stays hidden in
+    execution_context()."""
+
+    agent_run: AgentRun | None
+
+    async def record_event(
+        self, kind: ExecutionEventKind, name: str, status: str, detail: str,
+        duration_ms: int | None = None, data: dict[str, Any] | None = None,
+        provider: str | None = None,
+    ) -> None:
+        await record_event(kind, name, status, detail, duration_ms, data, provider)
+
+
+class ExecutionService:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    @asynccontextmanager
+    async def start_run(
+        self, trip_id: int, *, model: str | None = None
+    ) -> AsyncIterator[ExecutionRun]:
+        async with execution_context(self._session, trip_id, run_model=model) as agent_run:
+            yield ExecutionRun(agent_run=agent_run)
