@@ -17,7 +17,8 @@ from app.dbos_runtime import launch_dbos, shutdown_dbos
 from app.rate_limit import RateLimitError
 from app.repositories.booking_repository import BookingError
 from app.repositories.trips_repository import TripError
-from app.routes import booking, slack, trips
+from app.routes import booking, connectors, slack, trips
+from app.routes.connectors import ConnectorError
 from app.schemas import ErrorCode, ProblemDetail
 
 
@@ -38,11 +39,17 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(booking.router)
+    app.include_router(connectors.router)
     app.include_router(slack.router)
     app.include_router(trips.router)
 
     @app.exception_handler(BookingError)
     async def _render_booking_error(request: Request, error: BookingError) -> JSONResponse:
+        problem = ProblemDetail(code=error.code, detail=error.detail)
+        return JSONResponse(status_code=error.status_code, content=problem.model_dump(mode="json"))
+
+    @app.exception_handler(ConnectorError)
+    async def _render_connector_error(request: Request, error: ConnectorError) -> JSONResponse:
         problem = ProblemDetail(code=error.code, detail=error.detail)
         return JSONResponse(status_code=error.status_code, content=problem.model_dump(mode="json"))
 

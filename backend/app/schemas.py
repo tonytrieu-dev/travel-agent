@@ -9,8 +9,6 @@ from datetime import UTC, date, datetime
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 
-from app.models import AgentStepKind, ExecutionEventKind, FitnessLevel, TripStatus
-from app.state import BookingState
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -20,6 +18,9 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+
+from app.models import AgentStepKind, ExecutionEventKind, FitnessLevel, TripStatus
+from app.state import BookingState
 
 # Server timestamps are stored naive-UTC; serialize them with a +00:00 offset so a client doesn't
 # misread them as local time (which skewed the booking countdown by the viewer's UTC offset).
@@ -89,6 +90,19 @@ def _validate_traveler_age(value: int) -> int:
 class ProblemDetail(BaseModel):
     code: ErrorCode
     detail: str
+
+
+class ConnectorStatusOut(BaseModel):
+    configured: bool
+    enabled: bool
+
+
+class ConnectorsOut(BaseModel):
+    slack: ConnectorStatusOut
+
+
+class ConnectorToggleUpdate(BaseModel):
+    enabled: bool
 
 
 class BookingRequestCreate(BaseModel):
