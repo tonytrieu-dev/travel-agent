@@ -14,13 +14,14 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col
 
-from app.models import ExecutionEvent, ExecutionEventKind
+from app.models import AgentRun, ExecutionEvent, ExecutionEventKind, utcnow
 
 
 @dataclass
 class _ExecutionContext:
     session: AsyncSession
     trip_request_id: int
+    agent_run: AgentRun | None
     next_seq: int
     # pydantic_ai runs tool calls from the same model turn concurrently (see
     # search_flights/web_search running together); AsyncSession isn't safe for concurrent
@@ -32,9 +33,20 @@ _current: ContextVar[_ExecutionContext | None] = ContextVar("execution_context",
 
 
 @asynccontextmanager
-async def execution_context(session: AsyncSession, trip_request_id: int) -> AsyncIterator[None]:
-    """Bind session/trip_request_id for one run. seq resumes from the trip's max so re-planned
-    runs share one continuous timeline."""
+async def execution_context(
+    session: AsyncSession, trip_request_id: int, *, run_model: str | None = None
+) -> AsyncIterator[AgentRun | None]:
+    """Bind one execution so its append-only events retain both trip and run ownership."""
+    agent_run = (
+        AgentRun(trip_request_id=trip_request_id, status="running", model=run_model)
+        if run_model is not None
+        else None
+    )
+    if agent_run is not None:
+        session.add(agent_run)
+        await session.commit()
+        assert agent_run.id is not None
+
     result = await session.execute(
         select(func.max(ExecutionEvent.seq)).where(
             col(ExecutionEvent.trip_request_id) == trip_request_id
@@ -43,10 +55,24 @@ async def execution_context(session: AsyncSession, trip_request_id: int) -> Asyn
     starting_seq = (result.scalar_one_or_none() or 0) + 1
 
     token = _current.set(
-        _ExecutionContext(session=session, trip_request_id=trip_request_id, next_seq=starting_seq)
+        _ExecutionContext(
+            session=session,
+            trip_request_id=trip_request_id,
+            agent_run=agent_run,
+            next_seq=starting_seq,
+        )
     )
     try:
-        yield
+        yield agent_run
+    except Exception:
+        if agent_run is not None and agent_run.status == "running":
+            agent_run.status = "failed"
+            agent_run.finished_at = utcnow()
+            agent_run.total_ms = round(
+                (agent_run.finished_at - agent_run.started_at).total_seconds() * 1000
+            )
+            await session.commit()
+        raise
     finally:
         _current.reset(token)
 
@@ -75,15 +101,18 @@ async def record_event(
     detail: str,
     duration_ms: int | None = None,
     data: dict[str, Any] | None = None,
+    provider: str | None = None,
 ) -> None:
     context = _bound_context("record_event")
     async with context.lock:
         context.session.add(
             ExecutionEvent(
                 trip_request_id=context.trip_request_id,
+                agent_run_id=context.agent_run.id if context.agent_run is not None else None,
                 seq=context.next_seq,
                 kind=kind,
                 name=name,
+                provider=provider,
                 status=status,
                 detail=detail,
                 duration_ms=duration_ms,

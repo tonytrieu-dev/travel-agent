@@ -84,6 +84,16 @@ function App() {
     }
   }
 
+  // Drops the current trip entirely so the Questionnaire renders fresh — the only way back to
+  // the input form once a trip exists, for a traveler who wants to search a different flight.
+  const handleStartNewSearch = () => {
+    localStorage.removeItem(ACTIVE_TRIP_ID_STORAGE_KEY)
+    setTrip(null)
+    clearFlightAndBookingState()
+    setPlanResult(null)
+    setPlanError(null)
+  }
+
   const handleRequestPlan = async () => {
     if (!trip) return
     setIsPlanning(true)
@@ -98,6 +108,17 @@ function App() {
       setIsPlanning(false)
     }
   }
+
+  // Restoring `trip` only refetches the trip row itself; rehydrate what it says already exists.
+  useEffect(() => {
+    if (!trip) return
+    if (trip.status === "flights_searched" || trip.status === "itinerary_ready") {
+      handleSearchFlights()
+    }
+    if (trip.status === "itinerary_ready") {
+      handleRequestPlan()
+    }
+  }, [trip?.id])
 
   const handleAnswerClarification = async (answers: ClarificationAnswers) => {
     if (!trip) return
@@ -133,19 +154,16 @@ function App() {
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900 md:flex-row">
       <aside className="flex w-full shrink-0 flex-col border-b border-slate-200 bg-white md:sticky md:top-0 md:h-screen md:w-80 md:border-b-0 md:border-r">
-        <div className="border-b border-slate-200 px-6 py-6">
-          <h1
-            title={`Build ${__GIT_SHA__}`}
-            className="cursor-default text-3xl font-bold tracking-tight text-slate-900"
-          >
+        <div className="border-b border-slate-200 px-6 py-7">
+          <h1 className="cursor-default text-3xl font-bold tracking-tight text-slate-900">
             Travel Agent
           </h1>
-          <p className="mt-1.5 text-sm text-slate-500">
+          <p className="mt-3 text-sm leading-6 text-slate-500">
             AI trip planner with human-in-the-loop booking
           </p>
         </div>
 
-        <nav className="space-y-1 p-3" aria-label="Primary">
+        <nav className="space-y-2 p-4" aria-label="Primary">
           {TABS.map((tab) => {
             const isActive = activeTab === tab.key
             return (
@@ -154,10 +172,10 @@ function App() {
                 type="button"
                 onClick={() => setActiveTab(tab.key)}
                 aria-current={isActive ? "page" : undefined}
-                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition ${
+                className={`flex min-h-11 w-full items-center justify-between rounded-lg border px-4 py-2.5 text-left text-sm font-medium transition ${
                   isActive
-                    ? "bg-indigo-50 text-indigo-700"
-                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                    ? "border-indigo-100 bg-indigo-50 text-indigo-700"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
                 }`}
               >
                 {tab.label}
@@ -195,7 +213,8 @@ function App() {
                     isLoading={isSearchingFlights}
                     errorMessage={flightSearchError}
                     selectedOfferId={selectedOffer?.id ?? null}
-                    onSearch={handleSearchFlights}
+                    onSearchFlights={handleSearchFlights}
+                    onSearchNewFlight={handleStartNewSearch}
                     onSelectOffer={setSelectedOffer}
                   />
 

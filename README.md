@@ -2,22 +2,27 @@
 
 An AI travel-planning agent: give it an origin, destination, dates, age, and fitness level, and
 it searches real flights, researches real activities, and builds a fitness-tailored day-by-day
-itinerary — asking clarifying questions instead of guessing when it's missing what it needs. A
-strict **human-in-the-loop** gate sits between any plan and any booking write: nothing books
-without an explicit confirm-then-execute click from a person.
+itinerary. Required fields are validated at intake so the agent never guesses at missing trip
+data; it only asks a clarifying question when a *provided* value is genuinely ambiguous (e.g. a
+destination name that could mean more than one place). A strict **human-in-the-loop** gate sits
+between any plan and any booking action: the agent can research and propose flights but has no
+booking capability of its own — a person must explicitly review and approve before anything
+moves forward.
 
 ## What it does
 
 1. **Plan a trip** — origin, destination, dates, age, and fitness level are all required at
-   intake, so the agent always has what it needs to pace the itinerary and never has to ask.
+   intake, so the agent always has what it needs to pace the itinerary without guessing. It still
+   asks a clarifying question if a provided value is genuinely ambiguous.
 2. **Search real flights** — Google Flights results via SearchApi.io, cached by route+date to
    protect a one-time search quota.
 3. **Get a real itinerary** — the agent researches activities via Tavily web search and returns
    a day-by-day plan where every activity cites the real source URL it came from. No invented
    activities, no fabricated data.
-4. **Book with a human in the loop** — request a booking, confirm it, then execute it, as three
-   separate explicit steps. The write only happens after the second confirmation; a 30-minute
-   price-staleness window expires stale requests automatically.
+4. **Human-approved booking handoff** — review a proposed flight, explicitly approve it, then
+   retrieve real booking options, as three separate steps. The agent never books anything itself;
+   approval only unlocks a deterministic, audited workflow that hands off to the airline/OTA for
+   the actual purchase. A 30-minute price-staleness window expires stale requests automatically.
 5. **Watch the agent work** — an execution panel shows the run's tool calls, token usage,
    context-budget utilization, and timing, live.
 
@@ -26,15 +31,18 @@ without an explicit confirm-then-execute click from a person.
 - **Backend:** FastAPI, Pydantic AI, SQLModel/asyncpg, PostgreSQL 16, Alembic, DBOS (durable
   workflow execution, reuses the same Postgres instance).
 - **LLM:** Cerebras `gpt-oss-120b` via Pydantic AI.
-- **Flights:** SearchApi.io Google Flights (structured JSON, 100 free searches).
-- **Activities:** Tavily web search (1,000 free credits/month).
+- **Flights:** SearchApi.io Google Flights (structured JSON; free tier at signup time, see
+  [searchapi.io/pricing](https://www.searchapi.io/pricing)).
+- **Activities:** Tavily web search (free tier at signup time, see
+  [tavily.com/#pricing](https://www.tavily.com/#pricing)).
 - **Frontend:** React 19 + Vite + Tailwind CSS v4, TypeScript. A structured trip form drives the
   agent; a live activity feed streams its tool calls inline on the trip page, and a separate
   execution panel (with a live indicator in the sidebar nav) shows the full run trace.
 - **Evals:** `pydantic-evals` — deterministic + LLM-judged scoring of agent quality, separate
   from the pytest suite that gates system correctness.
 
-All three external services are free tier, no credit card required.
+All three external services offer a free tier as of this writing; check each provider's current
+pricing page before relying on exact quota numbers, which change over time.
 
 ## Running it
 

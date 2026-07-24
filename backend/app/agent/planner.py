@@ -10,11 +10,10 @@ from pydantic_ai.models.cerebras import CerebrasModel
 from pydantic_ai.providers.cerebras import CerebrasProvider
 from pydantic_ai.usage import UsageLimits
 
-from app.adapters.activities_tavily import TavilyActivityProvider
+from app.adapters.activities_tavily import ActivityProvider
 from app.adapters.flights_searchapi import FlightProvider
 from app.agent.execution_log import current_trip, record_event
 from app.agent.prompts import load_system_prompt, sanitize_web_content
-from app.agent.tool_gate import ToolClassification, register_tool
 from app.config import (
     CEREBRAS_MODEL,
     MAX_CONTEXT_TOKENS,
@@ -25,7 +24,11 @@ from app.config import (
     get_settings,
 )
 from app.models import ExecutionEventKind, FitnessLevel, TripRequest
-from app.repositories.trips_repository import get_recent_flight_results, offer_summary
+from app.repositories.trips_repository import (
+    flight_provider_name,
+    get_recent_flight_results,
+    offer_summary,
+)
 from app.schemas import ClarificationOut, ItineraryOut
 
 _IATA_CODE_PATTERN = re.compile(r"^[A-Z]{3}$")
@@ -34,8 +37,15 @@ _IATA_CODE_PATTERN = re.compile(r"^[A-Z]{3}$")
 @dataclass
 class PlannerDeps:
     flight_provider: FlightProvider
-    activity_provider: TavilyActivityProvider
+    activity_provider: ActivityProvider
     fitness_level: FitnessLevel | None = None
+
+
+def _activity_provider_name(provider: ActivityProvider) -> str:
+    return {
+        "TavilyActivityProvider": "Tavily",
+        "RecordedActivityProvider": "Recorded activities",
+    }.get(type(provider).__name__, type(provider).__name__)
 
 
 def default_usage_limits() -> UsageLimits:
@@ -70,6 +80,7 @@ async def search_flights(
             "ok",
             f"{len(cached_offers)} offers (reused from this trip's earlier search)",
             data={"offers": [offer_summary(offer) for offer in cached_offers]},
+            provider=flight_provider_name(ctx.deps.flight_provider),
         )
         return {
             "offers": [offer_summary(offer) for offer in cached_offers],
@@ -97,6 +108,7 @@ async def search_flights(
         else outcome.unavailable_reason,
         duration_ms,
         data={"offers": [offer_summary(offer) for offer in outcome.offers]},
+        provider=flight_provider_name(ctx.deps.flight_provider),
     )
     return {
         "offers": [offer_summary(offer) for offer in outcome.offers],
@@ -122,6 +134,7 @@ async def web_search(
         f"{len(results)} results for query={query!r}",
         duration_ms,
         data={"results": [{"title": result.title, "url": result.url} for result in results]},
+        provider=_activity_provider_name(ctx.deps.activity_provider),
     )
     return [
         {
@@ -148,8 +161,8 @@ def _build_agent() -> Agent[PlannerDeps, ItineraryOut | ClarificationOut]:
         retries={"output": MAX_OUTPUT_RETRIES},
     )
     built_agent.instrument = True
-    register_tool(built_agent, search_flights, classification=ToolClassification.READ_ONLY)
-    register_tool(built_agent, web_search, classification=ToolClassification.READ_ONLY)
+    built_agent.tool(strict=True)(search_flights)
+    built_agent.tool(strict=True)(web_search)
     return built_agent
 
 

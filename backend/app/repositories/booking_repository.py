@@ -13,6 +13,7 @@ from collections.abc import Awaitable, Callable
 from datetime import timedelta
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col
 
@@ -25,9 +26,13 @@ from app.models import (
     utcnow,
 )
 from app.schemas import ErrorCode
-from app.state import BookingState, BookingTransitionReason, is_transition_allowed
+from app.state import ALLOWED_TRANSITIONS, BookingState, BookingTransitionReason
 
 BookingOptionsFetcher = Callable[[FlightSearchResult], Awaitable[list[dict]]]
+_ACTIVE_BOOKING_STATES = (
+    BookingState.PENDING_USER_CONFIRMATION,
+    BookingState.CONFIRMED,
+)
 
 
 class BookingError(Exception):
@@ -95,12 +100,12 @@ async def request_booking(
             f"Flight offer {flight_search_result_id} does not belong to trip {trip_id}.",
         )
 
-    existing = await session.scalar(
-        select(HITLBookingLog).where(
-            col(HITLBookingLog.trip_request_id) == trip_id,
-            col(HITLBookingLog.flight_search_result_id) == flight_search_result_id,
-        )
+    active_booking_query = select(HITLBookingLog).where(
+        col(HITLBookingLog.trip_request_id) == trip_id,
+        col(HITLBookingLog.flight_search_result_id) == flight_search_result_id,
+        col(HITLBookingLog.state).in_(_ACTIVE_BOOKING_STATES),
     )
+    existing = await session.scalar(active_booking_query)
     if existing is not None:
         return existing
 
@@ -111,7 +116,14 @@ async def request_booking(
         expires_at=utcnow() + timedelta(minutes=BOOKING_TTL_MINUTES),
     )
     session.add(booking)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        existing = await session.scalar(active_booking_query)
+        if existing is None:
+            raise
+        return existing
     return booking
 
 
@@ -185,16 +197,14 @@ async def execute_booking(
 
     flight = await session.get(FlightSearchResult, booking.flight_search_result_id)
     assert flight is not None, "booking references a flight row that no longer exists"
+    # The human's confirm-then-execute decision is already real and structural (see
+    # DECISIONS.md); booking_options are supplementary airline/OTA links, not the thing being
+    # gated. An upstream hiccup fetching them must not block the execute itself — degrade
+    # honestly (no links) rather than fabricate a link or block a real, human-confirmed action.
     try:
         booking_options = await fetch_options(flight)
-    except Exception as upstream_error:
-        raise BookingError(
-            ErrorCode.BOOKING_OPTIONS_UNAVAILABLE,
-            502,
-            f"Could not fetch booking options for flight {flight.id} "
-            f"(booking_token={flight.booking_token}): {upstream_error}. "
-            "The booking stays CONFIRMED; retry execute once the upstream is available.",
-        ) from upstream_error
+    except Exception:
+        booking_options = []
     booking.booking_options = booking_options
     booking.booking_reference = f"TA-{booking.id}-{uuid.uuid4().hex[:10].upper()}"
     booking.executed_at = utcnow()
@@ -215,7 +225,7 @@ async def cancel_booking(session: AsyncSession, log_id: int) -> HITLBookingLog:
         raise BookingError(ErrorCode.BOOKING_NOT_FOUND, 404, f"No booking log {log_id}.")
     if booking.state == BookingState.CANCELLED:
         return booking  # idempotent
-    if not is_transition_allowed(booking.state, BookingState.CANCELLED):
+    if BookingState.CANCELLED not in ALLOWED_TRANSITIONS[booking.state]:
         raise BookingError(
             ErrorCode.INVALID_TRANSITION,
             409,

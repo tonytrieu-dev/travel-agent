@@ -99,8 +99,16 @@ async def search_trip_flights(
     trip_id: int, session: AsyncSession = Depends(get_session)
 ) -> FlightSearchOut:
     provider = get_flight_provider(get_settings())
-    async with execution_context(session, trip_id):
-        offers, unavailable_reason = await repository.search_flights(session, trip_id, provider)
+    await repository.get_trip(session, trip_id)
+    async with execution_context(
+        session,
+        trip_id,
+        run_model=repository.flight_provider_name(provider),
+    ) as agent_run:
+        assert agent_run is not None
+        offers, unavailable_reason = await repository.search_flights(
+            session, trip_id, provider, agent_run
+        )
     return FlightSearchOut(
         offers=[_to_flight_offer_out(offer) for offer in offers],
         unavailable_reason=unavailable_reason,
@@ -120,7 +128,11 @@ async def plan_trip(trip_id: int, session: AsyncSession = Depends(get_session)) 
     return PlanReadyOut(itinerary=output)
 
 
-def _to_agent_run_out(agent_run: AgentRun, steps: list[AgentRunStep]) -> AgentRunOut:
+def _to_agent_run_out(
+    agent_run: AgentRun,
+    steps: list[AgentRunStep],
+    events: list[ExecutionEvent],
+) -> AgentRunOut:
     estimated_cost_usd = (
         agent_run.total_input_tokens * LLM_INPUT_PRICE_PER_MILLION_TOKENS
         + agent_run.total_output_tokens * LLM_OUTPUT_PRICE_PER_MILLION_TOKENS
@@ -130,6 +142,7 @@ def _to_agent_run_out(agent_run: AgentRun, steps: list[AgentRunStep]) -> AgentRu
     )
     agent_run_out = AgentRunOut.model_validate(agent_run)
     agent_run_out.steps = [AgentRunStepOut.model_validate(step) for step in steps]
+    agent_run_out.events = [ExecutionEventOut.model_validate(event) for event in events]
     agent_run_out.estimated_cost_usd = round(estimated_cost_usd, 6)
     agent_run_out.budget_utilization_pct = round(budget_utilization_pct, 2)
     return agent_run_out
@@ -137,12 +150,17 @@ def _to_agent_run_out(agent_run: AgentRun, steps: list[AgentRunStep]) -> AgentRu
 
 def _to_panel_out(
     trip_id: int,
-    runs_with_steps: list[tuple[AgentRun, list[AgentRunStep]]],
+    runs_with_details: list[
+        tuple[AgentRun, list[AgentRunStep], list[ExecutionEvent]]
+    ],
     events: list[ExecutionEvent],
 ) -> ExecutionPanelOut:
     return ExecutionPanelOut(
         trip_request_id=trip_id,
-        agent_runs=[_to_agent_run_out(run, steps) for run, steps in runs_with_steps],
+        agent_runs=[
+            _to_agent_run_out(run, steps, run_events)
+            for run, steps, run_events in runs_with_details
+        ],
         events=[ExecutionEventOut.model_validate(event) for event in events],
     )
 
@@ -151,5 +169,5 @@ def _to_panel_out(
 async def get_trip_execution(
     trip_id: int, session: AsyncSession = Depends(get_session)
 ) -> ExecutionPanelOut:
-    runs_with_steps, events = await repository.get_execution_panel(session, trip_id)
-    return _to_panel_out(trip_id, runs_with_steps, events)
+    runs_with_details, events = await repository.get_execution_panel(session, trip_id)
+    return _to_panel_out(trip_id, runs_with_details, events)

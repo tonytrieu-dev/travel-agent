@@ -11,10 +11,10 @@ import asyncio
 import json
 import sys
 
+import httpx
+
 from app.adapters.flights_searchapi import cache_key
 from app.config import FLIGHT_CASSETTE_DIR, SEARCHAPI_BASE_URL, get_settings
-
-import httpx
 
 
 async def _capture(

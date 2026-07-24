@@ -226,9 +226,16 @@ async def seed_agent_run(
     return agent_run.id
 
 
-async def seed_execution_event(session: AsyncSession, trip_id: int, *, name: str = "search_flights") -> int:
+async def seed_execution_event(
+    session: AsyncSession,
+    trip_id: int,
+    *,
+    agent_run_id: int | None = None,
+    name: str = "search_flights",
+) -> int:
     event = ExecutionEvent(
         trip_request_id=trip_id,
+        agent_run_id=agent_run_id,
         seq=1,
         kind=ExecutionEventKind.API_CALL,
         name=name,
@@ -270,6 +277,16 @@ async def get_execution_events(session: AsyncSession, trip_id: int) -> list[Exec
             select(ExecutionEvent)
             .where(col(ExecutionEvent.trip_request_id) == trip_id)
             .order_by(col(ExecutionEvent.seq))
+        )
+    )
+
+
+async def get_agent_runs(session: AsyncSession, trip_id: int) -> list[AgentRun]:
+    return list(
+        await session.scalars(
+            select(AgentRun)
+            .where(col(AgentRun.trip_request_id) == trip_id)
+            .order_by(col(AgentRun.started_at))
         )
     )
 

@@ -3,7 +3,13 @@ a missing field is left null."""
 
 import json
 
-from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart, ToolCallPart, ToolReturnPart
+from pydantic_ai.messages import (
+    ModelMessage,
+    ModelResponse,
+    TextPart,
+    ToolCallPart,
+    ToolReturnPart,
+)
 from pydantic_ai.usage import RunUsage
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -94,6 +100,7 @@ async def persist_agent_run(
     message_history: list[ModelMessage],
     usage: RunUsage,
     status: str = "completed",
+    agent_run: AgentRun | None = None,
 ) -> AgentRun:
     """Persist the derived AgentRun + its ordered AgentRunStep rows in one transaction.
 
@@ -107,15 +114,14 @@ async def persist_agent_run(
         message_history[-1].timestamp if message_history else None,
     )
 
-    agent_run = AgentRun(
-        trip_request_id=trip_request_id,
-        status=status,
-        model=model,
-        total_input_tokens=usage.input_tokens,
-        total_output_tokens=usage.output_tokens,
-        total_ms=total_ms or 0,
-        finished_at=utcnow(),
-    )
+    if agent_run is None:
+        agent_run = AgentRun(trip_request_id=trip_request_id, status=status, model=model)
+    agent_run.status = status
+    agent_run.model = model
+    agent_run.total_input_tokens = usage.input_tokens
+    agent_run.total_output_tokens = usage.output_tokens
+    agent_run.total_ms = total_ms or 0
+    agent_run.finished_at = utcnow()
     session.add(agent_run)
     await session.flush()
     assert agent_run.id is not None, "agent_run must be flushed before steps reference its id"

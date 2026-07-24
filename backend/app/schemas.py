@@ -55,7 +55,6 @@ class ErrorCode(StrEnum):
     FLIGHT_NOT_FOUND = "flight_not_found"
     BOOKING_EXPIRED = "booking_expired"
     INVALID_TRANSITION = "invalid_transition"
-    BOOKING_OPTIONS_UNAVAILABLE = "booking_options_unavailable"
     VALIDATION_ERROR = "validation_error"
     RATE_LIMIT_EXCEEDED = "rate_limit_exceeded"
 
@@ -285,6 +284,20 @@ class AgentRunStepOut(BaseModel):
     tokens: int | None = None
 
 
+class ExecutionEventOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    seq: int
+    kind: ExecutionEventKind
+    name: str
+    provider: str | None = None
+    status: str
+    detail: str
+    duration_ms: int | None = None
+    data: dict[str, Any] | None = None
+    created_at: UtcDatetime
+
+
 class AgentRunOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -297,21 +310,9 @@ class AgentRunOut(BaseModel):
     started_at: UtcDatetime
     finished_at: UtcDatetime | None = None
     steps: list[AgentRunStepOut] = Field(default_factory=list)
+    events: list[ExecutionEventOut] = Field(default_factory=list)
     estimated_cost_usd: float | None = None
     budget_utilization_pct: float | None = None
-
-
-class ExecutionEventOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    seq: int
-    kind: ExecutionEventKind
-    name: str
-    status: str
-    detail: str
-    duration_ms: int | None = None
-    data: dict[str, Any] | None = None
-    created_at: UtcDatetime
 
 
 class ExecutionPanelOut(BaseModel):

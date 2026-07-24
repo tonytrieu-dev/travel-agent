@@ -3,6 +3,7 @@ Recorded selected by USE_LIVE_FLIGHT_API. Tolerant — errors/empty results retu
 unavailable_reason, never a fabricated offer.
 """
 
+import asyncio
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -10,7 +11,12 @@ from typing import Any, Protocol
 
 import httpx
 
-from app.config import FLIGHT_CASSETTE_DIR, SEARCHAPI_BASE_URL, Settings
+from app.config import (
+    FLIGHT_CASSETTE_DIR,
+    SEARCHAPI_BASE_URL,
+    SEARCHAPI_TIMEOUT_SECONDS,
+    Settings,
+)
 
 
 @dataclass
@@ -46,7 +52,14 @@ class FlightProvider(Protocol):
     ) -> FlightSearchOutcome: ...
 
     async def fetch_booking_options(
-        self, booking_token: str, *, departure_id: str, arrival_id: str, outbound_date: str
+        self,
+        booking_token: str,
+        *,
+        departure_id: str,
+        arrival_id: str,
+        outbound_date: str,
+        return_date: str | None,
+        booking_token_is_resolved: bool = False,
     ) -> list[dict[str, Any]]: ...
 
 
@@ -81,7 +94,7 @@ def derive_flight_legs(raw_offer: dict[str, Any]) -> list[dict[str, Any]]:
             "arrive_at": _airport_datetime(leg.get("arrival_airport", {})),
             "duration_minutes": leg.get("duration"),
         }
-        for leg in raw_offer.get("flights", [])
+        for leg in [*raw_offer.get("flights", []), *raw_offer.get("return_flights", [])]
     ]
 
 
@@ -132,10 +145,13 @@ class LiveSearchApiProvider:
         if return_date:
             params["return_date"] = return_date
         else:
-            params["type"] = "2"  # one-way; SearchApi defaults to round-trip and 400s without return_date
+            # SearchApi's one-way flag is flight_type=one_way, not SerpApi's type=2 convention —
+            # the wrong param name was silently ignored, leaving flight_type defaulted to
+            # round_trip, which then 400s demanding return_date.
+            params["flight_type"] = "one_way"
 
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with httpx.AsyncClient(timeout=SEARCHAPI_TIMEOUT_SECONDS) as client:
                 response = await client.get(
                     SEARCHAPI_BASE_URL,
                     params=params,
@@ -174,11 +190,140 @@ class LiveSearchApiProvider:
                     f"{arrival_id} on {outbound_date}"
                 )
             )
-        return FlightSearchOutcome(offers=offers)
+        if return_date is None:
+            return FlightSearchOutcome(offers=offers)
+
+        # ponytail: three exact nonstop pairs cap quota at four calls per search; add return
+        # selection or pagination if travelers need more choices.
+        displayed_offers = sorted(
+            (offer for offer in offers if offer.stops == 0),
+            key=lambda offer: offer.price_usd,
+        )[:3]
+        resolved = await asyncio.gather(
+            *(
+                self._pair_round_trip_offer(
+                    offer,
+                    departure_id=departure_id,
+                    arrival_id=arrival_id,
+                    outbound_date=outbound_date,
+                    return_date=return_date,
+                )
+                for offer in displayed_offers
+            ),
+            return_exceptions=True,
+        )
+        paired_offers = [
+            result for result in resolved if isinstance(result, NormalizedFlightOffer)
+        ]
+        if paired_offers:
+            return FlightSearchOutcome(offers=paired_offers)
+        detail = str(resolved[0]) if resolved else "no nonstop outbound offers"
+        return FlightSearchOutcome(
+            unavailable_reason=f"searchapi could not resolve exact round-trip offers: {detail}"
+        )
+
+    async def _get_or_raise(self, params: dict[str, Any], *, action: str, desc: str) -> dict[str, Any]:
+        """Shared GET + error handling for calls that raise on failure. search_offers keeps its
+        own handling because it degrades to an honest outcome and has a 429-specific branch."""
+        try:
+            async with httpx.AsyncClient(timeout=SEARCHAPI_TIMEOUT_SECONDS) as client:
+                response = await client.get(
+                    SEARCHAPI_BASE_URL,
+                    params=params,
+                    headers={"Authorization": f"Bearer {self._api_key}"},
+                )
+        except httpx.HTTPError as error:
+            raise RuntimeError(
+                f"searchapi {action} failed: network error ({error!r}) for {desc}"
+            ) from error
+
+        if response.status_code != 200:
+            raise RuntimeError(
+                f"searchapi {action} failed: HTTP {response.status_code} for {desc}: {response.text}"
+            )
+        return response.json()
+
+    async def _resolve_return_offer(
+        self,
+        departure_token: str,
+        *,
+        departure_id: str,
+        arrival_id: str,
+        outbound_date: str,
+        return_date: str,
+    ) -> NormalizedFlightOffer:
+        """A round-trip offer's stored token is a departure_token, not a bookable booking_token
+        (see _parse_offers) — SearchApi requires a second call, passing departure_token, to get
+        the return-leg options. Each of those carries its own real booking_token. The current UI
+        has no separate return-flight-selection step, so this picks the cheapest — the same
+        tie-break the rest of the app already uses for "the" flight."""
+        params = {
+            "engine": "google_flights",
+            "departure_token": departure_token,
+            "departure_id": departure_id,
+            "arrival_id": arrival_id,
+            "outbound_date": outbound_date,
+            "return_date": return_date,
+            "currency": "USD",
+        }
+        payload = await self._get_or_raise(
+            params,
+            action="departure_token resolution",
+            desc=f"departure_token={departure_token}",
+        )
+        return_offers = _parse_offers(payload)
+        if not return_offers:
+            raise RuntimeError(
+                f"searchapi returned no return-leg options for departure_token={departure_token}"
+            )
+        return min(return_offers, key=lambda offer: offer.price_usd)
+
+    async def _pair_round_trip_offer(
+        self,
+        outbound_offer: NormalizedFlightOffer,
+        *,
+        departure_id: str,
+        arrival_id: str,
+        outbound_date: str,
+        return_date: str,
+    ) -> NormalizedFlightOffer:
+        return_offer = await self._resolve_return_offer(
+            outbound_offer.booking_token,
+            departure_id=departure_id,
+            arrival_id=arrival_id,
+            outbound_date=outbound_date,
+            return_date=return_date,
+        )
+        outbound_offer.price_usd = return_offer.price_usd
+        outbound_offer.booking_token = return_offer.booking_token
+        outbound_offer.raw_offer = {
+            **outbound_offer.raw_offer,
+            "booking_token": return_offer.booking_token,
+            "return_flights": return_offer.raw_offer["flights"],
+        }
+        return outbound_offer
 
     async def fetch_booking_options(
-        self, booking_token: str, *, departure_id: str, arrival_id: str, outbound_date: str
+        self,
+        booking_token: str,
+        *,
+        departure_id: str,
+        arrival_id: str,
+        outbound_date: str,
+        return_date: str | None,
+        booking_token_is_resolved: bool = False,
     ) -> list[dict[str, Any]]:
+        if return_date and not booking_token_is_resolved:
+            booking_token = (
+                await self._resolve_return_offer(
+                    booking_token,
+                    departure_id=departure_id,
+                    arrival_id=arrival_id,
+                    outbound_date=outbound_date,
+                    return_date=return_date,
+                )
+            ).booking_token
+
         params = {
             "engine": "google_flights",
             "booking_token": booking_token,
@@ -187,25 +332,17 @@ class LiveSearchApiProvider:
             "outbound_date": outbound_date,
             "currency": "USD",
         }
-        try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                response = await client.get(
-                    SEARCHAPI_BASE_URL,
-                    params=params,
-                    headers={"Authorization": f"Bearer {self._api_key}"},
-                )
-        except httpx.HTTPError as error:
-            raise RuntimeError(
-                f"searchapi booking-options fetch failed: network error ({error!r}) "
-                f"for booking_token={booking_token}"
-            ) from error
-
-        if response.status_code != 200:
-            raise RuntimeError(
-                f"searchapi booking-options fetch failed: HTTP {response.status_code} "
-                f"for booking_token={booking_token}: {response.text}"
-            )
-        return list(response.json().get("booking_options", []))
+        if return_date:
+            params["return_date"] = return_date
+        else:
+            # SearchApi's one-way flag is flight_type=one_way, not SerpApi's type=2 convention —
+            # the wrong param name was silently ignored, leaving flight_type defaulted to
+            # round_trip, which then 400s demanding return_date.
+            params["flight_type"] = "one_way"
+        payload = await self._get_or_raise(
+            params, action="booking-options fetch", desc=f"booking_token={booking_token}"
+        )
+        return list(payload.get("booking_options", []))
 
 
 class RecordedProvider:
@@ -236,10 +373,23 @@ class RecordedProvider:
             return FlightSearchOutcome(
                 unavailable_reason=f"recorded cassette {key} contains no offers"
             )
+        if return_date and any(not offer.raw_offer.get("return_flights") for offer in offers):
+            return FlightSearchOutcome(
+                unavailable_reason=(
+                    f"recorded cassette {key} has outbound offers but no exact return pairing"
+                )
+            )
         return FlightSearchOutcome(offers=offers)
 
     async def fetch_booking_options(
-        self, booking_token: str, *, departure_id: str, arrival_id: str, outbound_date: str
+        self,
+        booking_token: str,
+        *,
+        departure_id: str,
+        arrival_id: str,
+        outbound_date: str,
+        return_date: str | None,
+        booking_token_is_resolved: bool = False,
     ) -> list[dict[str, Any]]:
         cassette_path = self._cassette_path(f"booking_{booking_token}")
         if not cassette_path.exists():

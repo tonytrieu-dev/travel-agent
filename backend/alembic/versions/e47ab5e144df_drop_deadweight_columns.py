@@ -9,8 +9,8 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 import sqlmodel
-from alembic import op
 
+from alembic import op
 
 revision: str = 'e47ab5e144df'
 down_revision: str | None = 'd8a61532fcf4'

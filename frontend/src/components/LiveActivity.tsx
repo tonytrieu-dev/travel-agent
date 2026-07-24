@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { useTripExecution } from "../hooks/useTripExecution"
 
 interface LiveActivityProps {
@@ -18,32 +19,47 @@ function labelFor(name: string): string {
 // activity log, not a banner that vanishes between runs.
 export function LiveActivity({ tripId, isRunActive }: LiveActivityProps) {
   const { panelData } = useTripExecution({ tripId, enabled: true, isRunActive })
+  const [clearedBeforeSeq, setClearedBeforeSeq] = useState(0)
 
-  const events = panelData?.events ?? []
+  const events = (panelData?.events ?? []).filter((event) => event.seq > clearedBeforeSeq)
   const recent = [...events].reverse()
+  // events is backend-ordered ascending by seq (trips_repository.py's ORDER BY seq), so the
+  // last element already holds the max — no scan needed.
+  const maxSeq = panelData?.events.at(-1)?.seq ?? 0
 
   return (
     <section
       aria-live="polite"
       className="space-y-3 rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
     >
-      <div className="flex items-center gap-2">
-        {isRunActive ? (
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-75" />
-            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-indigo-500" />
-          </span>
-        ) : (
-          <span className="h-2.5 w-2.5 rounded-full bg-slate-300" />
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          {isRunActive ? (
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-indigo-500" />
+            </span>
+          ) : (
+            <span className="h-2.5 w-2.5 rounded-full bg-slate-300" />
+          )}
+          <h2 className="text-lg font-semibold text-slate-900">
+            {isRunActive ? "Agent working…" : "Agent activity"}
+          </h2>
+        </div>
+        {recent.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setClearedBeforeSeq(maxSeq)}
+            className="text-xs font-medium text-slate-400 transition hover:text-slate-600"
+          >
+            Clear
+          </button>
         )}
-        <h2 className="text-lg font-semibold text-slate-900">
-          {isRunActive ? "Agent working…" : "Agent activity"}
-        </h2>
       </div>
 
       {recent.length === 0 ? (
         <p className="text-sm text-slate-500">
-          Nothing yet — tool calls will appear here once the agent runs.
+          Nothing yet — you'll see what the agent is doing here once it starts working.
         </p>
       ) : (
         <ol className="max-h-72 space-y-1.5 overflow-y-auto">

@@ -37,10 +37,7 @@ def test_recorded_data_survives_as_the_real_structured_payload_not_just_the_deta
 
     events = run_db(_work)
 
-    assert events[0].data == {"offers": [{"carrier": "United", "price_usd": 412.0}]}, (
-        f"data must round-trip the exact structured payload passed to record_event, got "
-        f"{events[0].data}"
-    )
+    assert events[0].data == {"offers": [{"carrier": "United", "price_usd": 412.0}]}
 
 
 def test_a_second_run_on_the_same_trip_resumes_seq_instead_of_restarting() -> None:
@@ -54,7 +51,4 @@ def test_a_second_run_on_the_same_trip_resumes_seq_instead_of_restarting() -> No
 
     events = run_db(_work)
 
-    assert [event.seq for event in events] == [1, 2], (
-        f"a re-planned trip's second run must continue the seq from the first run (no reused "
-        f"or reset sequence numbers), got {[event.seq for event in events]}"
-    )
+    assert [event.seq for event in events] == [1, 2]

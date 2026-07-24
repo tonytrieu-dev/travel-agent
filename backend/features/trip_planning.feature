@@ -23,6 +23,8 @@ Feature: Trip planning — create, update, search flights, and generate an itine
     Then the response is 200 with offers sourced "live"
     And the flight provider is called exactly once
     And a "search_flights" execution event is recorded for the trip
+    And a flight-search agent run with metrics is recorded for the trip
+    And the flight-search agent run owns its API event
 
   Scenario: Searching flights again within the cache TTL reuses the earlier real results
     Given an existing trip with no prior flight search
@@ -36,6 +38,13 @@ Feature: Trip planning — create, update, search flights, and generate an itine
     And the flight provider will return offers priced 812, 499, and 640 USD
     When flights are searched for the trip
     Then the response is 200 with offers ordered cheapest first
+
+  Scenario: An outbound-only cached round trip is refreshed with its exact return
+    Given an existing round-trip trip with an outbound-only cached flight search
+    And the flight provider will return a paired outbound and return offer
+    When flights are searched for the trip
+    Then the response offer contains the outbound and return legs in travel order
+    And the flight provider is called exactly once
 
   Scenario: Changing a trip's route after planning invalidates its cached flights and itinerary
     Given an existing trip with cached flights and a generated itinerary

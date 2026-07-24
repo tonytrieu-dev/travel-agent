@@ -10,12 +10,42 @@ interface BookingModuleProps {
 
 const POLL_INTERVAL_MS = 5_000
 
-function formatCountdown(msRemaining: number): string {
-  if (msRemaining <= 0) return "expired"
-  const totalSeconds = Math.floor(msRemaining / 1000)
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`
+// SearchApi's real booking link isn't a plain URL: booking_request.url is Google's redirect
+// endpoint, and it only resolves to the real airline/OTA checkout when POSTed with post_data
+// as the body — a GET (plain <a href>) 404s. post_data is itself a urlencoded "key=value" pair.
+function bookingFormFields(postData: string): [string, string][] {
+  return Array.from(new URLSearchParams(postData).entries())
+}
+
+function bookingOptionLabel(option: Record<string, unknown>): string | null {
+  if (typeof option.book_with === "string") return option.book_with
+  if (typeof option.name === "string") return option.name
+  return null
+}
+
+function bookingOptionPrice(option: Record<string, unknown>): number {
+  return typeof option.price === "number" ? option.price : Number.POSITIVE_INFINITY
+}
+
+// SearchApi returns one booking_option per fare class/OTA, so the same provider often appears
+// several times — collapse to the cheapest option per provider instead of a wall of duplicate
+// "Book with X" buttons.
+function cheapestPerProvider(options: Record<string, unknown>[]): Record<string, unknown>[] {
+  const cheapestByLabel = new Map<string, Record<string, unknown>>()
+  options.forEach((option, index) => {
+    const key = bookingOptionLabel(option) ?? `option-${index}`
+    const existing = cheapestByLabel.get(key)
+    if (!existing || bookingOptionPrice(option) < bookingOptionPrice(existing)) {
+      cheapestByLabel.set(key, option)
+    }
+  })
+  return Array.from(cheapestByLabel.values())
+}
+
+function searchAgainMessage(state: string): string | null {
+  if (state === "EXPIRED")
+    return "This booking expired before it was completed. Please search again for current prices."
+  return null
 }
 
 export function BookingModule({ trip, selectedOffer, onSearchAgain }: BookingModuleProps) {
@@ -23,19 +53,12 @@ export function BookingModule({ trip, selectedOffer, onSearchAgain }: BookingMod
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [announcement, setAnnouncement] = useState("")
-  const [nowMs, setNowMs] = useState(() => Date.now())
   const previousStateRef = useRef<string | null>(null)
-
-  // Tick every second so the countdown display stays live.
-  useEffect(() => {
-    const timer = setInterval(() => setNowMs(Date.now()), 1_000)
-    return () => clearInterval(timer)
-  }, [])
 
   // Poll the server for real state while a booking is open and not yet terminal — the panel
   // never fabricates a transition the server hasn't confirmed.
   useEffect(() => {
-    if (!bookingLog) return
+    if (!bookingLog || isLoading) return
     const terminal = ["EXECUTED", "CANCELLED", "EXPIRED"]
     if (terminal.includes(bookingLog.state)) return
 
@@ -48,9 +71,8 @@ export function BookingModule({ trip, selectedOffer, onSearchAgain }: BookingMod
       }
     }, POLL_INTERVAL_MS)
     return () => clearInterval(poll)
-  }, [bookingLog])
+  }, [bookingLog, isLoading])
 
-  // Announce state transitions for screen readers.
   useEffect(() => {
     if (bookingLog && bookingLog.state !== previousStateRef.current) {
       setAnnouncement(`Booking is now ${bookingLog.state.replaceAll("_", " ").toLowerCase()}.`)
@@ -67,8 +89,18 @@ export function BookingModule({ trip, selectedOffer, onSearchAgain }: BookingMod
     )
   }
 
-  const expiresAtMs = bookingLog ? new Date(bookingLog.expires_at).getTime() : null
-  const isPastExpiry = expiresAtMs !== null && nowMs >= expiresAtMs
+  const searchAgainText = bookingLog ? searchAgainMessage(bookingLog.state) : null
+  const bookingOptions = bookingLog?.booking_options
+    ? cheapestPerProvider(bookingLog.booking_options).filter((option) => {
+        const request = option.booking_request
+        return (
+          typeof request === "object" &&
+          request !== null &&
+          typeof (request as Record<string, unknown>).url === "string" &&
+          typeof (request as Record<string, unknown>).post_data === "string"
+        )
+      })
+    : []
 
   const runAction = async (action: () => Promise<BookingLogOut>) => {
     setIsLoading(true)
@@ -97,14 +129,19 @@ export function BookingModule({ trip, selectedOffer, onSearchAgain }: BookingMod
 
   const handleRequest = () =>
     runAction(() => requestBooking(trip.id, { flight_search_result_id: selectedOffer.id }))
-  const handleConfirm = () => bookingLog && runAction(() => confirmBooking(bookingLog.id))
+  const handleConfirm = () =>
+    bookingLog &&
+    runAction(async () => {
+      await confirmBooking(bookingLog.id)
+      return executeBooking(bookingLog.id)
+    })
   const handleExecute = () => bookingLog && runAction(() => executeBooking(bookingLog.id))
   const handleCancel = () => bookingLog && runAction(() => cancelBooking(bookingLog.id))
 
   return (
     <section className="rounded-xl border-2 border-indigo-200 bg-white p-6 shadow-sm">
       <h2 className="text-lg font-semibold text-slate-900">Book this trip</h2>
-      <p className="mt-1 text-sm text-slate-600">
+      <p className="mt-2 text-sm leading-6 text-slate-600">
         {selectedOffer.carrier} · ${selectedOffer.price_usd.toFixed(2)} {selectedOffer.currency}
       </p>
 
@@ -125,131 +162,113 @@ export function BookingModule({ trip, selectedOffer, onSearchAgain }: BookingMod
           disabled={isLoading}
           className="mt-4 rounded-md bg-indigo-600 px-4 py-2.5 font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
         >
-          {isLoading ? "Requesting…" : "Request booking"}
+          {isLoading ? "Reviewing…" : "Review booking"}
         </button>
       )}
 
-      {bookingLog?.state === "PENDING_USER_CONFIRMATION" && !isPastExpiry && (
-        <div className="mt-4 space-y-3">
-          <p className="text-sm text-slate-600">
-            Price hold expires in <span className="font-mono font-semibold">{formatCountdown(expiresAtMs! - nowMs)}</span>
-          </p>
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={handleConfirm}
-              disabled={isLoading}
-              className="rounded-md bg-emerald-600 px-4 py-2.5 font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-            >
-              {isLoading ? "Confirming…" : "I confirm — book this flight"}
-            </button>
-            <button
-              type="button"
-              onClick={handleCancel}
-              disabled={isLoading}
-              className="rounded-md border border-slate-300 px-4 py-2.5 font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Cancel
-            </button>
-          </div>
+      {bookingLog?.state === "PENDING_USER_CONFIRMATION" && (
+        <div className="mt-4 flex gap-3">
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={isLoading}
+            className="rounded-md bg-emerald-600 px-4 py-2.5 font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+          >
+            {isLoading ? "Getting airline link…" : "Approve this flight"}
+          </button>
+          <button
+            type="button"
+            onClick={handleCancel}
+            disabled={isLoading}
+            className="rounded-md border border-slate-300 px-4 py-2.5 font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Cancel
+          </button>
         </div>
       )}
 
-      {bookingLog?.state === "CONFIRMED" && !isPastExpiry && (
-        <div className="mt-4 space-y-3">
-          <p className="text-sm text-slate-600">
-            Price hold expires in <span className="font-mono font-semibold">{formatCountdown(expiresAtMs! - nowMs)}</span>
-          </p>
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={handleExecute}
-              disabled={isLoading}
-              className="rounded-md bg-indigo-600 px-4 py-2.5 font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-            >
-              {isLoading ? "Executing…" : "Execute booking"}
-            </button>
-            <button
-              type="button"
-              onClick={handleCancel}
-              disabled={isLoading}
-              className="rounded-md border border-slate-300 px-4 py-2.5 font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Cancel
-            </button>
-          </div>
+      {bookingLog?.state === "CONFIRMED" && (
+        <div className="mt-4 flex gap-3">
+          <button
+            type="button"
+            onClick={handleExecute}
+            disabled={isLoading}
+            className="rounded-md bg-indigo-600 px-4 py-2.5 font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+          >
+            {isLoading ? "Getting airline link…" : "Continue to airline"}
+          </button>
+          <button
+            type="button"
+            onClick={handleCancel}
+            disabled={isLoading}
+            className="rounded-md border border-slate-300 px-4 py-2.5 font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Cancel
+          </button>
         </div>
       )}
 
-      {bookingLog &&
-        ["PENDING_USER_CONFIRMATION", "CONFIRMED"].includes(bookingLog.state) &&
-        isPastExpiry && (
-          <div className="mt-4 space-y-3">
-            <p className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
-              This price hold has expired. Please search again for current prices.
-            </p>
-            <button
-              type="button"
-              onClick={onSearchAgain}
-              className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
-            >
-              Search again
-            </button>
-          </div>
-        )}
-
-      {bookingLog?.state === "EXECUTED" && (
+      {searchAgainText && (
         <div className="mt-4 space-y-3">
-          <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">
-            Booked. Reference: <span className="font-mono">{bookingLog.booking_reference}</span>
-          </p>
-          {bookingLog.booking_options && bookingLog.booking_options.length > 0 && (
-            <ul className="space-y-1">
-              {bookingLog.booking_options.map((option, index) => {
-                const link = typeof option.booking_url === "string" ? option.booking_url : typeof option.link === "string" ? option.link : typeof option.url === "string" ? option.url : null
-                const label = typeof option.book_with === "string" ? option.book_with : typeof option.name === "string" ? option.name : `Option ${index + 1}`
-                return (
-                  <li key={index}>
-                    {link ? (
-                      <a href={link} target="_blank" rel="noreferrer" className="text-sm text-indigo-600 hover:underline">
-                        Book with {label}
-                      </a>
-                    ) : (
-                      <span className="text-sm text-slate-600">{label}</span>
-                    )}
-                  </li>
-                )
-              })}
-            </ul>
-          )}
+          <p className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">{searchAgainText}</p>
+          <button
+            type="button"
+            onClick={onSearchAgain}
+            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
+          >
+            Search again
+          </button>
         </div>
       )}
 
       {bookingLog?.state === "CANCELLED" && (
         <div className="mt-4 space-y-3">
-          <p className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">This booking was cancelled.</p>
+          <p className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
+            This booking was cancelled.
+          </p>
           <button
             type="button"
-            onClick={onSearchAgain}
-            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
+            onClick={handleRequest}
+            disabled={isLoading}
+            className="rounded-md bg-indigo-600 px-4 py-2.5 font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
           >
-            Search again
+            {isLoading ? "Reviewing…" : "Book this flight again"}
           </button>
         </div>
       )}
 
-      {bookingLog?.state === "EXPIRED" && (
-        <div className="mt-4 space-y-3">
-          <p className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
-            This booking expired before it was completed. Please search again for current prices.
+      {bookingLog?.state === "EXECUTED" && (
+        <div className="mt-5 space-y-3">
+          {bookingOptions.length > 0 ? (
+            <ul className="space-y-1">
+              {bookingOptions.map((option, index) => {
+                const bookingRequest = option.booking_request as Record<string, string>
+                const label = bookingOptionLabel(option) ?? selectedOffer.carrier
+                return (
+                  <li key={index}>
+                    <form method="POST" action={bookingRequest.url} target="_blank" className="inline">
+                      {bookingFormFields(bookingRequest.post_data).map(([name, value]) => (
+                        <input key={name} type="hidden" name={name} value={value} />
+                      ))}
+                      <button
+                        type="submit"
+                        className="rounded-md bg-indigo-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                      >
+                        Book with {label}
+                      </button>
+                    </form>
+                  </li>
+                )
+              })}
+            </ul>
+          ) : (
+            <p className="text-sm text-slate-600">
+              No airline booking link is available for this offer.
+            </p>
+          )}
+          <p className="text-sm text-slate-600">
+            Your flight hasn&apos;t been purchased. Complete your booking on the airline site.
           </p>
-          <button
-            type="button"
-            onClick={onSearchAgain}
-            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
-          >
-            Search again
-          </button>
         </div>
       )}
     </section>

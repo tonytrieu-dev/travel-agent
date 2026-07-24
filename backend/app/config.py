@@ -13,14 +13,26 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Cerebras runs gpt-oss-120b directly and keeps clean JSON tool-calls for Pydantic AI.
 CEREBRAS_MODEL = "gpt-oss-120b"
+GEMINI_JUDGE_MODEL = "gemini-3.6-flash"
 
 SEARCHAPI_BASE_URL = "https://www.searchapi.io/api/v1/search"
+SEARCHAPI_TIMEOUT_SECONDS = 60.0
 
 # RecordedProvider replays real-captured payloads from here; never hand-fabricated.
 FLIGHT_CASSETTE_DIR = Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "recorded" / "flights"
+ACTIVITY_CASSETTE_PATH = (
+    Path(__file__).resolve().parent.parent
+    / "tests"
+    / "fixtures"
+    / "recorded"
+    / "activities"
+    / "san_diego.json"
+)
 
-# Agent guardrails: a per-run cumulative token budget and a tool-call ceiling so the ReAct loop
-# can't spin forever. Kept well under the model's large context window and provider rate limits.
+# Agent guardrails: MAX_TOOL_STEPS/MAX_REQUESTS_PER_RUN bound the ReAct loop's iteration count.
+# MAX_CONTEXT_TOKENS matches gpt-oss-120b's real 30_000 tokens/minute limit on Cerebras — don't
+# raise it, that just trades a clean UsageLimitExceeded (handled gracefully in dbos_runtime.py)
+# for a raw 429 mid-run. If runs legitimately hit it, trim tool-result verbosity instead.
 MAX_TOOL_STEPS = 8
 MAX_CONTEXT_TOKENS = 30_000
 MAX_REQUESTS_PER_RUN = MAX_TOOL_STEPS + 3
@@ -84,6 +96,7 @@ class Settings(BaseSettings):
     )
 
     cerebras_api_key: SecretStr
+    gemini_api_key: SecretStr | None = None
     searchapi_api_key: SecretStr
     tavily_api_key: SecretStr
     database_url: str

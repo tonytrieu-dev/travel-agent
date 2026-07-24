@@ -1,41 +1,65 @@
-"""The eval dataset for the travel-planner agent: fitness-appropriate itineraries and citation
-grounding (no hallucinated activities). Age and fitness level are mandatory at trip intake now,
-so there's no "ask for clarification" case here — the agent is never handed a prompt lacking them.
-"""
-
 from pydantic_evals import Case, Dataset
 
+from app.models import FitnessLevel
 from app.schemas import ClarificationOut, ItineraryOut
 from evals.evaluators import (
     CaseMetadata,
     CitationGrounding,
+    FitnessAppropriateness,
+    FlightSearchTrajectory,
+    LowFitnessSafety,
+    NoFlightActivities,
     OutputTypeMatches,
-    build_fitness_appropriateness_judge,
+    PhysicalLoad,
+    PhysicalLoadComparisons,
+    ToolCallBudget,
+    WebSearchTrajectory,
 )
 
-_TRIP_PROMPT = "Plan a trip from JFK to CDG, departing 2026-09-01, returning 2026-09-08."
+_TRIP_PROMPT = (
+    "Plan a trip from JFK to San Diego (SAN), departing 2026-09-01, returning 2026-09-08."
+)
+_FLIGHT_SEARCH = {
+    "departure_id": "JFK",
+    "arrival_id": "SAN",
+    "outbound_date": "2026-09-01",
+    "return_date": "2026-09-08",
+}
 
 
 def _build_cases() -> list[Case[str, ItineraryOut | ClarificationOut, CaseMetadata]]:
-    fitness_appropriateness_judge = build_fitness_appropriateness_judge()
     return [
         Case(
-            name="young_high_fitness_gets_active_itinerary",
-            inputs=f"{_TRIP_PROMPT} Traveler age: 24. Fitness level: high.",
-            metadata=CaseMetadata(expects="itinerary"),
-            evaluators=(fitness_appropriateness_judge, CitationGrounding()),
-        ),
-        Case(
-            name="elderly_low_fitness_gets_gentle_itinerary",
-            inputs=f"{_TRIP_PROMPT} Traveler age: 78. Fitness level: low.",
-            metadata=CaseMetadata(expects="itinerary"),
-            evaluators=(fitness_appropriateness_judge, CitationGrounding()),
-        ),
+            name=f"age_{age}_{fitness_level.value}_fitness",
+            inputs=(
+                f"{_TRIP_PROMPT} Traveler age: {age}. "
+                f"Fitness level: {fitness_level.value}."
+            ),
+            metadata=CaseMetadata(
+                expects="itinerary",
+                age=age,
+                fitness_level=fitness_level,
+                flight_search=_FLIGHT_SEARCH,
+            ),
+        )
+        for age in (24, 78)
+        for fitness_level in (FitnessLevel.LOW, FitnessLevel.HIGH)
     ]
 
 
 dataset: Dataset[str, ItineraryOut | ClarificationOut, CaseMetadata] = Dataset(
     name="travel_planner_evals",
     cases=_build_cases(),
-    evaluators=[OutputTypeMatches()],
+    evaluators=[
+        OutputTypeMatches(),
+        CitationGrounding(),
+        FlightSearchTrajectory(),
+        WebSearchTrajectory(),
+        ToolCallBudget(),
+        NoFlightActivities(),
+        PhysicalLoad(),
+        LowFitnessSafety(),
+        FitnessAppropriateness(),
+    ],
+    report_evaluators=[PhysicalLoadComparisons()],
 )

@@ -1,0 +1,1256 @@
+{
+  "search_metadata": {
+    "id": "search_KMjqpW46ERuDwgG22enbZ3LV",
+    "status": "Success",
+    "created_at": "2026-07-23T18:08:24Z",
+    "request_time_taken": 0.56,
+    "parsing_time_taken": 0.0,
+    "total_time_taken": 0.57,
+    "request_url": "https://www.google.com/travel/flights/search?tfs=CBwQAhoeEgoyMDI2LTA5LTAxagcIARIDSkZLcgcIARIDU0FOGh4SCjIwMjYtMDktMDhqBwgBEgNTQU5yBwgBEgNKRktAAUgBcAGCAQsI____________AZgBAQ&hl=en&gl=us&curr=USD",
+    "html_url": "https://www.searchapi.io/api/v1/searches/search_KMjqpW46ERuDwgG22enbZ3LV.html",
+    "json_url": "https://www.searchapi.io/api/v1/searches/search_KMjqpW46ERuDwgG22enbZ3LV"
+  },
+  "search_parameters": {
+    "engine": "google_flights",
+    "departure_id": "JFK",
+    "arrival_id": "SAN",
+    "currency": "USD",
+    "hl": "en",
+    "gl": "us",
+    "outbound_date": "2026-09-01",
+    "return_date": "2026-09-08",
+    "flight_type": "round_trip",
+    "travel_class": "economy",
+    "stops": "any",
+    "adults": "1",
+    "children": "0",
+    "infants_in_seat": "0",
+    "infants_on_lap": "0"
+  },
+  "best_flights": [
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "John F. Kennedy International Airport",
+            "id": "JFK",
+            "date": "2026-09-01",
+            "time": "08:00"
+          },
+          "arrival_airport": {
+            "name": "San Diego International Airport",
+            "id": "SAN",
+            "date": "2026-09-01",
+            "time": "10:52"
+          },
+          "duration": 352,
+          "airplane": "Airbus A320",
+          "airline": "JetBlue",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/B6.png",
+          "travel_class": "Economy",
+          "flight_number": "B6 189",
+          "extensions": [
+            "Power and USB outlets",
+            "Live TV",
+            "Wi-Fi free",
+            "Seat type Above Average Legroom",
+            "Legroom 33 inches",
+            "Carbon emission: 425 kg"
+          ],
+          "detected_extensions": {
+            "has_power_and_usb_outlets": true,
+            "has_live_tv": true,
+            "wifi": "free",
+            "seat_type": "Above Average Legroom",
+            "legroom_short": "33 in",
+            "legroom_long": "33 inches",
+            "carbon_emission": 425
+          }
+        }
+      ],
+      "total_duration": 352,
+      "carbon_emissions": {
+        "this_flight": 425000,
+        "typical_for_this_route": 325000,
+        "difference_percent": 31,
+        "lowest_route": 283000
+      },
+      "price": 328,
+      "type": "Round trip",
+      "extensions": [
+        "Checked baggage for a fee",
+        "Bag and fare conditions depend on the return flight"
+      ],
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/B6.png",
+      "departure_token": "WyJDalJJU214MU4weEJTRXRyUjJOQlFUSlhNRUZDUnkwdExTMHRMUzB0TFMxNWJHMW5NVUZCUVVGQlIzQnBWMHByUlVaaVRUUkJFZ1ZDTmpFNE9Sb0xDS0NBQWhBQ0dnTlZVMFE0SEhDZ2dBST0iLFtbIkpGSyIsIjIwMjYtMDktMDEiLCJTQU4iLG51bGwsIkI2IiwiMTg5Il1dXQ=="
+    },
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "John F. Kennedy International Airport",
+            "id": "JFK",
+            "date": "2026-09-01",
+            "time": "08:40"
+          },
+          "arrival_airport": {
+            "name": "San Diego International Airport",
+            "id": "SAN",
+            "date": "2026-09-01",
+            "time": "11:38"
+          },
+          "duration": 358,
+          "airplane": "Airbus A321neo",
+          "airline": "Delta",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/DL.png",
+          "travel_class": "Economy",
+          "flight_number": "DL 683",
+          "extensions": [
+            "Power and USB outlets",
+            "Live TV",
+            "Wi-Fi free",
+            "Seat type Average Legroom",
+            "Legroom 31 inches",
+            "Carbon emission: 274 kg"
+          ],
+          "detected_extensions": {
+            "has_power_and_usb_outlets": true,
+            "has_live_tv": true,
+            "wifi": "free",
+            "seat_type": "Average Legroom",
+            "legroom_short": "31 in",
+            "legroom_long": "31 inches",
+            "carbon_emission": 274
+          }
+        }
+      ],
+      "total_duration": 358,
+      "carbon_emissions": {
+        "this_flight": 274000,
+        "typical_for_this_route": 325000,
+        "difference_percent": -16,
+        "lowest_route": 283000
+      },
+      "price": 328,
+      "type": "Round trip",
+      "extensions": [
+        "Checked baggage for a fee",
+        "Bag and fare conditions depend on the return flight"
+      ],
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/DL.png",
+      "departure_token": "WyJDalJJU214MU4weEJTRXRyUjJOQlFUSlhNRUZDUnkwdExTMHRMUzB0TFMxNWJHMW5NVUZCUVVGQlIzQnBWMHByUlVaaVRUUkJFZ1ZFVERZNE14b0xDS0NBQWhBQ0dnTlZVMFE0SEhDZ2dBST0iLFtbIkpGSyIsIjIwMjYtMDktMDEiLCJTQU4iLG51bGwsIkRMIiwiNjgzIl1dXQ=="
+    },
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "John F. Kennedy International Airport",
+            "id": "JFK",
+            "date": "2026-09-01",
+            "time": "11:55"
+          },
+          "arrival_airport": {
+            "name": "San Diego International Airport",
+            "id": "SAN",
+            "date": "2026-09-01",
+            "time": "14:50"
+          },
+          "duration": 355,
+          "airplane": "Boeing 737MAX 9 Passenger",
+          "airline": "Alaska",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AS.png",
+          "travel_class": "Economy",
+          "flight_number": "AS 35",
+          "extensions": [
+            "Power and USB outlets",
+            "Stream video to own device",
+            "Wi-Fi for fee",
+            "Seat type Average Legroom",
+            "Legroom 31 inches",
+            "Carbon emission: 276 kg"
+          ],
+          "detected_extensions": {
+            "has_power_and_usb_outlets": true,
+            "has_stream_video_to_own_device": true,
+            "wifi": "for fee",
+            "seat_type": "Average Legroom",
+            "legroom_short": "31 in",
+            "legroom_long": "31 inches",
+            "carbon_emission": 276
+          }
+        }
+      ],
+      "total_duration": 355,
+      "carbon_emissions": {
+        "this_flight": 276000,
+        "typical_for_this_route": 325000,
+        "difference_percent": -15,
+        "lowest_route": 283000
+      },
+      "price": 378,
+      "type": "Round trip",
+      "extensions": [
+        "Checked baggage for a fee",
+        "Bag and fare conditions depend on the return flight"
+      ],
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AS.png",
+      "departure_token": "WyJDalJJU214MU4weEJTRXRyUjJOQlFUSlhNRUZDUnkwdExTMHRMUzB0TFMxNWJHMW5NVUZCUVVGQlIzQnBWMHByUlVaaVRUUkJFZ1JCVXpNMUdnc0lxS2NDRUFJYUExVlRSRGdjY0tpbkFnPT0iLFtbIkpGSyIsIjIwMjYtMDktMDEiLCJTQU4iLG51bGwsIkFTIiwiMzUiXV1d"
+    }
+  ],
+  "other_flights": [
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "John F. Kennedy International Airport",
+            "id": "JFK",
+            "date": "2026-09-01",
+            "time": "15:59"
+          },
+          "arrival_airport": {
+            "name": "San Diego International Airport",
+            "id": "SAN",
+            "date": "2026-09-01",
+            "time": "19:06"
+          },
+          "duration": 367,
+          "airplane": "Airbus A320",
+          "airline": "JetBlue",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/B6.png",
+          "travel_class": "Economy",
+          "flight_number": "B6 1189",
+          "is_often_delayed": true,
+          "extensions": [
+            "Power and USB outlets",
+            "Live TV",
+            "Wi-Fi free",
+            "Seat type Above Average Legroom",
+            "Legroom 33 inches",
+            "Carbon emission: 425 kg"
+          ],
+          "detected_extensions": {
+            "has_power_and_usb_outlets": true,
+            "has_live_tv": true,
+            "wifi": "free",
+            "seat_type": "Above Average Legroom",
+            "legroom_short": "33 in",
+            "legroom_long": "33 inches",
+            "carbon_emission": 425
+          }
+        }
+      ],
+      "total_duration": 367,
+      "carbon_emissions": {
+        "this_flight": 425000,
+        "typical_for_this_route": 325000,
+        "difference_percent": 31,
+        "lowest_route": 283000
+      },
+      "price": 328,
+      "type": "Round trip",
+      "extensions": [
+        "Checked baggage for a fee",
+        "Bag and fare conditions depend on the return flight"
+      ],
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/B6.png",
+      "departure_token": "WyJDalJJU214MU4weEJTRXRyUjJOQlFUSlhNRUZDUnkwdExTMHRMUzB0TFMxNWJHMW5NVUZCUVVGQlIzQnBWMHByUlVaaVRUUkJFZ1pDTmpFeE9Ea2FDd2lnZ0FJUUFob0RWVk5FT0J4d29JQUMiLFtbIkpGSyIsIjIwMjYtMDktMDEiLCJTQU4iLG51bGwsIkI2IiwiMTE4OSJdXV0="
+    },
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "John F. Kennedy International Airport",
+            "id": "JFK",
+            "date": "2026-09-01",
+            "time": "17:25"
+          },
+          "arrival_airport": {
+            "name": "San Diego International Airport",
+            "id": "SAN",
+            "date": "2026-09-01",
+            "time": "20:36"
+          },
+          "duration": 371,
+          "airplane": "Airbus A321neo",
+          "airline": "Delta",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/DL.png",
+          "travel_class": "Economy",
+          "flight_number": "DL 709",
+          "extensions": [
+            "Power and USB outlets",
+            "Live TV",
+            "Wi-Fi free",
+            "Seat type Average Legroom",
+            "Legroom 31 inches",
+            "Carbon emission: 274 kg"
+          ],
+          "detected_extensions": {
+            "has_power_and_usb_outlets": true,
+            "has_live_tv": true,
+            "wifi": "free",
+            "seat_type": "Average Legroom",
+            "legroom_short": "31 in",
+            "legroom_long": "31 inches",
+            "carbon_emission": 274
+          }
+        }
+      ],
+      "total_duration": 371,
+      "carbon_emissions": {
+        "this_flight": 274000,
+        "typical_for_this_route": 325000,
+        "difference_percent": -16,
+        "lowest_route": 283000
+      },
+      "price": 328,
+      "type": "Round trip",
+      "extensions": [
+        "Checked baggage for a fee",
+        "Bag and fare conditions depend on the return flight"
+      ],
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/DL.png",
+      "departure_token": "WyJDalJJU214MU4weEJTRXRyUjJOQlFUSlhNRUZDUnkwdExTMHRMUzB0TFMxNWJHMW5NVUZCUVVGQlIzQnBWMHByUlVaaVRUUkJFZ1ZFVERjd09Sb0xDS0NBQWhBQ0dnTlZVMFE0SEhDZ2dBST0iLFtbIkpGSyIsIjIwMjYtMDktMDEiLCJTQU4iLG51bGwsIkRMIiwiNzA5Il1dXQ=="
+    },
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "John F. Kennedy International Airport",
+            "id": "JFK",
+            "date": "2026-09-01",
+            "time": "07:15"
+          },
+          "arrival_airport": {
+            "name": "Phoenix Sky Harbor International Airport",
+            "id": "PHX",
+            "date": "2026-09-01",
+            "time": "09:39"
+          },
+          "duration": 324,
+          "airplane": "Airbus A321neo",
+          "airline": "American",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AA.png",
+          "travel_class": "Economy",
+          "flight_number": "AA 2369",
+          "extensions": [
+            "Power and USB outlets",
+            "Stream video to own device",
+            "Wi-Fi free",
+            "Seat type Average Legroom",
+            "Legroom 30 inches",
+            "Carbon emission: 227 kg"
+          ],
+          "detected_extensions": {
+            "has_power_and_usb_outlets": true,
+            "has_stream_video_to_own_device": true,
+            "wifi": "free",
+            "seat_type": "Average Legroom",
+            "legroom_short": "30 in",
+            "legroom_long": "30 inches",
+            "carbon_emission": 227
+          }
+        },
+        {
+          "departure_airport": {
+            "name": "Phoenix Sky Harbor International Airport",
+            "id": "PHX",
+            "date": "2026-09-01",
+            "time": "10:39"
+          },
+          "arrival_airport": {
+            "name": "San Diego International Airport",
+            "id": "SAN",
+            "date": "2026-09-01",
+            "time": "11:57"
+          },
+          "duration": 78,
+          "airplane": "Airbus A321neo",
+          "airline": "American",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AA.png",
+          "travel_class": "Economy",
+          "flight_number": "AA 2122",
+          "extensions": [
+            "Power and USB outlets",
+            "Stream video to own device",
+            "Wi-Fi free",
+            "Seat type Average Legroom",
+            "Legroom 30 inches",
+            "Carbon emission: 57 kg"
+          ],
+          "detected_extensions": {
+            "has_power_and_usb_outlets": true,
+            "has_stream_video_to_own_device": true,
+            "wifi": "free",
+            "seat_type": "Average Legroom",
+            "legroom_short": "30 in",
+            "legroom_long": "30 inches",
+            "carbon_emission": 57
+          }
+        }
+      ],
+      "layovers": [
+        {
+          "duration": 60,
+          "name": "Phoenix Sky Harbor International Airport",
+          "id": "PHX"
+        }
+      ],
+      "total_duration": 462,
+      "carbon_emissions": {
+        "this_flight": 286000,
+        "typical_for_this_route": 325000,
+        "difference_percent": -12,
+        "lowest_route": 283000
+      },
+      "price": 337,
+      "type": "Round trip",
+      "extensions": [
+        "Checked baggage for a fee",
+        "Bag and fare conditions depend on the return flight"
+      ],
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AA.png",
+      "departure_token": "WyJDalJJU214MU4weEJTRXRyUjJOQlFUSlhNRUZDUnkwdExTMHRMUzB0TFMxNWJHMW5NVUZCUVVGQlIzQnBWMHByUlVaaVRUUkJFZzFCUVRJek5qbDhRVUV5TVRJeUdnc0k1NFlDRUFJYUExVlRSRGdjY09lR0FnPT0iLFtbIkpGSyIsIjIwMjYtMDktMDEiLCJQSFgiLG51bGwsIkFBIiwiMjM2OSJdLFsiUEhYIiwiMjAyNi0wOS0wMSIsIlNBTiIsbnVsbCwiQUEiLCIyMTIyIl1dXQ=="
+    },
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "John F. Kennedy International Airport",
+            "id": "JFK",
+            "date": "2026-09-01",
+            "time": "10:00"
+          },
+          "arrival_airport": {
+            "name": "Phoenix Sky Harbor International Airport",
+            "id": "PHX",
+            "date": "2026-09-01",
+            "time": "12:21"
+          },
+          "duration": 321,
+          "airplane": "Boeing 737MAX 8 Passenger",
+          "airline": "American",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AA.png",
+          "travel_class": "Economy",
+          "flight_number": "AA 557",
+          "extensions": [
+            "Power and USB outlets",
+            "Stream video to own device",
+            "Wi-Fi free",
+            "Seat type Average Legroom",
+            "Legroom 30 inches",
+            "Carbon emission: 221 kg"
+          ],
+          "detected_extensions": {
+            "has_power_and_usb_outlets": true,
+            "has_stream_video_to_own_device": true,
+            "wifi": "free",
+            "seat_type": "Average Legroom",
+            "legroom_short": "30 in",
+            "legroom_long": "30 inches",
+            "carbon_emission": 221
+          }
+        },
+        {
+          "departure_airport": {
+            "name": "Phoenix Sky Harbor International Airport",
+            "id": "PHX",
+            "date": "2026-09-01",
+            "time": "14:16"
+          },
+          "arrival_airport": {
+            "name": "San Diego International Airport",
+            "id": "SAN",
+            "date": "2026-09-01",
+            "time": "15:26"
+          },
+          "duration": 70,
+          "airplane": "Airbus A321neo",
+          "airline": "American",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AA.png",
+          "travel_class": "Economy",
+          "flight_number": "AA 1951",
+          "extensions": [
+            "Power and USB outlets",
+            "Stream video to own device",
+            "Wi-Fi free",
+            "Seat type Average Legroom",
+            "Legroom 30 inches",
+            "Carbon emission: 57 kg"
+          ],
+          "detected_extensions": {
+            "has_power_and_usb_outlets": true,
+            "has_stream_video_to_own_device": true,
+            "wifi": "free",
+            "seat_type": "Average Legroom",
+            "legroom_short": "30 in",
+            "legroom_long": "30 inches",
+            "carbon_emission": 57
+          }
+        }
+      ],
+      "layovers": [
+        {
+          "duration": 115,
+          "name": "Phoenix Sky Harbor International Airport",
+          "id": "PHX"
+        }
+      ],
+      "total_duration": 506,
+      "carbon_emissions": {
+        "this_flight": 280000,
+        "typical_for_this_route": 325000,
+        "difference_percent": -14,
+        "lowest_route": 283000
+      },
+      "price": 337,
+      "type": "Round trip",
+      "extensions": [
+        "Checked baggage for a fee",
+        "Bag and fare conditions depend on the return flight"
+      ],
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AA.png",
+      "departure_token": "WyJDalJJU214MU4weEJTRXRyUjJOQlFUSlhNRUZDUnkwdExTMHRMUzB0TFMxNWJHMW5NVUZCUVVGQlIzQnBWMHByUlVaaVRUUkJFZ3hCUVRVMU4zeEJRVEU1TlRFYUN3am5oZ0lRQWhvRFZWTkVPQnh3NTRZQyIsW1siSkZLIiwiMjAyNi0wOS0wMSIsIlBIWCIsbnVsbCwiQUEiLCI1NTciXSxbIlBIWCIsIjIwMjYtMDktMDEiLCJTQU4iLG51bGwsIkFBIiwiMTk1MSJdXV0="
+    },
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "John F. Kennedy International Airport",
+            "id": "JFK",
+            "date": "2026-09-01",
+            "time": "12:55"
+          },
+          "arrival_airport": {
+            "name": "Phoenix Sky Harbor International Airport",
+            "id": "PHX",
+            "date": "2026-09-01",
+            "time": "15:07"
+          },
+          "duration": 312,
+          "airplane": "Boeing 737MAX 8 Passenger",
+          "airline": "American",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AA.png",
+          "travel_class": "Economy",
+          "flight_number": "AA 2829",
+          "extensions": [
+            "Power and USB outlets",
+            "Stream video to own device",
+            "Wi-Fi free",
+            "Seat type Average Legroom",
+            "Legroom 30 inches",
+            "Carbon emission: 221 kg"
+          ],
+          "detected_extensions": {
+            "has_power_and_usb_outlets": true,
+            "has_stream_video_to_own_device": true,
+            "wifi": "free",
+            "seat_type": "Average Legroom",
+            "legroom_short": "30 in",
+            "legroom_long": "30 inches",
+            "carbon_emission": 221
+          }
+        },
+        {
+          "departure_airport": {
+            "name": "Phoenix Sky Harbor International Airport",
+            "id": "PHX",
+            "date": "2026-09-01",
+            "time": "17:06"
+          },
+          "arrival_airport": {
+            "name": "San Diego International Airport",
+            "id": "SAN",
+            "date": "2026-09-01",
+            "time": "18:18"
+          },
+          "duration": 72,
+          "airplane": "Airbus A321",
+          "airline": "American",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AA.png",
+          "travel_class": "Economy",
+          "flight_number": "AA 480",
+          "extensions": [
+            "Power and USB outlets",
+            "Stream video to own device",
+            "Wi-Fi free",
+            "Seat type Average Legroom",
+            "Legroom 30 inches",
+            "Carbon emission: 76 kg"
+          ],
+          "detected_extensions": {
+            "has_power_and_usb_outlets": true,
+            "has_stream_video_to_own_device": true,
+            "wifi": "free",
+            "seat_type": "Average Legroom",
+            "legroom_short": "30 in",
+            "legroom_long": "30 inches",
+            "carbon_emission": 76
+          }
+        }
+      ],
+      "layovers": [
+        {
+          "duration": 119,
+          "name": "Phoenix Sky Harbor International Airport",
+          "id": "PHX"
+        }
+      ],
+      "total_duration": 503,
+      "carbon_emissions": {
+        "this_flight": 298000,
+        "typical_for_this_route": 325000,
+        "difference_percent": -8,
+        "lowest_route": 283000
+      },
+      "price": 337,
+      "type": "Round trip",
+      "extensions": [
+        "Checked baggage for a fee",
+        "Bag and fare conditions depend on the return flight"
+      ],
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AA.png",
+      "departure_token": "WyJDalJJU214MU4weEJTRXRyUjJOQlFUSlhNRUZDUnkwdExTMHRMUzB0TFMxNWJHMW5NVUZCUVVGQlIzQnBWMHByUlVaaVRUUkJFZ3hCUVRJNE1qbDhRVUUwT0RBYUN3am5oZ0lRQWhvRFZWTkVPQnh3NTRZQyIsW1siSkZLIiwiMjAyNi0wOS0wMSIsIlBIWCIsbnVsbCwiQUEiLCIyODI5Il0sWyJQSFgiLCIyMDI2LTA5LTAxIiwiU0FOIixudWxsLCJBQSIsIjQ4MCJdXV0="
+    },
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "John F. Kennedy International Airport",
+            "id": "JFK",
+            "date": "2026-09-01",
+            "time": "06:29"
+          },
+          "arrival_airport": {
+            "name": "Boston Logan International Airport",
+            "id": "BOS",
+            "date": "2026-09-01",
+            "time": "07:46"
+          },
+          "duration": 77,
+          "airplane": "Airbus A320",
+          "airline": "JetBlue",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/B6.png",
+          "travel_class": "Economy",
+          "flight_number": "B6 2718",
+          "extensions": [
+            "Power and USB outlets",
+            "Live TV",
+            "Wi-Fi free",
+            "Seat type Above Average Legroom",
+            "Legroom 32 inches",
+            "Carbon emission: 72 kg"
+          ],
+          "detected_extensions": {
+            "has_power_and_usb_outlets": true,
+            "has_live_tv": true,
+            "wifi": "free",
+            "seat_type": "Above Average Legroom",
+            "legroom_short": "32 in",
+            "legroom_long": "32 inches",
+            "carbon_emission": 72
+          }
+        },
+        {
+          "departure_airport": {
+            "name": "Boston Logan International Airport",
+            "id": "BOS",
+            "date": "2026-09-01",
+            "time": "08:50"
+          },
+          "arrival_airport": {
+            "name": "San Diego International Airport",
+            "id": "SAN",
+            "date": "2026-09-01",
+            "time": "11:56"
+          },
+          "duration": 366,
+          "airplane": "Airbus A320",
+          "airline": "JetBlue",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/B6.png",
+          "travel_class": "Economy",
+          "flight_number": "B6 219",
+          "extensions": [
+            "Power and USB outlets",
+            "Live TV",
+            "Wi-Fi free",
+            "Seat type Above Average Legroom",
+            "Legroom 32 inches",
+            "Carbon emission: 411 kg"
+          ],
+          "detected_extensions": {
+            "has_power_and_usb_outlets": true,
+            "has_live_tv": true,
+            "wifi": "free",
+            "seat_type": "Above Average Legroom",
+            "legroom_short": "32 in",
+            "legroom_long": "32 inches",
+            "carbon_emission": 411
+          }
+        }
+      ],
+      "layovers": [
+        {
+          "duration": 64,
+          "name": "Boston Logan International Airport",
+          "id": "BOS"
+        }
+      ],
+      "total_duration": 507,
+      "carbon_emissions": {
+        "this_flight": 484000,
+        "typical_for_this_route": 325000,
+        "difference_percent": 49,
+        "lowest_route": 283000
+      },
+      "price": 351,
+      "type": "Round trip",
+      "extensions": [
+        "Checked baggage for a fee",
+        "Bag and fare conditions depend on the return flight"
+      ],
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/B6.png",
+      "departure_token": "WyJDalJJU214MU4weEJTRXRyUjJOQlFUSlhNRUZDUnkwdExTMHRMUzB0TFMxNWJHMW5NVUZCUVVGQlIzQnBWMHByUlVaaVRUUkJFZ3hDTmpJM01UaDhRall5TVRrYUN3amhrUUlRQWhvRFZWTkVPQnh3NFpFQyIsW1siSkZLIiwiMjAyNi0wOS0wMSIsIkJPUyIsbnVsbCwiQjYiLCIyNzE4Il0sWyJCT1MiLCIyMDI2LTA5LTAxIiwiU0FOIixudWxsLCJCNiIsIjIxOSJdXV0="
+    },
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "John F. Kennedy International Airport",
+            "id": "JFK",
+            "date": "2026-09-01",
+            "time": "20:30"
+          },
+          "arrival_airport": {
+            "name": "San Diego International Airport",
+            "id": "SAN",
+            "date": "2026-09-01",
+            "time": "23:43"
+          },
+          "duration": 373,
+          "airplane": "Airbus A321neo",
+          "airline": "Delta",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/DL.png",
+          "travel_class": "Economy",
+          "flight_number": "DL 685",
+          "is_often_delayed": true,
+          "extensions": [
+            "Power and USB outlets",
+            "Live TV",
+            "Wi-Fi free",
+            "Seat type Average Legroom",
+            "Legroom 31 inches",
+            "Carbon emission: 274 kg"
+          ],
+          "detected_extensions": {
+            "has_power_and_usb_outlets": true,
+            "has_live_tv": true,
+            "wifi": "free",
+            "seat_type": "Average Legroom",
+            "legroom_short": "31 in",
+            "legroom_long": "31 inches",
+            "carbon_emission": 274
+          }
+        }
+      ],
+      "total_duration": 373,
+      "carbon_emissions": {
+        "this_flight": 274000,
+        "typical_for_this_route": 325000,
+        "difference_percent": -16,
+        "lowest_route": 283000
+      },
+      "price": 418,
+      "type": "Round trip",
+      "extensions": [
+        "Checked baggage for a fee",
+        "Bag and fare conditions depend on the return flight"
+      ],
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/DL.png",
+      "departure_token": "WyJDalJJU214MU4weEJTRXRyUjJOQlFUSlhNRUZDUnkwdExTMHRMUzB0TFMxNWJHMW5NVUZCUVVGQlIzQnBWMHByUlVaaVRUUkJFZ1ZFVERZNE5Sb0xDTWpHQWhBQ0dnTlZVMFE0SEhESXhnST0iLFtbIkpGSyIsIjIwMjYtMDktMDEiLCJTQU4iLG51bGwsIkRMIiwiNjg1Il1dXQ=="
+    }
+  ],
+  "price_insights": {
+    "lowest_price": 328,
+    "price_level": "high",
+    "typical_price_range": {
+      "low_price": 195,
+      "high_price": 300
+    },
+    "price_history": [
+      {
+        "price": 287,
+        "iso_date": "2026-05-24T04:00:00Z"
+      },
+      {
+        "price": 287,
+        "iso_date": "2026-05-25T04:00:00Z"
+      },
+      {
+        "price": 287,
+        "iso_date": "2026-05-26T04:00:00Z"
+      },
+      {
+        "price": 287,
+        "iso_date": "2026-05-27T04:00:00Z"
+      },
+      {
+        "price": 287,
+        "iso_date": "2026-05-28T04:00:00Z"
+      },
+      {
+        "price": 287,
+        "iso_date": "2026-05-29T04:00:00Z"
+      },
+      {
+        "price": 287,
+        "iso_date": "2026-05-30T04:00:00Z"
+      },
+      {
+        "price": 287,
+        "iso_date": "2026-05-31T04:00:00Z"
+      },
+      {
+        "price": 287,
+        "iso_date": "2026-06-01T04:00:00Z"
+      },
+      {
+        "price": 287,
+        "iso_date": "2026-06-02T04:00:00Z"
+      },
+      {
+        "price": 287,
+        "iso_date": "2026-06-03T04:00:00Z"
+      },
+      {
+        "price": 287,
+        "iso_date": "2026-06-04T04:00:00Z"
+      },
+      {
+        "price": 297,
+        "iso_date": "2026-06-05T04:00:00Z"
+      },
+      {
+        "price": 297,
+        "iso_date": "2026-06-06T04:00:00Z"
+      },
+      {
+        "price": 297,
+        "iso_date": "2026-06-07T04:00:00Z"
+      },
+      {
+        "price": 255,
+        "iso_date": "2026-06-08T04:00:00Z"
+      },
+      {
+        "price": 255,
+        "iso_date": "2026-06-09T04:00:00Z"
+      },
+      {
+        "price": 255,
+        "iso_date": "2026-06-10T04:00:00Z"
+      },
+      {
+        "price": 255,
+        "iso_date": "2026-06-11T04:00:00Z"
+      },
+      {
+        "price": 255,
+        "iso_date": "2026-06-12T04:00:00Z"
+      },
+      {
+        "price": 317,
+        "iso_date": "2026-06-13T04:00:00Z"
+      },
+      {
+        "price": 317,
+        "iso_date": "2026-06-14T04:00:00Z"
+      },
+      {
+        "price": 317,
+        "iso_date": "2026-06-15T04:00:00Z"
+      },
+      {
+        "price": 297,
+        "iso_date": "2026-06-16T04:00:00Z"
+      },
+      {
+        "price": 297,
+        "iso_date": "2026-06-17T04:00:00Z"
+      },
+      {
+        "price": 328,
+        "iso_date": "2026-06-18T04:00:00Z"
+      },
+      {
+        "price": 328,
+        "iso_date": "2026-06-19T04:00:00Z"
+      },
+      {
+        "price": 328,
+        "iso_date": "2026-06-20T04:00:00Z"
+      },
+      {
+        "price": 328,
+        "iso_date": "2026-06-21T04:00:00Z"
+      },
+      {
+        "price": 328,
+        "iso_date": "2026-06-22T04:00:00Z"
+      },
+      {
+        "price": 328,
+        "iso_date": "2026-06-23T04:00:00Z"
+      },
+      {
+        "price": 328,
+        "iso_date": "2026-06-24T04:00:00Z"
+      },
+      {
+        "price": 308,
+        "iso_date": "2026-06-25T04:00:00Z"
+      },
+      {
+        "price": 308,
+        "iso_date": "2026-06-26T04:00:00Z"
+      },
+      {
+        "price": 308,
+        "iso_date": "2026-06-27T04:00:00Z"
+      },
+      {
+        "price": 308,
+        "iso_date": "2026-06-28T04:00:00Z"
+      },
+      {
+        "price": 297,
+        "iso_date": "2026-06-29T04:00:00Z"
+      },
+      {
+        "price": 297,
+        "iso_date": "2026-06-30T04:00:00Z"
+      },
+      {
+        "price": 297,
+        "iso_date": "2026-07-01T04:00:00Z"
+      },
+      {
+        "price": 297,
+        "iso_date": "2026-07-02T04:00:00Z"
+      },
+      {
+        "price": 308,
+        "iso_date": "2026-07-03T04:00:00Z"
+      },
+      {
+        "price": 308,
+        "iso_date": "2026-07-04T04:00:00Z"
+      },
+      {
+        "price": 308,
+        "iso_date": "2026-07-05T04:00:00Z"
+      },
+      {
+        "price": 308,
+        "iso_date": "2026-07-06T04:00:00Z"
+      },
+      {
+        "price": 211,
+        "iso_date": "2026-07-07T04:00:00Z"
+      },
+      {
+        "price": 308,
+        "iso_date": "2026-07-08T04:00:00Z"
+      },
+      {
+        "price": 308,
+        "iso_date": "2026-07-09T04:00:00Z"
+      },
+      {
+        "price": 308,
+        "iso_date": "2026-07-10T04:00:00Z"
+      },
+      {
+        "price": 308,
+        "iso_date": "2026-07-11T04:00:00Z"
+      },
+      {
+        "price": 308,
+        "iso_date": "2026-07-12T04:00:00Z"
+      },
+      {
+        "price": 308,
+        "iso_date": "2026-07-13T04:00:00Z"
+      },
+      {
+        "price": 308,
+        "iso_date": "2026-07-14T04:00:00Z"
+      },
+      {
+        "price": 308,
+        "iso_date": "2026-07-15T04:00:00Z"
+      },
+      {
+        "price": 313,
+        "iso_date": "2026-07-16T04:00:00Z"
+      },
+      {
+        "price": 313,
+        "iso_date": "2026-07-17T04:00:00Z"
+      },
+      {
+        "price": 318,
+        "iso_date": "2026-07-18T04:00:00Z"
+      },
+      {
+        "price": 318,
+        "iso_date": "2026-07-19T04:00:00Z"
+      },
+      {
+        "price": 318,
+        "iso_date": "2026-07-20T04:00:00Z"
+      },
+      {
+        "price": 318,
+        "iso_date": "2026-07-21T04:00:00Z"
+      },
+      {
+        "price": 318,
+        "iso_date": "2026-07-22T04:00:00Z"
+      },
+      {
+        "price": 328,
+        "iso_date": "2026-07-23T04:00:00Z"
+      }
+    ]
+  },
+  "airports": [
+    {
+      "departure": [
+        {
+          "airport": {
+            "id": "JFK",
+            "name": "John F. Kennedy International Airport"
+          },
+          "city": "New York",
+          "country": "United States",
+          "country_code": "US",
+          "image": "https://encrypted-tbn1.gstatic.com/images?q=tbn:ANd9GcRa1dwH1NZQk4dsbPiyA9Vrq2RX75jXSZ-OkHn7NkLHl-11HercqDXoZ4p2cDxJkH6vca2degawrCzHEQ",
+          "thumbnail": "https://encrypted-tbn1.gstatic.com/images?q=tbn:ANd9GcQEaUa9NsdPWGpAUGkTApkZDT_4M6_6V8wTcC0v1b1wJAJX-BuMSiipXbsoznGgcI1xLOc5QiTcR_xovexgjdOz0gqQe0tRQ9h0bUkZ07Q"
+        }
+      ],
+      "arrival": [
+        {
+          "airport": {
+            "id": "SAN",
+            "name": "San Diego International Airport"
+          },
+          "city": "San Diego",
+          "country": "United States",
+          "country_code": "US",
+          "image": "https://encrypted-tbn3.gstatic.com/images?q=tbn:ANd9GcQEOz0aPlrhIfM3YSlR68LMNiXeDXdUvIGLhy8nX9xj8_Wcdp1-tHiBcw3EIHgJ_ssoPAWoNFwEKkgV0g",
+          "thumbnail": "https://encrypted-tbn3.gstatic.com/images?q=tbn:ANd9GcT-YOh9oxUwyq8LTaU2vjl5BuF2H3ubR4_fAoNeER5Axn-DQdDAHcVLQF9LXGeiqXphUjCCkIBbUyqWvq8k64PpD9KfPVpztp6OO9daRpE"
+        }
+      ]
+    },
+    {
+      "departure": [
+        {
+          "airport": {
+            "id": "SAN",
+            "name": "San Diego International Airport"
+          },
+          "city": "San Diego",
+          "country": "United States",
+          "country_code": "US",
+          "image": "https://encrypted-tbn3.gstatic.com/images?q=tbn:ANd9GcQEOz0aPlrhIfM3YSlR68LMNiXeDXdUvIGLhy8nX9xj8_Wcdp1-tHiBcw3EIHgJ_ssoPAWoNFwEKkgV0g",
+          "thumbnail": "https://encrypted-tbn3.gstatic.com/images?q=tbn:ANd9GcT-YOh9oxUwyq8LTaU2vjl5BuF2H3ubR4_fAoNeER5Axn-DQdDAHcVLQF9LXGeiqXphUjCCkIBbUyqWvq8k64PpD9KfPVpztp6OO9daRpE"
+        }
+      ],
+      "arrival": [
+        {
+          "airport": {
+            "id": "JFK",
+            "name": "John F. Kennedy International Airport"
+          },
+          "city": "New York",
+          "country": "United States",
+          "country_code": "US",
+          "image": "https://encrypted-tbn1.gstatic.com/images?q=tbn:ANd9GcRa1dwH1NZQk4dsbPiyA9Vrq2RX75jXSZ-OkHn7NkLHl-11HercqDXoZ4p2cDxJkH6vca2degawrCzHEQ",
+          "thumbnail": "https://encrypted-tbn1.gstatic.com/images?q=tbn:ANd9GcQEaUa9NsdPWGpAUGkTApkZDT_4M6_6V8wTcC0v1b1wJAJX-BuMSiipXbsoznGgcI1xLOc5QiTcR_xovexgjdOz0gqQe0tRQ9h0bUkZ07Q"
+        }
+      ]
+    }
+  ],
+  "airlines": {
+    "alliances": [
+      {
+        "code": "ONEWORLD",
+        "name": "Oneworld"
+      },
+      {
+        "code": "SKYTEAM",
+        "name": "SkyTeam"
+      },
+      {
+        "code": "STAR_ALLIANCE",
+        "name": "Star Alliance"
+      }
+    ],
+    "airlines": [
+      {
+        "code": "AS",
+        "name": "Alaska"
+      },
+      {
+        "code": "AA",
+        "name": "American"
+      },
+      {
+        "code": "AD",
+        "name": "Azul"
+      },
+      {
+        "code": "DE",
+        "name": "Condor"
+      },
+      {
+        "code": "DL",
+        "name": "Delta"
+      },
+      {
+        "code": "F9",
+        "name": "Frontier"
+      },
+      {
+        "code": "GF",
+        "name": "Gulf Air"
+      },
+      {
+        "code": "B6",
+        "name": "JetBlue"
+      },
+      {
+        "code": "SY",
+        "name": "Sun Country Airlines"
+      },
+      {
+        "code": "WS",
+        "name": "WestJet"
+      }
+    ],
+    "hubs": [
+      {
+        "code": "ATL",
+        "name": "Atlanta"
+      },
+      {
+        "code": "AUS",
+        "name": "Austin"
+      },
+      {
+        "code": "BOS",
+        "name": "Boston"
+      },
+      {
+        "code": "CLT",
+        "name": "Charlotte"
+      },
+      {
+        "code": "ORD",
+        "name": "Chicago"
+      },
+      {
+        "code": "CVG",
+        "name": "Cincinnati"
+      },
+      {
+        "code": "CLE",
+        "name": "Cleveland"
+      },
+      {
+        "code": "DFW",
+        "name": "Dallas"
+      },
+      {
+        "code": "DTW",
+        "name": "Detroit"
+      },
+      {
+        "code": "LAX",
+        "name": "Los Angeles"
+      },
+      {
+        "code": "MIA",
+        "name": "Miami"
+      },
+      {
+        "code": "MSP",
+        "name": "Minneapolis"
+      },
+      {
+        "code": "PHX",
+        "name": "Phoenix"
+      },
+      {
+        "code": "PDX",
+        "name": "Portland"
+      },
+      {
+        "code": "SLC",
+        "name": "Salt Lake City"
+      },
+      {
+        "code": "SFO",
+        "name": "San Francisco"
+      },
+      {
+        "code": "SEA",
+        "name": "Seattle"
+      }
+    ]
+  },
+  "baggage_allowance_links": [
+    {
+      "airline_code": "AS",
+      "airline": "Alaska",
+      "url": "https://www.alaskaair.com/content/travel-info/baggage/overview"
+    },
+    {
+      "airline_code": "AA",
+      "airline": "American",
+      "url": "https://www.aa.com/i18n/travel-info/baggage/checked-baggage-policy.jsp"
+    },
+    {
+      "airline_code": "DL",
+      "airline": "Delta",
+      "url": "https://www.delta.com/content/www/en_US/traveling-with-us/baggage/before-your-trip/checked.html"
+    },
+    {
+      "airline_code": "B6",
+      "airline": "JetBlue",
+      "url": "https://www.jetblue.com/at-the-airport/baggage-information?intcmp=hd_info"
+    }
+  ],
+  "passenger_assistance_links": [
+    {
+      "airline_code": "B6",
+      "airline": "JetBlue",
+      "url": "https://www.jetblue.com/at-the-airport/accessibility-assistance"
+    },
+    {
+      "airline_code": "DL",
+      "airline": "Delta",
+      "url": "https://www.delta.com/us/en/accessible-travel-services/overview"
+    },
+    {
+      "airline_code": "AS",
+      "airline": "Alaska",
+      "url": "https://www.alaskaair.com/content/travel-info/accessible-services"
+    },
+    {
+      "airline_code": "AA",
+      "airline": "American",
+      "url": "https://www.aa.com/i18n/travel-info/special-assistance/special-assistance.jsp"
+    }
+  ]
+}

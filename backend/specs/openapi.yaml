@@ -81,7 +81,8 @@ paths:
       summary: >-
         Search real flight offers for the trip's own stored route and dates. Reuses a real
         search made for the same route+dates within FLIGHT_CACHE_TTL_MINUTES instead of spending
-        another unit of the scarce SearchApi quota.
+        another unit of the scarce SearchApi quota. Each invocation records an agent run with
+        provider, latency, token, cost, and tool-step metrics.
       parameters:
         - { name: trip_id, in: path, required: true, schema: { type: integer } }
       responses:
@@ -142,9 +143,10 @@ paths:
     get:
       operationId: get_trip_execution
       summary: >-
-        The Agent Execution Panel data: the latest /plan run (tokens, timing, ordered
-        model/tool steps) plus the trip's full tool/API-call event timeline. Real derived data
-        only — a run that hasn't happened yet returns agent_run: null, never fabricated metrics.
+        Every flight-search and itinerary-planning agent run for the trip, newest first, with
+        its own model/tool steps, API/protocol events, tokens, timing, and cost. The top-level
+        event stream is retained for live activity only; execution history groups each event
+        under the run that produced it.
       parameters:
         - { name: trip_id, in: path, required: true, schema: { type: integer } }
       responses:
@@ -162,7 +164,9 @@ paths:
   /api/trips/{trip_id}/booking/request:
     post:
       operationId: request_booking
-      summary: Open a HITL booking request for a chosen flight offer (idempotent per trip+flight).
+      summary: >-
+        Open a HITL booking request for a chosen flight offer (idempotent while active; a
+        cancelled request can be opened again).
       parameters:
         - { name: trip_id, in: path, required: true, schema: { type: integer } }
       requestBody:
@@ -172,7 +176,7 @@ paths:
             schema: { $ref: '#/components/schemas/BookingRequestCreate' }
       responses:
         '200':
-          description: The booking log, in state PENDING_USER_CONFIRMATION.
+          description: A new or existing active booking log in state PENDING_USER_CONFIRMATION.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/BookingLogOut' }
@@ -232,13 +236,18 @@ paths:
     post:
       operationId: execute_booking
       summary: >-
-        The gated write (CONFIRMED -> EXECUTED): fetch real booking options, store them plus a
-        record locator. Atomic (SELECT ... FOR UPDATE) and idempotent once EXECUTED.
+        The gated write (CONFIRMED -> EXECUTED): store a record locator, plus real booking
+        options if the upstream (SearchApi or its recorded cassette) is reachable — a failure to
+        fetch those supplementary links degrades honestly (none stored) rather than blocking the
+        already-real, human-confirmed execute. Atomic (SELECT ... FOR UPDATE) and idempotent once
+        EXECUTED.
       parameters:
         - { name: log_id, in: path, required: true, schema: { type: integer } }
       responses:
         '200':
-          description: The booking log, now EXECUTED, carrying the stored booking options.
+          description: >-
+            The booking log, now EXECUTED, with booking_options populated if the upstream link
+            fetch succeeded, or empty if it didn't.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/BookingLogOut' }
@@ -249,11 +258,6 @@ paths:
               schema: { $ref: '#/components/schemas/ProblemDetail' }
         '409':
           description: Not in CONFIRMED state, or the fare's price-hold TTL has passed.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ProblemDetail' }
-        '502':
-          description: The booking-options upstream (SearchApi or its recorded cassette) is unavailable.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetail' }
@@ -290,7 +294,7 @@ components:
     ErrorCode:
       type: string
       description: Machine-readable failure code; the human explanation is in `detail`.
-      enum: [booking_not_found, trip_not_found, flight_not_found, booking_expired, invalid_transition, booking_options_unavailable, validation_error, rate_limit_exceeded]
+      enum: [booking_not_found, trip_not_found, flight_not_found, booking_expired, invalid_transition, validation_error, rate_limit_exceeded]
 
     BookingRequestCreate:
       type: object
@@ -407,7 +411,7 @@ components:
 
     FlightOfferOut:
       type: object
-      required: [id, offer_index, carrier, price_usd, currency, depart_at, arrive_at, stops, source]
+      required: [id, offer_index, carrier, price_usd, currency, depart_at, arrive_at, stops, source, legs]
       properties:
         id: { type: integer }
         offer_index: { type: integer }
@@ -419,6 +423,9 @@ components:
         stops: { type: integer }
         source: { type: string, enum: [live, cached] }
         legs:
+          description: >-
+            Flown segments in travel order. Round-trip offers contain the outbound segments
+            followed by the exact selected return segments.
           type: array
           items: { $ref: '#/components/schemas/FlightLegOut' }
 
@@ -510,6 +517,9 @@ components:
         steps:
           type: array
           items: { $ref: '#/components/schemas/AgentRunStepOut' }
+        events:
+          type: array
+          items: { $ref: '#/components/schemas/ExecutionEventOut' }
         estimated_cost_usd: { type: [number, 'null'] }
         budget_utilization_pct: { type: [number, 'null'] }
 
@@ -520,6 +530,7 @@ components:
         seq: { type: integer }
         kind: { $ref: '#/components/schemas/ExecutionEventKind' }
         name: { type: string }
+        provider: { type: [string, 'null'] }
         status: { type: string }
         detail: { type: string }
         duration_ms: { type: [integer, 'null'] }

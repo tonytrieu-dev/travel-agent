@@ -25,13 +25,10 @@ round trip was guaranteed on nearly every real trip; validating at intake remove
 entirely instead of just making it reliable. Scoped to the API boundary only: `TripRequest.age`/
 `.fitness_level` stay nullable in the DB so existing incomplete rows keep reading fine.
 
-## Two read-only tools + a fail-closed tool gate
-Only `search_flights` and `web_search`, both `READ_ONLY` — the only classification the gate
-currently defines. Registration requires a classification; an unclassified tool raises `TypeError`
-at import instead of silently registering. **Alternative:** register tools directly on the agent.
-**Rejected** — the gate makes wiring a future write tool fail closed by construction (it can't be
-registered without deliberately adding a classification for it) and keeps a regression test
-(`test_tool_gate.py`) honest.
+## The agent has only two read-only tools
+Only `search_flights` and `web_search` are registered on the planner, both with strict JSON
+schemas. Booking remains outside the agent as the REST state machine above, so the model has no
+write tool to invoke.
 
 ## Audit tables are append-only at the database
 `booking_transition` and `execution_event` have `BEFORE UPDATE/DELETE` triggers that raise.
@@ -65,12 +62,14 @@ of JSON tool calls, which Pydantic AI can't parse.
 
 ## Real data only, honest degradation
 Adapters never fabricate. On quota/rate-limit/empty they return cached real data if present, or an
-honest `unavailable_reason` — never an invented offer or activity. One-way booking-options fetches
+honest `unavailable_reason` — never an invented offer or activity. Booking-options fetches
 (`departure_id`/`arrival_id`/`outbound_date` forwarded alongside `booking_token`, all derived from
-the flight's stored `raw_offer`) work end-to-end. Round-trip fares still fail honestly — resolving
-their `departure_token` into a real `booking_token` needs a second SearchApi call, which stays
-deferred rather than spend the one-time search quota on a feature beyond the assignment's "strong
-plus."
+the flight's stored `raw_offer`) work end-to-end for one-way and round-trip alike. Round-trip
+offers store a `departure_token`, not a real `booking_token` (see `_parse_offers`); resolving it
+costs one extra SearchApi call (`_resolve_return_booking_token`) that fetches the return-leg
+options and picks the cheapest — the current UI has no separate return-flight-selection step, so
+this is the same cheapest tie-break the rest of the app already uses. Any failure in that
+resolution degrades honestly to no booking links, same as the rest of the booking-options path.
 
 ## Deferred by design
 Episodic/semantic/procedural agent memory, full auth (only `get_current_user` changes), and

@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import JSON, Column, UniqueConstraint
+from sqlalchemy import JSON, Column, Index, UniqueConstraint, text
 from sqlmodel import Field, SQLModel
 
 from app.state import BookingState
@@ -115,11 +115,15 @@ class Itinerary(SQLModel, table=True):
 
 class HITLBookingLog(SQLModel, table=True):
     __tablename__ = "hitl_booking_log"
-    # One booking request per (trip, flight offer): a double-click on "Request booking" reuses
-    # the existing row instead of creating a duplicate.
     __table_args__ = (
-        UniqueConstraint(
-            "trip_request_id", "flight_search_result_id", name="uq_booking_trip_flight"
+        Index(
+            "uq_booking_trip_flight_active",
+            "trip_request_id",
+            "flight_search_result_id",
+            unique=True,
+            postgresql_where=text(
+                "state IN ('PENDING_USER_CONFIRMATION', 'CONFIRMED')"
+            ),
         ),
     )
 
@@ -132,7 +136,7 @@ class HITLBookingLog(SQLModel, table=True):
     # fabricated airline PNR (only an airline can mint a real PNR).
     booking_reference: str | None = None
     # The real SearchApi booking options fetched at execute time: provider, price, and a
-    # booking_url to the airline/OTA checkout.
+    # booking_request (POST url + post_data) that redirects to the airline/OTA checkout.
     booking_options: list[dict[str, Any]] | None = Field(default=None, sa_column=Column(JSON))
     expires_at: datetime  # price-staleness TTL
     confirmed_at: datetime | None = None
@@ -164,9 +168,11 @@ class ExecutionEvent(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     trip_request_id: int = Field(foreign_key="trip_request.id", index=True)
+    agent_run_id: int | None = Field(default=None, foreign_key="agent_run.id", index=True)
     seq: int
     kind: ExecutionEventKind
     name: str
+    provider: str | None = None
     status: str
     detail: str
     duration_ms: int | None = None

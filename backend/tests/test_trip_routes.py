@@ -1,6 +1,8 @@
 """Trip route boundaries that are easy to regress without an endpoint-level check."""
 
 from tests.db_helpers import get_trip, run_db, seed_trip
+
+
 def test_get_trip_returns_the_persisted_trip(client) -> None:
     trip_id = run_db(lambda session: seed_trip(session, depart_date="2026-09-01"))
 

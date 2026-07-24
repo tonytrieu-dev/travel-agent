@@ -46,6 +46,3 @@ ALLOWED_TRANSITIONS: dict[BookingState, set[BookingState]] = {
     BookingState.CANCELLED: set(),  # terminal
     BookingState.EXPIRED: set(),  # terminal
 }
-
-def is_transition_allowed(from_state: BookingState, to_state: BookingState) -> bool:
-    return to_state in ALLOWED_TRANSITIONS[from_state]

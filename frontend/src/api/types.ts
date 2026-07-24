@@ -18,7 +18,6 @@ export type ErrorCode =
   | "flight_not_found"
   | "booking_expired"
   | "invalid_transition"
-  | "booking_options_unavailable"
   | "validation_error"
   | "rate_limit_exceeded"
 
@@ -146,6 +145,7 @@ export interface AgentRunOut {
   started_at: string
   finished_at?: string | null
   steps: AgentRunStepOut[]
+  events: ExecutionEventOut[]
   estimated_cost_usd?: number | null
   budget_utilization_pct?: number | null
 }
@@ -154,6 +154,7 @@ export interface ExecutionEventOut {
   seq: number
   kind: ExecutionEventKind
   name: string
+  provider?: string | null
   status: string
   detail: string
   duration_ms?: number | null

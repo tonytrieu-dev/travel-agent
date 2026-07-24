@@ -13,7 +13,12 @@ from app.db import get_session
 from app.dbos_runtime import execute_booking_durable
 from app.models import BookingTransition, HITLBookingLog
 from app.repositories import booking_repository as repository
-from app.schemas import BookingLogOut, BookingRequestCreate, BookingTransitionOut, ProblemDetail
+from app.schemas import (
+    BookingLogOut,
+    BookingRequestCreate,
+    BookingTransitionOut,
+    ProblemDetail,
+)
 
 router = APIRouter(prefix="/api", tags=["booking"])
 

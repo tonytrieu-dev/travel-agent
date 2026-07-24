@@ -115,14 +115,8 @@ def test_persisted_agent_run_sums_tokens_and_orders_one_step_per_tool_call() -> 
     )
 
     tool_steps = [step for step in steps if step.kind is AgentStepKind.TOOL]
-    assert [step.name for step in tool_steps] == ["search_flights", "web_search"], (
-        f"expected one AgentRunStep per tool call in call order, got "
-        f"{[step.name for step in tool_steps]}"
-    )
-    assert all(step.status == "completed" for step in tool_steps), (
-        "every tool call in this fixture has a matching ToolReturnPart, so none should be "
-        "derived as missing a result"
-    )
+    assert [step.name for step in tool_steps] == ["search_flights", "web_search"]
+    assert all(step.status == "completed" for step in tool_steps)
     assert tool_steps[0].output_summary is not None and "Air France" in tool_steps[0].output_summary, (
         f"a tool step's output_summary must carry its real ToolReturnPart content, not be "
         f"dropped; got {tool_steps[0].output_summary!r}"

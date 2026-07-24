@@ -18,6 +18,11 @@ Feature: Human-in-the-loop booking gate
     And no booking reference is stored on the booking
     And the booking-options provider is never called
 
+  Scenario: A cancelled flight can be booked again
+    Given a booking still pending user confirmation
+    When the booking is cancelled and the same flight is requested again
+    Then a new pending booking is returned for the same flight
+
   Scenario: An expired fare cannot be executed
     Given a confirmed booking whose price hold has already expired
     When execute is called once
@@ -25,9 +30,9 @@ Feature: Human-in-the-loop booking gate
     And the booking is left EXPIRED with an audit transition into EXPIRED
     And the booking-options provider is never called
 
-  Scenario: A booking-options upstream failure surfaces as a structured error, not a crash
+  Scenario: A booking-options upstream failure still completes the human-confirmed execute
     Given a confirmed booking whose price hold is still valid
     And the booking-options provider will fail
     When execute is called once
-    Then the response is 502 with error code "booking_options_unavailable"
-    And the booking is left CONFIRMED with no booking reference stored
+    Then the response is 200 with a booking reference and no booking options stored
+    And the booking ends EXECUTED with exactly one transition into EXECUTED

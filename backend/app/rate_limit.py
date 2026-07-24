@@ -8,7 +8,11 @@ from collections import defaultdict
 
 from fastapi import Request
 
-from app.config import MAX_CONCURRENT_AGENT_RUNS, RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_SECONDS
+from app.config import (
+    MAX_CONCURRENT_AGENT_RUNS,
+    RATE_LIMIT_MAX_REQUESTS,
+    RATE_LIMIT_WINDOW_SECONDS,
+)
 from app.schemas import ErrorCode
 
 _agent_run_lock = asyncio.Lock()

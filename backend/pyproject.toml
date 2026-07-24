@@ -9,15 +9,11 @@ dependencies = [
     "pydantic>=2.10",
     "pydantic-settings>=2.7",
     "pydantic-ai-slim[google,openai]>=2.9",
-    "pydantic-evals>=2.9",
     "dbos>=1.0",
     "sqlmodel>=0.0.22",
     "asyncpg>=0.30",
     "alembic>=1.14",
     "httpx>=0.28",
-    "tavily-python>=0.5",
-    "email-validator>=2.2",
-    "python-json-logger>=3.2",
 ]
 
 [dependency-groups]
@@ -25,7 +21,7 @@ dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.25",
     "pytest-bdd>=8.1",
-    "httpx>=0.28",
+    "pydantic-evals>=2.9",
     "pyyaml>=6.0",
     "pyrefly>=0.16",
 ]
@@ -34,6 +30,7 @@ dev = [
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
 testpaths = ["tests"]
+pythonpath = ["."]
 
 [tool.pyrefly]
 project-includes = ["app", "evals", "tests"]
