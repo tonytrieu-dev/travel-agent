@@ -18,6 +18,8 @@ GEMINI_JUDGE_MODEL = "gemini-3.6-flash"
 SEARCHAPI_BASE_URL = "https://www.searchapi.io/api/v1/search"
 SEARCHAPI_TIMEOUT_SECONDS = 60.0
 
+SLACK_API_TIMEOUT_SECONDS = 10.0
+
 # RecordedProvider replays real-captured payloads from here; never hand-fabricated.
 FLIGHT_CASSETTE_DIR = Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "recorded" / "flights"
 ACTIVITY_CASSETTE_PATH = (
@@ -103,6 +105,10 @@ class Settings(BaseSettings):
 
     use_live_flight_api: bool = True
     frontend_origin: str = "http://localhost:5173"
+
+    slack_bot_token: SecretStr | None = None
+    slack_signing_secret: SecretStr | None = None
+    slack_approvals_channel_id: str | None = None
 
     @computed_field
     @property

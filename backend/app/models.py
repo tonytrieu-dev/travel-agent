@@ -9,10 +9,9 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
+from app.state import BookingState
 from sqlalchemy import JSON, Column, Index, UniqueConstraint, text
 from sqlmodel import Field, SQLModel
-
-from app.state import BookingState
 
 
 def utcnow() -> datetime:
@@ -142,6 +141,17 @@ class HITLBookingLog(SQLModel, table=True):
     confirmed_at: datetime | None = None
     executed_at: datetime | None = None
     created_at: datetime = Field(default_factory=utcnow)
+
+
+class ConnectorSetting(SQLModel, table=True):
+    """Single-row table: live, DB-backed toggles for optional external connectors (currently
+    just Slack). Kept separate from ``Settings`` because it must be flippable at runtime without
+    a restart — that's the point of a toggle instead of an env var."""
+
+    __tablename__ = "connector_setting"
+
+    id: int | None = Field(default=None, primary_key=True)
+    slack_enabled: bool = Field(default=False)
 
 
 # ── Audit & observability ────────────────────────────────────────────────────────────────

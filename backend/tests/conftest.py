@@ -19,11 +19,10 @@ import os
 from dataclasses import dataclass, field
 
 import pytest
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-
 from app.adapters.flights_searchapi import FlightSearchOutcome, NormalizedFlightOffer
 from app.schemas import ClarificationOut, ItineraryDayOut, ItineraryOut
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from tests.db_helpers import TEST_DATABASE_URL, run_db
 
 # Must run before any ``app.*`` import: ``app.db``/``app.config`` build their engine once from
@@ -35,7 +34,7 @@ os.environ.setdefault("DATABASE_URL", TEST_DATABASE_URL)
 
 _ALL_TABLES = (
     "booking_transition, execution_event, agent_run_step, agent_run, hitl_booking_log, "
-    "itinerary, flight_search_result, trip_request, user_account"
+    "itinerary, flight_search_result, trip_request, user_account, connector_setting"
 )
 
 
@@ -196,10 +195,9 @@ def client(
     planner_spy: PlannerRunSpy,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    from starlette.testclient import TestClient
-
     from app.db import get_engine, get_session
     from app.main import app
+    from starlette.testclient import TestClient
 
     app_engine = create_async_engine(TEST_DATABASE_URL, pool_pre_ping=True)
     app_session_factory = async_sessionmaker(app_engine, expire_on_commit=False)
