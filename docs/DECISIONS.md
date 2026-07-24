@@ -86,6 +86,11 @@ depending on an abstraction over it. **Kept as the deliberate extension point:**
 narrow interface specifically so that a real multi-connector future (Discord, Teams, ...) is a
 module swap to `chat-sdk-python`, not a rewrite — see `docs/SLACK_SETUP.md`.
 
+**Local dev needs a public callback URL.** Slack's Interactivity config can't POST to
+`localhost`, so `POST /api/slack/interactions` has to be reachable from the internet even during
+local development. `ngrok http 8000` is the tunnel used for this (see `docs/SLACK_SETUP.md`) —
+no code depends on ngrok specifically, any HTTPS tunnel pointed at port 8000 works the same way.
+
 ## Slack approve only confirms; execute stays in the frontend
 The Slack callback (`routes/slack.py`) calls only `confirm_booking`/`reject_booking`, never
 `execute_booking`. **Alternative:** let Approve in Slack also execute the booking.

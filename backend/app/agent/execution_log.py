@@ -133,13 +133,6 @@ class ExecutionRun:
 
     agent_run: AgentRun | None
 
-    async def record_event(
-        self, kind: ExecutionEventKind, name: str, status: str, detail: str,
-        duration_ms: int | None = None, data: dict[str, Any] | None = None,
-        provider: str | None = None,
-    ) -> None:
-        await record_event(kind, name, status, detail, duration_ms, data, provider)
-
     async def persist_result(
         self, *, message_history: list[Any], usage: RunUsage, status: str = "completed"
     ) -> AgentRun:

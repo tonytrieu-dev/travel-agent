@@ -27,7 +27,7 @@ from app.models import (
     TripStatus,
     utcnow,
 )
-from app.repositories.trips_repository import ErrorCode, TripError
+from app.repositories.trips_repository import ErrorCode, TripError, cheapest_first
 
 
 @dataclass
@@ -35,13 +35,6 @@ class TripFlightSearchOutcome:
     offers: list[FlightSearchResult]
     unavailable_reason: str | None
     source: str  # "same_trip_cache" | "cross_trip_cache" | "live"
-
-
-def _cheapest_first(offers: list[FlightSearchResult]) -> list[FlightSearchResult]:
-    """Ascending price order is a backend guarantee, held on every path (fresh live search,
-    own-trip reuse, cross-trip cache) so all three agree — the frontend lists offers in the
-    order the API returns them."""
-    return sorted(offers, key=lambda offer: offer.price_usd)
 
 
 def _complete_flight_results(
@@ -127,7 +120,7 @@ class FlightSearchService:
                     f"{len(results)} offers (cached from an identical route/date search)",
                     results, run_started_at, run_started_monotonic,
                 )
-                return TripFlightSearchOutcome(_cheapest_first(results), None, "cross_trip_cache")
+                return TripFlightSearchOutcome(cheapest_first(results), None, "cross_trip_cache")
         provider_started = time.monotonic()
         outcome = await self._provider.search_offers(
             trip.origin, trip.destination_airport, trip.depart_date, trip.return_date
@@ -155,7 +148,7 @@ class FlightSearchService:
             run_started_at, run_started_monotonic,
             provider_duration_ms,
         )
-        return TripFlightSearchOutcome(_cheapest_first(results), outcome.unavailable_reason, "live")
+        return TripFlightSearchOutcome(cheapest_first(results), outcome.unavailable_reason, "live")
 
     async def _get_same_trip_cache(self, trip: TripRequest) -> list[FlightSearchResult]:
         cutoff = utcnow() - timedelta(minutes=FLIGHT_CACHE_TTL_MINUTES)
@@ -167,7 +160,7 @@ class FlightSearchService:
                 )
             )
         )
-        return _cheapest_first(_complete_flight_results(results, trip.return_date))
+        return cheapest_first(_complete_flight_results(results, trip.return_date))
 
     async def _get_cross_trip_cache(self, trip: TripRequest) -> list[FlightSearchResult]:
         cutoff = utcnow() - timedelta(minutes=FLIGHT_CACHE_TTL_MINUTES)

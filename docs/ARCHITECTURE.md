@@ -26,7 +26,7 @@ over REST; there is no server-rendered coupling between them.
 
 ## Requirements → implementation
 
-- **Cheapest flights:** `trips_repository.py::_cheapest_first` sorts every offer ascending by
+- **Cheapest flights:** `trips_repository.py::cheapest_first` sorts every offer ascending by
   `price_usd` on every path (fresh search, own-trip reuse, cross-trip cache) — a backend
   guarantee, not just provider ordering. The UI lists offers in that order, so the cheapest is
   always shown first.
@@ -139,9 +139,11 @@ When enabled, `request_booking` (`routes/booking.py`) additionally posts a Confi
 Kit message via `notify_pending_approval`; Slack's callback hits `POST /api/slack/interactions`,
 which verifies the request signature (stdlib `hmac`, constant-time compare) before resolving to
 the same `confirm_booking`/`reject_booking` repository calls the in-app buttons use — Slack is an
-alternate front door to the identical state machine, not a second one. See
-[SLACK_SETUP.md](SLACK_SETUP.md) for setup and [DECISIONS.md](DECISIONS.md) for why this is a
-hand-rolled adapter instead of a third-party chat SDK.
+alternate front door to the identical state machine, not a second one. Slack's Interactivity
+config requires a public HTTPS URL for that callback, so local development tunnels the backend
+with `ngrok http 8000`. See [SLACK_SETUP.md](SLACK_SETUP.md) for setup and
+[DECISIONS.md](DECISIONS.md) for why this is a hand-rolled adapter instead of a third-party chat
+SDK.
 
 ## Agent Execution Panel
 

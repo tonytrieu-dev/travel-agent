@@ -105,24 +105,12 @@ async def update_trip(session: AsyncSession, trip_id: int, data: TripRequestUpda
     return trip
 
 
-def _cheapest_first(offers: list[FlightSearchResult]) -> list[FlightSearchResult]:
+def cheapest_first(offers: list[FlightSearchResult]) -> list[FlightSearchResult]:
     """The take-home requires surfacing the cheapest flights, and the frontend lists offers in
     the order the API returns them — so ascending price order is a backend guarantee, held on
-    every path (fresh live search, own-trip reuse, cross-trip cache) so all three agree."""
+    every path (fresh live search, own-trip reuse, cross-trip cache) so all three agree. Shared
+    with services/flight_search.py, which is the only other caller."""
     return sorted(offers, key=lambda offer: offer.price_usd)
-
-
-def _complete_flight_results(
-    offers: list[FlightSearchResult], return_date: str | None
-) -> list[FlightSearchResult]:
-    if return_date is None:
-        return offers
-    return [
-        offer
-        for offer in offers
-        if offer.raw_offer.get("return_flights")
-        and offer.raw_offer.get("booking_token") == offer.booking_token
-    ]
 
 
 async def get_trip_snapshot(
@@ -158,7 +146,7 @@ async def get_trip_snapshot(
         if batch_started_at is not None
         else False
     )
-    return trip, _cheapest_first(offers), itinerary, is_stale
+    return trip, cheapest_first(offers), itinerary, is_stale
 
 
 def _build_planner_prompt(trip: TripRequest) -> str:

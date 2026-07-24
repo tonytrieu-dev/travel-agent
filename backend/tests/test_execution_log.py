@@ -2,6 +2,8 @@
 run and resume correctly across multiple runs on the same trip.
 """
 
+import asyncio
+
 from sqlalchemy import select
 from sqlmodel import col
 
@@ -52,3 +54,23 @@ def test_a_second_run_on_the_same_trip_resumes_seq_instead_of_restarting() -> No
     events = run_db(_work)
 
     assert [event.seq for event in events] == [1, 2]
+
+
+def test_concurrent_record_event_calls_get_sequential_non_colliding_seq() -> None:
+    """record_event() writes go through a per-run asyncio.Lock because AsyncSession isn't safe
+    for concurrent use; pydantic_ai runs tool calls from the same model turn concurrently, so
+    three record_event() calls racing via asyncio.gather must still land as non-colliding,
+    strictly increasing seq numbers rather than colliding or being silently dropped."""
+
+    async def _work(session):
+        trip_id = await seed_trip(session)
+        async with execution_context(session, trip_id):
+            await asyncio.gather(
+                record_event(ExecutionEventKind.API_CALL, "a", "ok", "1"),
+                record_event(ExecutionEventKind.API_CALL, "b", "ok", "2"),
+                record_event(ExecutionEventKind.API_CALL, "c", "ok", "3"),
+            )
+        return [event.seq for event in await _events_for(session, trip_id)]
+
+    seqs = run_db(_work)
+    assert seqs == [1, 2, 3], f"concurrent record_event calls must not collide on seq; got {seqs}"
