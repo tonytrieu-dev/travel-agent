@@ -7,6 +7,11 @@ handler can stay thin and no stack trace or internal ever leaks to the client.
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
 from app.config import get_settings
 from app.dbos_runtime import launch_dbos, shutdown_dbos
 from app.rate_limit import RateLimitError
@@ -14,10 +19,6 @@ from app.repositories.booking_repository import BookingError
 from app.repositories.trips_repository import TripError
 from app.routes import booking, slack, trips
 from app.schemas import ErrorCode, ProblemDetail
-from fastapi import FastAPI, Request
-from fastapi.exceptions import RequestValidationError
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
 
 @asynccontextmanager

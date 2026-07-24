@@ -6,6 +6,9 @@ clicked button. Never executes a booking here — see docs/superpowers/specs for
 import json
 from typing import Any
 
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
+
 from app.adapters.slack_hitl import (
     build_resolution_blocks,
     parse_block_action,
@@ -16,8 +19,6 @@ from app.adapters.slack_hitl import (
 from app.config import get_settings
 from app.db import get_session_factory
 from app.schemas import SlackAuthErrorOut, SlackInteractionOut
-from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
 
 router = APIRouter(prefix="/api/slack", tags=["slack"])
 
