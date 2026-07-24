@@ -10,10 +10,12 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any
 
+from pydantic_ai.usage import RunUsage
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col
 
+from app.agent.observability import persist_agent_run
 from app.models import AgentRun, ExecutionEvent, ExecutionEventKind, utcnow
 
 
@@ -137,6 +139,20 @@ class ExecutionRun:
         provider: str | None = None,
     ) -> None:
         await record_event(kind, name, status, detail, duration_ms, data, provider)
+
+    async def persist_result(
+        self, *, message_history: list[Any], usage: RunUsage, status: str = "completed"
+    ) -> AgentRun:
+        context = _bound_context("ExecutionRun.persist_result")
+        return await persist_agent_run(
+            context.session,
+            trip_request_id=context.trip_request_id,
+            model=context.agent_run.model if context.agent_run is not None else "unknown",
+            message_history=message_history,
+            usage=usage,
+            status=status,
+            agent_run=context.agent_run,
+        )
 
 
 class ExecutionService:
