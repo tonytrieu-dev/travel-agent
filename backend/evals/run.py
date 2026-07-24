@@ -3,10 +3,6 @@ import re
 from functools import partial
 from typing import Literal
 
-from pydantic_evals import Dataset
-from pydantic_evals.dataset import set_eval_attribute
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.adapters.activities_tavily import (
     RecordedActivityProvider,
     TavilyActivityProvider,
@@ -18,6 +14,7 @@ from app.config import (
     ACTIVITY_CASSETTE_PATH,
     CEREBRAS_MODEL,
     FLIGHT_CASSETTE_DIR,
+    GEMINI_JUDGE_MODEL,
     get_settings,
 )
 from app.db import get_session_factory
@@ -29,6 +26,9 @@ from evals.evaluators import (
     CaseMetadata,
     extract_planner_trace,
 )
+from pydantic_evals import Dataset
+from pydantic_evals.dataset import set_eval_attribute
+from sqlalchemy.ext.asyncio import AsyncSession
 
 ProviderMode = Literal["recorded", "live-smoke"]
 
@@ -92,6 +92,7 @@ async def task(
 def build_run_metadata(provider_mode: ProviderMode = "recorded") -> dict[str, str]:
     return {
         "model": CEREBRAS_MODEL,
+        "judge_model": GEMINI_JUDGE_MODEL,
         "provider_mode": provider_mode,
     }
 

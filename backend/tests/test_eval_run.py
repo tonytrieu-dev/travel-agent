@@ -9,6 +9,14 @@ from evals import run
 from tests.db_helpers import run_db
 
 
+def test_run_metadata_names_planner_and_judge_models() -> None:
+    assert run.build_run_metadata() == {
+        "model": "gpt-oss-120b",
+        "judge_model": "gemini-3.6-flash",
+        "provider_mode": "recorded",
+    }
+
+
 def test_recorded_dependencies_ignore_live_flight_setting() -> None:
     dependencies = run._planner_deps("Fitness level: low.", "recorded")
 
