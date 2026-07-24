@@ -6,14 +6,40 @@ The booking-options provider is a counting spy so "books exactly once" is a real
 quota calls, not about a fabricated return value.
 """
 
+import hashlib
+import hmac
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
-from pytest_bdd import given, parsers, scenarios, then, when
-
 from app.state import BookingState
+from pytest_bdd import given, parsers, scenarios, then, when
 from tests.conftest import BookingOptionsFetchSpy
 from tests.db_helpers import count_transitions_into, get_booking, run_db, seed_booking
+
+_TEST_SIGNING_SECRET = "test-signing-secret"
+_TEST_CHANNEL_ID = "C_TEST_CHANNEL"
+
+
+def _sign(body: bytes, timestamp: str) -> str:
+    base_string = f"v0:{timestamp}:".encode() + body
+    digest = hmac.new(_TEST_SIGNING_SECRET.encode(), base_string, hashlib.sha256).hexdigest()
+    return f"v0={digest}"
+
+
+def _approval_form_body(log_id: int) -> bytes:
+    import json
+    import urllib.parse
+
+    payload = json.dumps(
+        {
+            "type": "block_actions",
+            "channel": {"id": _TEST_CHANNEL_ID},
+            "actions": [{"action_id": "approve_booking", "value": str(log_id)}],
+        }
+    )
+    return urllib.parse.urlencode({"payload": payload}).encode()
+
 
 scenarios("../../features/booking_hitl.feature")
 
@@ -179,4 +205,84 @@ def _response_with_reference_no_options(bag: dict) -> None:
     assert not body["booking_options"], (
         f"a failed booking-options fetch must degrade to empty, never a fabricated link, got "
         f"{body['booking_options']!r}"
+    )
+
+
+@given("Slack is configured with a known signing secret and channel")
+def _slack_configured(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app import config
+
+    settings = config.Settings(
+        cerebras_api_key="x", searchapi_api_key="x", tavily_api_key="x",
+        database_url=config.get_settings().database_url,
+        slack_bot_token="xoxb-test",
+        slack_signing_secret=_TEST_SIGNING_SECRET,
+        slack_approvals_channel_id=_TEST_CHANNEL_ID,
+    )
+    monkeypatch.setattr(config, "get_settings", lambda: settings)
+    monkeypatch.setattr("app.routes.slack.get_settings", lambda: settings)
+
+
+@when("a correctly signed Slack approval for that booking arrives")
+def _signed_approval(client, log_id: int, bag: dict) -> None:
+    body = _approval_form_body(log_id)
+    timestamp = str(int(time.time()))
+    bag["response"] = client.post(
+        "/api/slack/interactions",
+        content=body,
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "X-Slack-Request-Timestamp": timestamp,
+            "X-Slack-Signature": _sign(body, timestamp),
+        },
+    )
+
+
+@when("an incorrectly signed Slack approval for that booking arrives")
+def _unsigned_approval(client, log_id: int, bag: dict) -> None:
+    body = _approval_form_body(log_id)
+    timestamp = str(int(time.time()))
+    bag["response"] = client.post(
+        "/api/slack/interactions",
+        content=body,
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "X-Slack-Request-Timestamp": timestamp,
+            "X-Slack-Signature": "v0=0000000000000000000000000000000000000000000000000000000000000000",
+        },
+    )
+
+
+@then(parsers.parse("the Slack response is {status:d} with replace_original true"))
+def _slack_response_replace_original(bag: dict, status: int) -> None:
+    response = bag["response"]
+    assert response.status_code == status, (
+        f"expected {status}, got {response.status_code}: {response.text}"
+    )
+    assert response.json()["replace_original"] is True
+
+
+@then(parsers.parse("the Slack response is {status:d}"))
+def _slack_response_status(bag: dict, status: int) -> None:
+    response = bag["response"]
+    assert response.status_code == status, (
+        f"expected {status}, got {response.status_code}: {response.text}"
+    )
+
+
+@then("the booking ends CONFIRMED")
+def _ends_confirmed(log_id: int) -> None:
+    booking = run_db(lambda session: get_booking(session, log_id))
+    assert booking.state is BookingState.CONFIRMED, (
+        f"a correctly signed Slack approval must confirm the booking via resolve_approve, "
+        f"found state={booking.state}"
+    )
+
+
+@then("the booking is still PENDING_USER_CONFIRMATION")
+def _still_pending(log_id: int) -> None:
+    booking = run_db(lambda session: get_booking(session, log_id))
+    assert booking.state is BookingState.PENDING_USER_CONFIRMATION, (
+        f"a rejected (unsigned) Slack interaction must not have touched the booking, "
+        f"found state={booking.state}"
     )

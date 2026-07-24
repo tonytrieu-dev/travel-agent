@@ -36,3 +36,17 @@ Feature: Human-in-the-loop booking gate
     When execute is called once
     Then the response is 200 with a booking reference and no booking options stored
     And the booking ends EXECUTED with exactly one transition into EXECUTED
+
+  Scenario: A signed Slack approval confirms the booking
+    Given a booking still pending user confirmation
+    And Slack is configured with a known signing secret and channel
+    When a correctly signed Slack approval for that booking arrives
+    Then the Slack response is 200 with replace_original true
+    And the booking ends CONFIRMED
+
+  Scenario: An unsigned Slack request is rejected without touching the booking
+    Given a booking still pending user confirmation
+    And Slack is configured with a known signing secret and channel
+    When an incorrectly signed Slack approval for that booking arrives
+    Then the Slack response is 401
+    And the booking is still PENDING_USER_CONFIRMATION
