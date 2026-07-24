@@ -22,9 +22,13 @@ function formatDateTime(isoString: string): string {
 
 function searchButtonLabel(isLoading: boolean, searchResult: FlightSearchOut | null): string {
   if (isLoading) return "Searching…"
-  if (searchResult?.is_stale) return "Refresh prices"
   if (searchResult) return "Search for new flight"
   return "Search flights"
+}
+
+function searchNewButtonLabel(isLoading: boolean, searchResult: FlightSearchOut | null): string {
+  if (searchResult) return "Search for new flight"
+  return searchButtonLabel(isLoading, searchResult)
 }
 
 function FlightDirection({ label, legs }: { label: string; legs: FlightLegOut[] }) {
@@ -68,14 +72,30 @@ export function FlightSearch({
             {trip.return_date ? ` – ${trip.return_date}` : ""}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={!searchResult || searchResult.is_stale ? onSearchFlights : onSearchNewFlight}
-          disabled={isLoading}
-          className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-        >
-          {searchButtonLabel(isLoading, searchResult)}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {searchResult?.is_stale && (
+            <button
+              type="button"
+              onClick={onSearchFlights}
+              disabled={isLoading}
+              className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+            >
+              {isLoading ? "Searching…" : "Refresh prices"}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={searchResult ? onSearchNewFlight : onSearchFlights}
+            disabled={isLoading}
+            className={`rounded-md px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:bg-slate-300 ${
+              searchResult?.is_stale
+                ? "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                : "bg-indigo-600 text-white hover:bg-indigo-700"
+            }`}
+          >
+            {searchNewButtonLabel(isLoading, searchResult)}
+          </button>
+        </div>
       </div>
 
       {errorMessage && (
@@ -106,14 +126,18 @@ export function FlightSearch({
             const returnLegs = offer.legs.slice(outboundEnd + 1)
             return (
               <li key={offer.id}>
-                <div
+                <label
                   className={`flex items-center justify-between gap-4 rounded-lg border p-4 transition ${
+                    searchResult.is_stale
+                      ? "cursor-not-allowed opacity-60"
+                      : "cursor-pointer"
+                  } ${
                     selectedOfferId === offer.id
                       ? "border-indigo-500 bg-indigo-50"
                       : "border-slate-200 hover:border-slate-300"
                   }`}
                 >
-                  <label className="flex flex-1 cursor-pointer items-center gap-3">
+                  <div className="flex flex-1 items-center gap-3">
                     <input
                       type="radio"
                       name="flight-offer"
@@ -135,13 +159,13 @@ export function FlightSearch({
                         </p>
                       )}
                     </div>
-                  </label>
+                  </div>
                   <div className="text-right">
                     <p className="font-semibold whitespace-nowrap text-slate-900">
                       ${offer.price_usd.toFixed(2)} {offer.currency}
                     </p>
                   </div>
-                </div>
+                </label>
               </li>
             )
           })}
