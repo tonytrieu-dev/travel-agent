@@ -21,8 +21,10 @@ from app.models import (
     AgentRunStep,
     AgentStepKind,
     ExecutionEventKind,
+    FlightResultSource,
     FlightSearchResult,
     TripRequest,
+    TripStatus,
     utcnow,
 )
 from app.repositories.trips_repository import ErrorCode, TripError
@@ -103,7 +105,34 @@ class FlightSearchService:
                 same_trip_cache, run_started_at, run_started_monotonic,
             )
             return TripFlightSearchOutcome(same_trip_cache, None, "same_trip_cache")
-        raise NotImplementedError
+        provider_started = time.monotonic()
+        outcome = await self._provider.search_offers(
+            trip.origin, trip.destination_airport, trip.depart_date, trip.return_date
+        )
+        provider_duration_ms = round((time.monotonic() - provider_started) * 1000)
+        results = [
+            FlightSearchResult(
+                trip_request_id=trip_id, offer_index=index, carrier=offer.carrier,
+                price_usd=offer.price_usd, currency=offer.currency, depart_at=offer.depart_at,
+                arrive_at=offer.arrive_at, stops=offer.stops, booking_token=offer.booking_token,
+                raw_offer=offer.raw_offer, source=FlightResultSource.LIVE,
+            )
+            for index, offer in enumerate(outcome.offers)
+        ]
+        if persist:
+            self._session.add_all(results)
+            if results:
+                trip.status = TripStatus.FLIGHTS_SEARCHED
+            await self._session.commit()
+        await self._log(
+            trip, agent_run,
+            "ok" if outcome.unavailable_reason is None else "unavailable",
+            f"{len(results)} offers" if outcome.unavailable_reason is None else outcome.unavailable_reason,
+            outcome.offers if not persist else results,
+            run_started_at, run_started_monotonic,
+            provider_duration_ms,
+        )
+        return TripFlightSearchOutcome(_cheapest_first(results), outcome.unavailable_reason, "live")
 
     async def _get_same_trip_cache(self, trip: TripRequest) -> list[FlightSearchResult]:
         cutoff = utcnow() - timedelta(minutes=FLIGHT_CACHE_TTL_MINUTES)

@@ -78,3 +78,73 @@ def test_cache_hit_preserves_agent_run_timing_metadata() -> None:
     assert agent_run.total_ms is not None and agent_run.total_ms >= 0, (
         f"a cache-hit run must still report a real elapsed duration, got {agent_run.total_ms}"
     )
+
+
+def test_expired_cache_invokes_provider_and_persists_cheapest_first() -> None:
+    async def _work(session):
+        trip_id = await seed_trip(session)
+        provider = FlightSearchSpy(
+            offers=[
+                NormalizedFlightOffer(
+                    carrier="EXPENSIVE", price_usd=900.0, currency="USD",
+                    depart_at="2026-08-01T09:00:00", arrive_at="2026-08-01T21:00:00",
+                    stops=0, booking_token="tok-a", raw_offer={},
+                ),
+                NormalizedFlightOffer(
+                    carrier="CHEAP", price_usd=100.0, currency="USD",
+                    depart_at="2026-08-01T10:00:00", arrive_at="2026-08-01T22:00:00",
+                    stops=1, booking_token="tok-b", raw_offer={},
+                ),
+            ]
+        )
+        service = FlightSearchService(session, provider)
+        async with execution_context(session, trip_id):
+            outcome = await service.search(trip_id)
+        from tests.db_helpers import get_flight_search_results
+
+        persisted = await get_flight_search_results(session, trip_id)
+        return provider, outcome, persisted
+
+    provider, outcome, persisted = run_db(_work)
+    assert provider.calls == 1
+    assert outcome.source == "live"
+    assert [offer.carrier for offer in outcome.offers] == ["CHEAP", "EXPENSIVE"], (
+        "results must be cheapest-first regardless of provider order"
+    )
+    assert len(persisted) == 2, "live search results must be persisted"
+
+
+def test_unavailable_provider_result_is_reported_honestly() -> None:
+    async def _work(session):
+        trip_id = await seed_trip(session)
+        provider = FlightSearchSpy(offers=[], unavailable_reason="No cassette for this route")
+        service = FlightSearchService(session, provider)
+        async with execution_context(session, trip_id):
+            return await service.search(trip_id)
+
+    outcome = run_db(_work)
+    assert outcome.unavailable_reason == "No cassette for this route"
+    assert outcome.offers == []
+
+
+def test_provider_is_called_with_the_stored_trips_criteria_not_anything_else() -> None:
+    """FlightSearchService.search takes no route/date arguments beyond trip_id — this pins
+    that guarantee at the service level (not just the old planner-tool call site): whatever
+    criteria the trip was created with is what reaches the provider, always, since there is
+    no parameter through which a caller could redirect the search."""
+
+    async def _work(session):
+        trip_id = await seed_trip(session)  # db_helpers default: JFK -> CDG, 2026-08-01, one-way
+        provider = FlightSearchSpy()
+        service = FlightSearchService(session, provider)
+        async with execution_context(session, trip_id):
+            await service.search(trip_id)
+        return provider
+
+    provider = run_db(_work)
+    assert provider.last_search_params == {
+        "departure_id": "JFK",
+        "arrival_id": "CDG",
+        "outbound_date": "2026-08-01",
+        "return_date": None,
+    }, f"provider must be called with the trip's own stored criteria, got {provider.last_search_params}"
