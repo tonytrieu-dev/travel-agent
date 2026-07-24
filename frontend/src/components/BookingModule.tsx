@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState } from "react"
-import { ApiError, cancelBooking, confirmBooking, executeBooking, getBooking, requestBooking } from "../api/client"
+import {
+  ApiError,
+  cancelBooking,
+  confirmBooking,
+  executeBooking,
+  getBooking,
+  getConnectors,
+  requestBooking,
+} from "../api/client"
 import type { BookingLogOut, FlightOfferOut, TripRequestOut } from "../api/types"
 
 interface BookingModuleProps {
@@ -53,6 +61,7 @@ export function BookingModule({ trip, selectedOffer, onSearchAgain }: BookingMod
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [announcement, setAnnouncement] = useState("")
+  const [isSlackApprovalEnabled, setIsSlackApprovalEnabled] = useState<boolean | null>(null)
   const previousStateRef = useRef<string | null>(null)
 
   // Poll the server for real state while a booking is open and not yet terminal — the panel
@@ -79,6 +88,14 @@ export function BookingModule({ trip, selectedOffer, onSearchAgain }: BookingMod
       previousStateRef.current = bookingLog.state
     }
   }, [bookingLog])
+
+  useEffect(() => {
+    getConnectors()
+      .then((connectors) =>
+        setIsSlackApprovalEnabled(connectors.slack.configured && connectors.slack.enabled),
+      )
+      .catch(() => setIsSlackApprovalEnabled(false))
+  }, [])
 
   if (!selectedOffer) {
     return (
@@ -166,7 +183,15 @@ export function BookingModule({ trip, selectedOffer, onSearchAgain }: BookingMod
         </button>
       )}
 
-      {bookingLog?.state === "PENDING_USER_CONFIRMATION" && (
+      {bookingLog?.state === "PENDING_USER_CONFIRMATION" && isSlackApprovalEnabled !== false && (
+        <p className="mt-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          {isSlackApprovalEnabled
+            ? "Waiting for approval in Slack. Use the Slack message to approve or reject this flight."
+            : "Checking approval channel…"}
+        </p>
+      )}
+
+      {bookingLog?.state === "PENDING_USER_CONFIRMATION" && !isSlackApprovalEnabled && (
         <div className="mt-4 flex gap-3">
           <button
             type="button"
