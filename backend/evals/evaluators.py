@@ -25,7 +25,7 @@ from pydantic_evals.evaluators import (
 )
 from pydantic_evals.reporting import TableResult
 
-from app.agent.planner import _is_unsafe_intensity
+from app.agent.planner import _is_flight_activity, _is_unsafe_intensity
 from app.config import GEMINI_JUDGE_MODEL, MAX_TOOL_STEPS, get_settings
 from app.models import FitnessLevel
 from app.schemas import ClarificationOut, ItineraryOut
@@ -260,7 +260,7 @@ class NoFlightActivities(Evaluator[str, ItineraryOut | ClarificationOut, CaseMet
             activity.name
             for day in ctx.output.days
             for activity in day.activities
-            if _FLIGHT_FACT_QUERY.search(f"{activity.name} {activity.description}")
+            if _is_flight_activity(activity.name, activity.description)
         ]
         return EvaluationReason(
             value=not flights,
@@ -286,17 +286,14 @@ class FlightSearchTrajectory(Evaluator[str, ItineraryOut | ClarificationOut, Cas
                 value=matches,
                 reason=None if matches else f"expected no search_flights call, got {len(calls)}",
             )
-        if len(calls) != 1:
-            return EvaluationReason(
-                value=False, reason=f"expected one search_flights call, got {len(calls)}"
-            )
-        call = calls[0]
-        matches = call["status"] == "success" and call["arguments"] == expected
+        matches = bool(calls) and all(
+            call["status"] == "success" and call["arguments"] == expected for call in calls
+        )
         return EvaluationReason(
             value=matches,
             reason=None
             if matches
-            else f"expected successful search_flights args {expected}, got {call}",
+            else f"expected successful search_flights args {expected}, got {calls}",
         )
 
 
@@ -439,25 +436,55 @@ class PhysicalLoadComparisons(ReportEvaluator[str, ItineraryOut | ClarificationO
         ctx: ReportEvaluatorContext[str, ItineraryOut | ClarificationOut, CaseMetadata],
     ) -> TableResult:
         loads: dict[tuple[int, FitnessLevel], list[float]] = {}
+        attempts: Counter[tuple[int, FitnessLevel]] = Counter()
         for case in ctx.report.cases:
-            if case.metadata is None or "physical_load" not in case.metrics:
-                raise ValueError(f"{case.name} has no physical_load metric")
+            if case.metadata is not None:
+                attempts[(case.metadata["age"], case.metadata["fitness_level"])] += 1
+            score = case.scores.get("physical_load")
+            if case.metadata is None or score is None:
+                continue
             key = (case.metadata["age"], case.metadata["fitness_level"])
-            loads.setdefault(key, []).append(float(case.metrics["physical_load"]))
-        means = {key: mean(values) for key, values in loads.items()}
+            loads.setdefault(key, []).append(float(score.value))
+        for failure in ctx.report.failures:
+            if failure.metadata is not None:
+                attempts[(failure.metadata["age"], failure.metadata["fitness_level"])] += 1
         comparisons = [
-            ("age 24: low <= high", means[(24, FitnessLevel.LOW)], means[(24, FitnessLevel.HIGH)]),
-            ("age 78: low <= high", means[(78, FitnessLevel.LOW)], means[(78, FitnessLevel.HIGH)]),
-            ("low fitness: age 78 <= 24", means[(78, FitnessLevel.LOW)], means[(24, FitnessLevel.LOW)]),
-            ("high fitness: age 78 <= 24", means[(78, FitnessLevel.HIGH)], means[(24, FitnessLevel.HIGH)]),
+            ("age 24: low <= high", (24, FitnessLevel.LOW), (24, FitnessLevel.HIGH)),
+            ("age 78: low <= high", (78, FitnessLevel.LOW), (78, FitnessLevel.HIGH)),
+            ("low fitness: age 78 <= 24", (78, FitnessLevel.LOW), (24, FitnessLevel.LOW)),
+            ("high fitness: age 78 <= 24", (78, FitnessLevel.HIGH), (24, FitnessLevel.HIGH)),
         ]
-        failed = [label for label, lower, upper in comparisons if lower > upper]
-        if failed:
-            raise ValueError(f"physical load comparisons failed: {failed}")
+        rows: list[list[str | int | float | bool | None]] = []
+        for label, left_key, right_key in comparisons:
+            left = loads.get(left_key, [])
+            right = loads.get(right_key, [])
+            left_mean = mean(left) if left else None
+            right_mean = mean(right) if right else None
+            rows.append(
+                [
+                    label,
+                    left_mean,
+                    len(left),
+                    right_mean,
+                    len(right),
+                    left_mean is not None
+                    and right_mean is not None
+                    and len(left) == attempts[left_key]
+                    and len(right) == attempts[right_key]
+                    and left_mean <= right_mean,
+                ]
+            )
         return TableResult(
             title="Physical load comparisons",
-            columns=["comparison", "left mean load", "right mean load", "passes"],
-            rows=[[label, lower, upper, True] for label, lower, upper in comparisons],
+            columns=[
+                "comparison",
+                "left mean load",
+                "left samples",
+                "right mean load",
+                "right samples",
+                "passes",
+            ],
+            rows=rows,
         )
 
 

@@ -67,7 +67,8 @@ def test_eval_trip_matches_dataset_route() -> None:
 def test_live_smoke_selects_first_case_once(monkeypatch) -> None:
     assert len(run._selected_dataset("live-smoke").cases) == 1
     captured = {}
-    report = SimpleNamespace(print=lambda: None)
+    printed = {}
+    report = SimpleNamespace(print=lambda **kwargs: printed.update(kwargs))
     selected_dataset = SimpleNamespace(
         evaluate_sync=lambda task, **kwargs: captured.update(kwargs) or report
     )
@@ -77,3 +78,4 @@ def test_live_smoke_selects_first_case_once(monkeypatch) -> None:
 
     assert captured["repeat"] == 1
     assert captured["max_concurrency"] == 1
+    assert printed == {"include_reasons": True}

@@ -32,6 +32,13 @@ from app.repositories.trips_repository import (
 from app.schemas import ClarificationOut, ItineraryOut
 
 _IATA_CODE_PATTERN = re.compile(r"^[A-Z]{3}$")
+_FLIGHT_ACTIVITY_PATTERN = re.compile(
+    r"\b(?:flight|fly|flying|airfare|airline)\b", re.IGNORECASE
+)
+_OPTIONAL_CLARIFICATION_PATTERN = re.compile(
+    r"\b(?:budget|interests?|preferences?|prefer|age|fitness|dates?|depart|return|origin|airport)\b",
+    re.IGNORECASE,
+)
 
 
 @dataclass
@@ -182,6 +189,44 @@ def _web_search_urls(messages: list[ModelMessage]) -> set[str]:
                     if isinstance(result, dict) and result.get("url")
                 )
     return urls
+
+
+def _is_flight_activity(name: str, description: str) -> bool:
+    return bool(_FLIGHT_ACTIVITY_PATTERN.search(f"{name} {description}"))
+
+
+@agent.output_validator
+def reject_optional_clarification(
+    _context: RunContext[PlannerDeps], output: ItineraryOut | ClarificationOut
+) -> ItineraryOut | ClarificationOut:
+    if not isinstance(output, ClarificationOut):
+        return output
+    if not any(_OPTIONAL_CLARIFICATION_PATTERN.search(question) for question in output.questions):
+        return output
+    raise ModelRetry(
+        "Plan directly from the provided origin, destination, dates, age, and fitness level. "
+        "Do not ask about optional budget, interests, preferences, or already-provided trip fields."
+    )
+
+
+@agent.output_validator
+def reject_flight_activities(
+    _context: RunContext[PlannerDeps], output: ItineraryOut | ClarificationOut
+) -> ItineraryOut | ClarificationOut:
+    if not isinstance(output, ItineraryOut):
+        return output
+    flights = [
+        activity.name
+        for day in output.days
+        for activity in day.activities
+        if _is_flight_activity(activity.name, activity.description)
+    ]
+    if flights:
+        raise ModelRetry(
+            f"Flights are not itinerary activities: {flights}. Remove them; flight options are "
+            "shown separately to the traveler."
+        )
+    return output
 
 
 @agent.output_validator

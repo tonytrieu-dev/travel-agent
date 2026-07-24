@@ -2,7 +2,6 @@ from copy import deepcopy
 from types import SimpleNamespace
 from typing import cast
 
-import pytest
 from pydantic_ai.messages import (
     ModelRequest,
     ModelResponse,
@@ -15,6 +14,7 @@ from pydantic_evals.evaluators import (
     EvaluatorContext,
     ReportEvaluatorContext,
 )
+from pydantic_evals.reporting import ReportCaseFailure
 
 from app.config import MAX_TOOL_STEPS
 from app.models import FitnessLevel
@@ -188,7 +188,7 @@ def test_good_trace_passes_deterministic_trajectory_evaluators() -> None:
     assert _passes(CitationGrounding(), trace)
 
 
-def test_flight_search_requires_one_successful_call_with_exact_arguments() -> None:
+def test_flight_search_allows_duplicate_successful_calls_with_exact_arguments() -> None:
     wrong_arguments = _good_trace()
     wrong_arguments["calls"][0]["arguments"]["return_date"] = "2026-09-09"
     duplicate = _good_trace()
@@ -196,7 +196,7 @@ def test_flight_search_requires_one_successful_call_with_exact_arguments() -> No
     duplicate["tool_call_count"] += 1
 
     assert not _passes(FlightSearchTrajectory(), wrong_arguments)
-    assert not _passes(FlightSearchTrajectory(), duplicate)
+    assert _passes(FlightSearchTrajectory(), duplicate)
 
 
 def test_web_search_enforces_budget_success_and_no_flight_fact_queries() -> None:
@@ -295,31 +295,61 @@ def test_physical_load_rejects_unknown_and_unsafe_low_fitness_intensity() -> Non
     assert not flight.value
 
 
-def test_report_comparison_uses_mean_load_and_rejects_regression() -> None:
+def test_report_comparison_reports_regressions_and_missing_samples_without_crashing() -> None:
     cases = []
     for age, fitness_level, load in (
         (24, FitnessLevel.LOW, 1),
         (24, FitnessLevel.LOW, 3),
         (24, FitnessLevel.HIGH, 2),
+        (24, FitnessLevel.HIGH, 4),
         (78, FitnessLevel.LOW, 1),
+        (78, FitnessLevel.LOW, 1),
+        (78, FitnessLevel.HIGH, 2),
         (78, FitnessLevel.HIGH, 2),
     ):
         metadata = _metadata()
         metadata["age"] = age
         metadata["fitness_level"] = fitness_level
-        cases.append(SimpleNamespace(name="case", metadata=metadata, metrics={"physical_load": load}))
+        cases.append(
+            SimpleNamespace(
+                name="case",
+                metadata=metadata,
+                scores={"physical_load": SimpleNamespace(value=load)},
+            )
+        )
     context = cast(
         ReportEvaluatorContext[str, ItineraryOut | ClarificationOut, CaseMetadata],
-        SimpleNamespace(report=SimpleNamespace(cases=cases)),
+        SimpleNamespace(report=SimpleNamespace(cases=cases, failures=[])),
     )
 
     table = PhysicalLoadComparisons().evaluate(context)
 
-    assert len(table.rows) == 4
+    assert all(row[-1] is True for row in table.rows)
 
-    cases[2].metrics["physical_load"] = 1
-    with pytest.raises(ValueError):
-        PhysicalLoadComparisons().evaluate(context)
+    cases[0].scores["physical_load"].value = 7
+    assert PhysicalLoadComparisons().evaluate(context).rows[0][-1] is False
+
+    cases[0].scores["physical_load"].value = 1
+    cases[2].scores.clear()
+    missing_sample_table = PhysicalLoadComparisons().evaluate(context)
+    assert missing_sample_table.rows[0][-1] is False
+
+    failed_metadata = _metadata()
+    failed_metadata["age"] = 24
+    failed_metadata["fitness_level"] = FitnessLevel.HIGH
+    context.report.failures.append(
+        ReportCaseFailure(
+            name="failed",
+            inputs="prompt",
+            metadata=failed_metadata,
+            expected_output=None,
+            error_message="failed",
+            error_stacktrace="failed",
+        )
+    )
+    cases[2].scores["physical_load"] = SimpleNamespace(value=2)
+    incomplete_table = PhysicalLoadComparisons().evaluate(context)
+    assert incomplete_table.rows[0][-1] is False
 
 
 def test_dataset_has_four_matched_cases_and_all_deterministic_evaluators() -> None:

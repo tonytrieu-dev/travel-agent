@@ -3,6 +3,10 @@ import re
 from functools import partial
 from typing import Literal
 
+from pydantic_evals import Dataset
+from pydantic_evals.dataset import set_eval_attribute
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.adapters.activities_tavily import (
     RecordedActivityProvider,
     TavilyActivityProvider,
@@ -26,9 +30,6 @@ from evals.evaluators import (
     CaseMetadata,
     extract_planner_trace,
 )
-from pydantic_evals import Dataset
-from pydantic_evals.dataset import set_eval_attribute
-from sqlalchemy.ext.asyncio import AsyncSession
 
 ProviderMode = Literal["recorded", "live-smoke"]
 
@@ -120,7 +121,7 @@ def main(*, repeat: int = 1, live_smoke: bool = False) -> None:
         metadata=metadata,
         max_concurrency=1,
     )
-    report.print()
+    report.print(include_reasons=True)
 
 
 if __name__ == "__main__":
