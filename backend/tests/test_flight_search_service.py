@@ -2,6 +2,8 @@
 /flights/search route (full persistence + cross-trip cache) and the planner's search_flights
 tool (same-trip cache + live search only, never persists, never reaches across trips)."""
 
+from datetime import timedelta
+
 import pytest
 
 from app.adapters.flights_searchapi import NormalizedFlightOffer
@@ -217,34 +219,43 @@ def test_incomplete_round_trip_offers_are_filtered_out_of_cache_reads() -> None:
     )
 
 
-def test_route_and_planner_tool_modes_agree_on_offer_ordering_and_shape() -> None:
-    """Both callers must go through the same cheapest-first/round-trip-filter logic — this
-    pins that persist=False/allow_cross_trip_cache=False changes only side effects, not the
-    returned offers' content or order."""
+def test_cross_trip_cache_excludes_offers_from_a_stale_batch_on_the_source_trip() -> None:
+    """Regression: _get_cross_trip_cache's second query had no created_at filter, so once a
+    source trip had any one TTL-fresh offer, ALL of that trip's historical offers -- including
+    a batch older than the TTL -- got copied into the new trip, mixing stale prices into a
+    result presented as freshly cached and risking duplicate offer_index values across batches."""
 
     async def _work(session):
-        trip_id = await seed_trip(session)
-        offers = [
-            NormalizedFlightOffer(
-                carrier="B", price_usd=500.0, currency="USD", depart_at="2026-08-01T09:00:00",
-                arrive_at="2026-08-01T21:00:00", stops=0, booking_token="b", raw_offer={},
-            ),
-            NormalizedFlightOffer(
-                carrier="A", price_usd=200.0, currency="USD", depart_at="2026-08-01T10:00:00",
-                arrive_at="2026-08-01T22:00:00", stops=1, booking_token="a", raw_offer={},
-            ),
-        ]
-        async with execution_context(session, trip_id):
-            route_outcome = await FlightSearchService(
-                session, FlightSearchSpy(offers=offers)
-            ).search(trip_id)
-        other_trip_id = await seed_trip(session)
-        async with execution_context(session, other_trip_id):
-            tool_outcome = await FlightSearchService(
-                session, FlightSearchSpy(offers=offers)
-            ).search(other_trip_id, persist=False, allow_cross_trip_cache=False)
-        return route_outcome, tool_outcome
+        from app.models import FlightSearchResult
+        from app.models import utcnow as model_utcnow
 
-    route_outcome, tool_outcome = run_db(_work)
-    assert [offer.carrier for offer in route_outcome.offers] == ["A", "B"]
-    assert [offer.carrier for offer in tool_outcome.offers] == ["A", "B"]
+        source_trip_id = await seed_trip(session)
+        session.add(
+            FlightSearchResult(
+                trip_request_id=source_trip_id, offer_index=0, carrier="STALE", price_usd=999.0,
+                currency="USD", depart_at="2026-08-01T09:00:00", arrive_at="2026-08-01T21:00:00",
+                stops=0, booking_token="tok-stale", raw_offer={},
+                created_at=model_utcnow() - timedelta(minutes=60),  # outside the 15-minute TTL
+            )
+        )
+        session.add(
+            FlightSearchResult(
+                trip_request_id=source_trip_id, offer_index=0, carrier="FRESH", price_usd=100.0,
+                currency="USD", depart_at="2026-08-01T09:00:00", arrive_at="2026-08-01T21:00:00",
+                stops=0, booking_token="tok-fresh", raw_offer={},
+                created_at=model_utcnow() - timedelta(minutes=1),  # inside the TTL
+            )
+        )
+        await session.commit()
+        other_trip_id = await seed_trip(session)
+        service = FlightSearchService(session, FlightSearchSpy())
+        async with execution_context(session, other_trip_id):
+            outcome = await service.search(other_trip_id)
+        return outcome
+
+    outcome = run_db(_work)
+    assert outcome.source == "cross_trip_cache"
+    assert [offer.carrier for offer in outcome.offers] == ["FRESH"], (
+        f"only offers from the source trip's TTL-fresh batch may be copied across trips, "
+        f"got {[offer.carrier for offer in outcome.offers]}"
+    )

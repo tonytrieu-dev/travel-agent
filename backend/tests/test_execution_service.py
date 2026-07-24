@@ -4,9 +4,6 @@ directly. current_trip()/record_event() stay as working compatibility shims — 
 still call them and must keep working unchanged."""
 
 
-
-
-
 import asyncio
 
 from pydantic_ai.usage import RunUsage

@@ -189,7 +189,8 @@ class FlightSearchService:
         source_offers = list(
             await self._session.scalars(
                 select(FlightSearchResult).where(
-                    col(FlightSearchResult.trip_request_id) == source_trip_id
+                    col(FlightSearchResult.trip_request_id) == source_trip_id,
+                    col(FlightSearchResult.created_at) >= cutoff,
                 )
             )
         )
