@@ -21,6 +21,7 @@ def test_start_run_creates_an_agent_run_bound_to_the_trip() -> None:
         trip_id = await seed_trip(session)
         service = ExecutionService(session)
         async with service.start_run(trip_id, model="test-model") as run:
+            assert run.agent_run is not None
             agent_run_id = run.agent_run.id
         return trip_id, agent_run_id
 
