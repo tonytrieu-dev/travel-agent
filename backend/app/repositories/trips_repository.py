@@ -4,24 +4,19 @@ Mirrors booking_repository's shape (a domain error carrying code/status/detail, 
 taking an already-open session) so the two repositories read the same way.
 """
 
-import time
 from collections import defaultdict
 from collections.abc import Awaitable, Callable
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, select
 
 from app.adapters.flights_searchapi import FlightProvider, NormalizedFlightOffer
-from app.agent.execution_log import record_event
 from app.config import FLIGHT_CACHE_TTL_MINUTES
 from app.models import (
     AgentRun,
     AgentRunStep,
-    AgentStepKind,
     ExecutionEvent,
-    ExecutionEventKind,
-    FlightResultSource,
     FlightSearchResult,
     Itinerary,
     TripRequest,
@@ -111,24 +106,6 @@ async def update_trip(session: AsyncSession, trip_id: int, data: TripRequestUpda
     return trip
 
 
-def _to_flight_result(
-    trip_id: int, *, offer_index: int, source_offer: FlightSearchResult, source: FlightResultSource
-) -> FlightSearchResult:
-    return FlightSearchResult(
-        trip_request_id=trip_id,
-        offer_index=offer_index,
-        carrier=source_offer.carrier,
-        price_usd=source_offer.price_usd,
-        currency=source_offer.currency,
-        depart_at=source_offer.depart_at,
-        arrive_at=source_offer.arrive_at,
-        stops=source_offer.stops,
-        booking_token=source_offer.booking_token,
-        raw_offer=source_offer.raw_offer,
-        source=source,
-    )
-
-
 def _cheapest_first(offers: list[FlightSearchResult]) -> list[FlightSearchResult]:
     """The take-home requires surfacing the cheapest flights, and the frontend lists offers in
     the order the API returns them — so ascending price order is a backend guarantee, held on
@@ -203,52 +180,6 @@ def flight_provider_name(provider: FlightProvider) -> str:
     }.get(type(provider).__name__, type(provider).__name__)
 
 
-async def _record_search_flights_run(
-    session: AsyncSession,
-    agent_run: AgentRun,
-    trip: TripRequest,
-    started_at: datetime,
-    started_monotonic: float,
-    status: str,
-    detail: str,
-    offers: list[FlightSearchResult] | list[NormalizedFlightOffer],
-    provider_duration_ms: int | None = None,
-) -> None:
-    await record_event(
-        ExecutionEventKind.API_CALL,
-        "search_flights",
-        status,
-        detail,
-        provider_duration_ms,
-        data={"offers": [offer_summary(offer) for offer in offers]},
-        provider=agent_run.model,
-    )
-    finished_at = utcnow()
-    total_ms = round((time.monotonic() - started_monotonic) * 1000)
-    agent_run.status = "completed" if status == "ok" else status
-    agent_run.total_ms = total_ms
-    agent_run.started_at = started_at
-    agent_run.finished_at = finished_at
-    assert agent_run.id is not None
-    session.add(
-        AgentRunStep(
-            agent_run_id=agent_run.id,
-            seq=1,
-            kind=AgentStepKind.TOOL,
-            name="search_flights",
-            status=status,
-            duration_ms=provider_duration_ms if provider_duration_ms is not None else total_ms,
-            input_summary=(
-                f"{trip.origin} to {trip.destination_airport}, "
-                f"{trip.depart_date} to {trip.return_date or 'one-way'}"
-            ),
-            output_summary=detail,
-            tokens=0,
-        )
-    )
-    await session.commit()
-
-
 async def get_recent_flight_results(session: AsyncSession, trip_id: int) -> list[FlightSearchResult]:
     """Extracted so the planner agent's search_flights tool can reuse this same cache check."""
     cutoff = utcnow() - timedelta(minutes=FLIGHT_CACHE_TTL_MINUTES)
@@ -264,122 +195,6 @@ async def get_recent_flight_results(session: AsyncSession, trip_id: int) -> list
     return _cheapest_first(
         _complete_flight_results(results, trip.return_date if trip is not None else None)
     )
-
-
-async def search_flights(
-    session: AsyncSession, trip_id: int, provider: FlightProvider, agent_run: AgentRun
-) -> tuple[list[FlightSearchResult], str | None]:
-    run_started_at = utcnow()
-    run_started_monotonic = time.monotonic()
-    trip = await session.get(TripRequest, trip_id)
-    if trip is None:
-        raise TripError(ErrorCode.TRIP_NOT_FOUND, 404, f"No trip {trip_id}.")
-
-    cutoff = utcnow() - timedelta(minutes=FLIGHT_CACHE_TTL_MINUTES)
-
-    # A repeat call on this same trip within the TTL is a safe retry, not a new search: return
-    # what's already stored instead of appending another duplicate batch (POST here must be
-    # idempotent within the TTL window, or every retry would multiply the trip's stored offers).
-    own_recent_results = await get_recent_flight_results(session, trip_id)
-    if own_recent_results:
-        await _record_search_flights_run(
-            session,
-            agent_run,
-            trip,
-            run_started_at,
-            run_started_monotonic,
-            "ok",
-            f"{len(own_recent_results)} offers (reused, already searched within TTL)",
-            own_recent_results,
-        )
-        return own_recent_results, None
-
-    cache_source_trip_id = await session.scalar(
-        select(FlightSearchResult.trip_request_id)
-        .join(TripRequest, col(FlightSearchResult.trip_request_id) == col(TripRequest.id))
-        .where(
-            col(TripRequest.origin) == trip.origin,
-            col(TripRequest.destination_airport) == trip.destination_airport,
-            col(TripRequest.depart_date) == trip.depart_date,
-            col(TripRequest.return_date) == trip.return_date,
-            col(FlightSearchResult.created_at) >= cutoff,
-        )
-        .order_by(col(FlightSearchResult.created_at).desc())
-        .limit(1)
-    )
-
-    cached_source_offers: list[FlightSearchResult] = []
-    if cache_source_trip_id is not None:
-        cached_source_offers = list(
-            await session.scalars(
-                select(FlightSearchResult).where(
-                    col(FlightSearchResult.trip_request_id) == cache_source_trip_id
-                )
-            )
-        )
-    cached_source_offers = _complete_flight_results(cached_source_offers, trip.return_date)
-    if cached_source_offers:
-        results = [
-            _to_flight_result(
-                trip_id,
-                offer_index=source_offer.offer_index,
-                source_offer=source_offer,
-                source=FlightResultSource.CACHED,
-            )
-            for source_offer in cached_source_offers
-        ]
-        session.add_all(results)
-        trip.status = TripStatus.FLIGHTS_SEARCHED
-        await session.commit()
-        await _record_search_flights_run(
-            session,
-            agent_run,
-            trip,
-            run_started_at,
-            run_started_monotonic,
-            "ok",
-            f"{len(results)} offers (cached from an identical route/date search)",
-            results,
-        )
-        return _cheapest_first(results), None
-
-    provider_started_monotonic = time.monotonic()
-    outcome = await provider.search_offers(
-        trip.origin, trip.destination_airport, trip.depart_date, trip.return_date
-    )
-    provider_duration_ms = round((time.monotonic() - provider_started_monotonic) * 1000)
-    results = [
-        FlightSearchResult(
-            trip_request_id=trip_id,
-            offer_index=index,
-            carrier=offer.carrier,
-            price_usd=offer.price_usd,
-            currency=offer.currency,
-            depart_at=offer.depart_at,
-            arrive_at=offer.arrive_at,
-            stops=offer.stops,
-            booking_token=offer.booking_token,
-            raw_offer=offer.raw_offer,
-            source=FlightResultSource.LIVE,
-        )
-        for index, offer in enumerate(outcome.offers)
-    ]
-    session.add_all(results)
-    if results:
-        trip.status = TripStatus.FLIGHTS_SEARCHED
-    await session.commit()
-    await _record_search_flights_run(
-        session,
-        agent_run,
-        trip,
-        run_started_at,
-        run_started_monotonic,
-        "ok" if outcome.unavailable_reason is None else "unavailable",
-        f"{len(results)} offers" if outcome.unavailable_reason is None else outcome.unavailable_reason,
-        outcome.offers,
-        provider_duration_ms,
-    )
-    return _cheapest_first(results), outcome.unavailable_reason
 
 
 def _build_planner_prompt(trip: TripRequest) -> str:

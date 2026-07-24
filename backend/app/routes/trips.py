@@ -41,6 +41,7 @@ from app.schemas import (
     TripRequestUpdate,
     TripSnapshotOut,
 )
+from app.services.flight_search import FlightSearchService, flight_provider_name
 
 router = APIRouter(prefix="/api", tags=["trips"])
 
@@ -122,17 +123,13 @@ async def search_trip_flights(
     provider = get_flight_provider(get_settings())
     await repository.get_trip(session, trip_id)
     async with execution_context(
-        session,
-        trip_id,
-        run_model=repository.flight_provider_name(provider),
+        session, trip_id, run_model=flight_provider_name(provider)
     ) as agent_run:
         assert agent_run is not None
-        offers, unavailable_reason = await repository.search_flights(
-            session, trip_id, provider, agent_run
-        )
+        outcome = await FlightSearchService(session, provider).search(trip_id, agent_run=agent_run)
     return FlightSearchOut(
-        offers=[_to_flight_offer_out(offer) for offer in offers],
-        unavailable_reason=unavailable_reason,
+        offers=[_to_flight_offer_out(offer) for offer in outcome.offers],
+        unavailable_reason=outcome.unavailable_reason,
     )
 
 
