@@ -16,6 +16,9 @@ flowchart LR
     Agent -.->|run_planner_durable| DBOS[DBOS workflow]
     Repo -.->|execute_booking_durable| DBOS
     DBOS --> DB
+    API -->|/api/connectors| ConnSetting[(connector_setting)]
+    API -->|notify_pending_approval| Slack[(Slack)]
+    Slack -->|/api/slack/interactions| API
 ```
 
 The backend is a single FastAPI process. The frontend is a separate static SPA that talks to it
@@ -35,6 +38,9 @@ over REST; there is no server-rendered coupling between them.
 - **Visible UI:** React SPA with a live tool-call feed and an execution panel (see below).
 - **HITL booking (bonus):** explicit confirm-then-execute clicks gate the only booking write;
   see "HITL booking" below for what "execute" does and doesn't do.
+- **Slack HITL connector (bonus):** an optional, DB-toggled Slack approval message with
+  Confirm/Reject buttons offers the same gate through Slack instead of the UI; see "Slack HITL
+  connector" below.
 
 ## APIs & AI protocols
 
@@ -45,6 +51,7 @@ over REST; there is no server-rendered coupling between them.
 | Cerebras (`gpt-oss-120b`) | The planner LLM — reasoning, tool selection, structured output. | Pydantic AI `CerebrasModel`/`CerebrasProvider` in `planner.py`. |
 | SearchApi.io Google Flights | Real flight offers + booking options. | `flights_searchapi.py` (Live vs Recorded strategy). |
 | Tavily | Real, source-attributed activity research. | `activities_tavily.py`. |
+| Slack (optional) | Approval message with Confirm/Reject buttons; signed callback. | `slack_hitl.py` + `routes/slack.py`. |
 
 **AI protocols:**
 
@@ -96,10 +103,12 @@ execution panel renders events only inside their owning run.
 ## Data model
 
 Five core tables (`user_account`, `trip_request`, `flight_search_result`, `itinerary`,
-`hitl_booking_log`) plus four audit/observability tables (`booking_transition`, `execution_event`,
-`agent_run`, `agent_run_step`) in `app/models.py`. `booking_transition` and `execution_event` are
-append-only, enforced by a Postgres trigger (`reject_audit_row_mutation()`) — `UPDATE`/`DELETE`
-raises at the database level regardless of what application code attempts.
+`hitl_booking_log`), one connector-config table (`connector_setting` — a single-row, DB-backed
+toggle so the Slack connector can be flipped at runtime without a restart), and four
+audit/observability tables (`booking_transition`, `execution_event`, `agent_run`, `agent_run_step`)
+in `app/models.py`. `booking_transition` and `execution_event` are append-only, enforced by a
+Postgres trigger (`reject_audit_row_mutation()`) — `UPDATE`/`DELETE` raises at the database level
+regardless of what application code attempts.
 
 ## HITL booking (`app/state.py`)
 
@@ -118,6 +127,21 @@ confirm, then execute" is structural, not a prompt instruction the model could b
 `TA-*` reference on the `HITLBookingLog` row — it's a human-confirmed booking *handoff*, not a
 real airline reservation/purchase (no PNR, no payment). Completing a real purchase is out of
 scope for this take-home; see [DECISIONS.md](DECISIONS.md).
+
+## Slack HITL connector (`app/adapters/slack_hitl.py`, `app/routes/slack.py`, `app/routes/connectors.py`)
+
+Optional, off by default. `GET/PATCH /api/connectors` reads and flips the single-row
+`connector_setting.slack_enabled` toggle, gated so it can only be enabled when
+`SLACK_BOT_TOKEN`/`SLACK_SIGNING_SECRET`/`SLACK_APPROVALS_CHANNEL_ID` are all configured (409
+otherwise). The frontend's Connectors tab (`ConnectorsPanel.tsx`) drives this toggle.
+
+When enabled, `request_booking` (`routes/booking.py`) additionally posts a Confirm/Reject Block
+Kit message via `notify_pending_approval`; Slack's callback hits `POST /api/slack/interactions`,
+which verifies the request signature (stdlib `hmac`, constant-time compare) before resolving to
+the same `confirm_booking`/`reject_booking` repository calls the in-app buttons use — Slack is an
+alternate front door to the identical state machine, not a second one. See
+[SLACK_SETUP.md](SLACK_SETUP.md) for setup and [DECISIONS.md](DECISIONS.md) for why this is a
+hand-rolled adapter instead of a third-party chat SDK.
 
 ## Agent Execution Panel
 

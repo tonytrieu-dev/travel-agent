@@ -86,6 +86,20 @@ depending on an abstraction over it. **Kept as the deliberate extension point:**
 narrow interface specifically so that a real multi-connector future (Discord, Teams, ...) is a
 module swap to `chat-sdk-python`, not a rewrite — see `docs/SLACK_SETUP.md`.
 
+## Slack approve only confirms; execute stays in the frontend
+The Slack callback (`routes/slack.py`) calls only `confirm_booking`/`reject_booking`, never
+`execute_booking`. **Alternative:** let Approve in Slack also execute the booking.
+**Rejected** — Slack requires an ack within 3 seconds, and execute calls SearchApi and can take up
+to `SEARCHAPI_TIMEOUT_SECONDS`; execute stays behind the frontend's existing Execute action, where
+the UI already discloses ("your flight hasn't been purchased") what execute does and doesn't do.
+
+## Connector enablement is a DB-backed toggle, not just an env var
+`connector_setting.slack_enabled` is a single-row table flipped via `/api/connectors`, separate
+from whether Slack credentials exist in settings. **Alternative:** treat "credentials present" as
+"enabled." **Rejected** — that collapses configuration and intent into one flag, so any deployment
+with the env vars set would silently start posting to Slack; the toggle lets an operator configure
+Slack once and still flip it off at runtime without a restart or an env change.
+
 ## Deferred by design
 Episodic/semantic/procedural agent memory, full auth (only `get_current_user` changes), and
 payment processing — each pays off across many sessions or needs infrastructure the take-home
