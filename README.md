@@ -42,7 +42,8 @@ moves forward.
   from the pytest suite that gates system correctness.
 
 All three external services offer a free tier as of this writing; check each provider's current
-pricing page before relying on exact quota numbers, which change over time.
+pricing page before relying on exact quota numbers, which change over time. For why each one was
+picked over its alternatives, see [DECISIONS.md](docs/DECISIONS.md).
 
 ## Running it
 
@@ -124,6 +125,9 @@ Nothing here is required for the app to run — without it, the Connectors tab s
 toggle greyed out and booking approval stays in-app.
 
 ## Key decisions
+
+Full reasoning (alternative considered, why it was rejected) for these and the API choices above
+is in [docs/DECISIONS.md](docs/DECISIONS.md). Short version:
 
 - **HITL is a REST state machine, not an agent tool.** Booking moves through
   `PENDING_USER_CONFIRMATION → CONFIRMED → EXECUTED` (or `CANCELLED`/`EXPIRED`) driven entirely

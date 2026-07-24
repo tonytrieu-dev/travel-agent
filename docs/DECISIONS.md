@@ -60,6 +60,27 @@ tokens/minute for the same model, so itinerary generation completes end-to-end. 
 `llama-3.3-70b-versatile`. **Rejected** — it emits its native `<function=...>` text format instead
 of JSON tool calls, which Pydantic AI can't parse.
 
+## SearchApi.io over Amadeus/Duffel/Skyscanner/raw scraping, for flights
+`flights_searchapi.py` calls SearchApi.io's Google Flights engine. **Alternative 1:** Amadeus or
+Duffel — enterprise flight APIs with real booking capability. **Rejected** — both gate access
+behind a business/partner approval process, which doesn't fit a take-home's signup-and-go
+timeline. **Alternative 2:** scrape Google Flights directly. **Rejected** — no stable schema, no
+free-tier guarantee, and fragile to markup changes. **Chosen because:** free tier at signup,
+Google Flights data already normalized into structured JSON, and the response's `best_flights`
+array is pre-ranked cheapest-first by SearchApi.io itself — the app's own `cheapest_first`
+guarantee (see "Cheapest flights" in [ARCHITECTURE.md](ARCHITECTURE.md)) reinforces this rather
+than building price-sort/filter logic from scratch against raw, unranked results.
+
+## Tavily over Serper/Bing/SerpAPI/Google Custom Search, for activity research
+`activities_tavily.py` calls Tavily for the itinerary's activity research. **Alternative:**
+general-purpose search APIs (Serper, Bing Search API, SerpAPI, Google Custom Search) — cheaper or
+more familiar, but return raw SERPs (titles/snippets/links) that need extra parsing before an LLM
+can use them reliably. **Rejected** — that parsing step is exactly the kind of brittle scraping
+this project's "real data only, honest degradation" principle (below) tries to avoid. **Chosen
+because:** Tavily is purpose-built for LLM agents — free tier at signup, and results come back
+already shaped for grounding a model's output (clean content + source URL per result), which is
+what `web_search`'s citation requirement (every activity cites a real URL) needs directly.
+
 ## Real data only, honest degradation
 Adapters never fabricate. On quota/rate-limit/empty they return cached real data if present, or an
 honest `unavailable_reason` — never an invented offer or activity. Booking-options fetches
