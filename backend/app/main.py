@@ -44,17 +44,11 @@ def create_app() -> FastAPI:
     app.include_router(trips.router)
 
     @app.exception_handler(BookingError)
-    async def _render_booking_error(request: Request, error: BookingError) -> JSONResponse:
-        problem = ProblemDetail(code=error.code, detail=error.detail)
-        return JSONResponse(status_code=error.status_code, content=problem.model_dump(mode="json"))
-
     @app.exception_handler(ConnectorError)
-    async def _render_connector_error(request: Request, error: ConnectorError) -> JSONResponse:
-        problem = ProblemDetail(code=error.code, detail=error.detail)
-        return JSONResponse(status_code=error.status_code, content=problem.model_dump(mode="json"))
-
     @app.exception_handler(TripError)
-    async def _render_trip_error(request: Request, error: TripError) -> JSONResponse:
+    async def _render_domain_error(
+        request: Request, error: BookingError | ConnectorError | TripError
+    ) -> JSONResponse:
         problem = ProblemDetail(code=error.code, detail=error.detail)
         return JSONResponse(status_code=error.status_code, content=problem.model_dump(mode="json"))
 

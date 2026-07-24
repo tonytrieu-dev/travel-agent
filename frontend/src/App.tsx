@@ -18,7 +18,6 @@ import { BookingModule } from "./components/BookingModule"
 import { ConnectorsPanel } from "./components/ConnectorsPanel"
 import { ExecutionPanel } from "./components/ExecutionPanel"
 import { FlightSearch } from "./components/FlightSearch"
-import { Footer } from "./components/Footer"
 import { ItineraryPanel, type ClarificationAnswers } from "./components/ItineraryPanel"
 import { LiveActivity } from "./components/LiveActivity"
 import { Questionnaire } from "./components/Questionnaire"
@@ -254,7 +253,9 @@ function App() {
           {activeTab === "connectors" && <ConnectorsPanel />}
         </main>
 
-        <Footer />
+        <footer className="mt-10 border-t border-slate-200 py-6 text-center text-xs text-slate-400">
+          <p>flights via Google Flights (SearchApi.io) · activity research via Tavily</p>
+        </footer>
       </div>
     </div>
   )

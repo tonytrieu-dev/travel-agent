@@ -21,14 +21,9 @@ function formatDateTime(isoString: string): string {
 }
 
 function searchButtonLabel(isLoading: boolean, searchResult: FlightSearchOut | null): string {
+  if (searchResult) return "Search for new flight"
   if (isLoading) return "Searching…"
-  if (searchResult) return "Search for new flight"
   return "Search flights"
-}
-
-function searchNewButtonLabel(isLoading: boolean, searchResult: FlightSearchOut | null): string {
-  if (searchResult) return "Search for new flight"
-  return searchButtonLabel(isLoading, searchResult)
 }
 
 function FlightDirection({ label, legs }: { label: string; legs: FlightLegOut[] }) {
@@ -93,7 +88,7 @@ export function FlightSearch({
                 : "bg-indigo-600 text-white hover:bg-indigo-700"
             }`}
           >
-            {searchNewButtonLabel(isLoading, searchResult)}
+            {searchButtonLabel(isLoading, searchResult)}
           </button>
         </div>
       </div>

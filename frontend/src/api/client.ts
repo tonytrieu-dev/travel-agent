@@ -49,16 +49,8 @@ export function createTrip(tripRequestCreate: TripRequestCreate): Promise<TripRe
   })
 }
 
-const tripSnapshotRequests = new Map<number, Promise<TripSnapshotOut>>()
-
 export function getTripSnapshot(tripId: number): Promise<TripSnapshotOut> {
-  const existingRequest = tripSnapshotRequests.get(tripId)
-  if (existingRequest) return existingRequest
-  const snapshotRequest = request<TripSnapshotOut>(`/trips/${tripId}/snapshot`).finally(() =>
-    tripSnapshotRequests.delete(tripId),
-  )
-  tripSnapshotRequests.set(tripId, snapshotRequest)
-  return snapshotRequest
+  return request<TripSnapshotOut>(`/trips/${tripId}/snapshot`)
 }
 
 export function updateTrip(
