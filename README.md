@@ -126,25 +126,7 @@ toggle greyed out and booking approval stays in-app.
 
 ## Key decisions
 
-Full reasoning (alternative considered, why it was rejected) for these and the API choices above
-is in [docs/DECISIONS.md](docs/DECISIONS.md). Short version:
-
-- **HITL is a REST state machine, not an agent tool.** Booking moves through
-  `PENDING_USER_CONFIRMATION → CONFIRMED → EXECUTED` (or `CANCELLED`/`EXPIRED`) driven entirely
-  by explicit human clicks against `/bookings/*` routes. The agent can plan and search but never
-  writes a booking — this makes "a human must click before the write" a structural guarantee,
-  not a prompt-dependent one.
-- **Ask, don't assume.** The planner's output type is a union of `Itinerary | ClarificationOut`;
-  missing trip details produce real clarifying questions instead of a guessed itinerary.
-- **Real data only, honestly degraded.** Flight and activity adapters never fabricate results.
-  On a quota/rate-limit/empty response they return cached real data if available, or an honest
-  "unavailable" reason — never invented offers or activities.
-- **Durable execution via DBOS.** The planner and booking-execution flows are wrapped as DBOS
-  workflows so a crash mid-run resumes rather than silently losing state, reusing the same
-  Postgres instance (no extra infrastructure).
-- **Append-only audit trail enforced at the database.** Booking transitions and execution events
-  are protected by DB triggers that reject `UPDATE`/`DELETE`, not just application-level
-  convention.
-- **Rate limiting protects scarce third-party quota.** Per-IP request caps and a global
-  concurrency cap on `/plan` and `/flights/search` keep the app from burning through LLM
-  request limits or SearchApi's one-time search allotment.
+Every load-bearing choice in this project — HITL as a REST state machine, ask-don't-assume typing,
+real-data-only degradation, DBOS for durable execution, the append-only audit trail, rate limiting,
+and why each external API was picked over its alternatives — is documented with its reasoning in
+[docs/DECISIONS.md](docs/DECISIONS.md).

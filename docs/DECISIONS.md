@@ -126,6 +126,14 @@ from whether Slack credentials exist in settings. **Alternative:** treat "creden
 with the env vars set would silently start posting to Slack; the toggle lets an operator configure
 Slack once and still flip it off at runtime without a restart or an env change.
 
+## Rate limiting protects scarce third-party quota
+`enforce_request_rate_limit` (`app/rate_limit.py`) applies a per-IP request cap plus a global
+concurrency cap on real LLM calls, gating `/plan` and `/flights/search`. **Alternative:** no
+limiting, rely on each provider's own rate-limit response. **Rejected** — SearchApi's free tier
+is a one-time search allotment, not a renewing rate limit, so a burst of retries (accidental
+double-clicks, a buggy client) would permanently burn quota rather than just wait out a window;
+limiting at the app boundary protects that budget before a request ever reaches SearchApi.
+
 ## Deferred by design
 Episodic/semantic/procedural agent memory, full auth (only `get_current_user` changes), and
 payment processing — each pays off across many sessions or needs infrastructure the take-home
