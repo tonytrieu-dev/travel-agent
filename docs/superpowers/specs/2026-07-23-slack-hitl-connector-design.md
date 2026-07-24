@@ -2,10 +2,23 @@
 
 ## Goal
 
-Let a human confirm a flight booking from Slack, not just from the app's own UI —
+Let a human approve a flight booking from Slack, not just from the app's own UI —
 demonstrating that the approval gate is a channel-agnostic surface over the existing
 state machine, not a redesign of it. Explicitly scoped to booking approvals only
 (see "Out of scope").
+
+## Revision note
+
+This is a revision after a review pass (see git history for the prior version).
+The review's core finding: the original design over-scoped the dependency (a
+9-platform, alpha-status chat SDK for one Slack message and one callback), the
+copy ("Confirm & Book") overclaimed what execution actually does, and it executed
+the booking inside the Slack interaction request — a real problem, since Slack
+requires a response within 3 seconds and execution calls an external provider.
+All of that is fixed below. The one point where this revision deliberately
+disagrees with the review: the DB-backed Connectors toggle stays, shrunk to its
+minimal form, because it's an explicit, twice-confirmed requirement, not a
+code-quality question.
 
 ## Why this is safe to add
 
@@ -13,12 +26,13 @@ The state machine in `app/state.py` (`ALLOWED_TRANSITIONS`) is the single source
 truth for what transitions are legal; `booking_repository.py` is the only code that
 writes booking state, and every write lands in the same transaction as an immutable
 `BookingTransition` audit row. Slack becomes a second *caller* of the same
-`confirm_booking` / `execute_booking_durable` / `cancel_booking` functions the REST
-routes already call — no new transition logic, no new write path.
+`confirm_booking` / `cancel_booking` functions the REST routes already call — no
+new transition logic, no new write path, and (per the fix below) no new execution
+path either.
 
 The button's `value` is a `booking_log_id` the server itself embedded when building
-the card. Slack never sends free text back to the app; the only input from Slack is
-"which button, for which id, clicked by which user." There is no prompt-injection
+the message. Slack never sends free text back to the app; the only input from Slack
+is "which button, for which id, from which channel." There is no prompt-injection
 surface in this design, because nothing LLM-generated or user-authored ever flows
 from Slack into the agent or into a write.
 
@@ -35,6 +49,16 @@ from Slack into the agent or into a write.
   not a second product surface.
 - **Multi-workspace / OAuth install flow.** Single workspace, static bot token.
 - **Email delivery channel.** Slack only, per scope discussion.
+- **Slack-identity-to-user mapping.** `BookingTransition.actor_user_id` continues
+  to record `requested_by_user_id`, exactly as it does today for the frontend
+  path. The Slack message does not claim a clicker identity the DB doesn't back
+  (see "Card content" below) — adding real identity mapping is a standing
+  auth decision, not something this connector should introduce as a side effect.
+- **Executing the booking from Slack.** Approve only calls `confirm_booking`.
+  Execution (which calls SearchApi and can take up to `SEARCHAPI_TIMEOUT_SECONDS`)
+  stays behind the frontend's existing Execute action — both because Slack
+  requires a 3-second ack and because the frontend already makes clear ("your
+  flight hasn't been purchased") what execute does and doesn't do.
 
 ## Architecture
 
@@ -48,26 +72,31 @@ repository.request_booking()  ── writes HITLBookingLog(PENDING_USER_CONFIRMA
 slack_hitl.notify_pending_approval(booking, trip, flight)
         │
         ▼
-Card posted to #approvals channel — Confirm & Book / Reject buttons,
-value = booking_log_id
+Block Kit message posted to the configured channel via chat.postMessage —
+Approve flight / Reject buttons, value = booking_log_id
 
         ⋯ human clicks a button in Slack ⋯
 
-POST /api/slack/events  (Slack's signed interactivity payload)
+POST /api/slack/interactions
+  (Content-Type: application/x-www-form-urlencoded, body has one field: `payload`)
         │
         ▼
-chat.webhooks["slack"](request)  — chat-sdk verifies signature, parses block_actions
+verify_signature(raw_body, headers)  — stdlib hmac/hashlib, Slack's documented
+  v0:{timestamp}:{raw_body} scheme, timing-safe compare, 5-minute replay window
         │
         ▼
-@chat.on_action("confirm_booking" | "reject_booking") handler
-        │  opens a session via get_session_factory() (same pattern dbos_runtime.py uses)
-        ▼
-resolve_confirm() / resolve_reject()  — plain functions, call the SAME
-repository.confirm_booking / execute_booking_durable / repository.cancel_booking
+parse payload → validate type == "block_actions", channel.id == configured
+  channel, action_id in {approve_booking, reject_booking}, value is a valid int
         │
         ▼
-handler edits the original Slack message: outcome + who clicked,
-buttons removed (prevents double-click races)
+resolve_approve() / resolve_reject()  — plain functions, call the SAME
+repository.confirm_booking / repository.cancel_booking used by the REST routes.
+Catch BookingError, render its existing .detail text — no new copy to keep in sync.
+        │
+        ▼
+HTTP response body IS the Slack update: {"replace_original": true, "text": ...,
+  "blocks": [...]}  — buttons removed, outcome shown. Satisfies Slack's 3-second
+  ack because it's the same synchronous request/response, no follow-up call needed.
 ```
 
 ## Components
@@ -75,69 +104,91 @@ buttons removed (prevents double-click races)
 ### `app/adapters/slack_hitl.py` (new)
 
 Follows the existing adapter pattern (`activities_tavily.py`, `flights_searchapi.py`):
-owns all Slack I/O, tolerant of failures — a Slack outage must never turn a
-successful booking request into a 500.
+owns all Slack I/O over plain `httpx`, tolerant of failures — a Slack outage must
+never turn a successful booking request into a 500. No new dependency: `httpx` is
+already used for the SearchApi/Tavily adapters; signature verification is ~10 lines
+of stdlib `hmac`/`hashlib`. (A 9-platform, alpha-status chat SDK was considered and
+dropped — the actual need is one Block Kit POST and one signed callback, and
+pulling in cross-platform card translation, concurrency primitives, and multiple
+state backends for that is more surface than the feature warrants.)
 
-- `build_approval_card(trip, flight, booking) -> CardElement` — pure function,
-  returns the `chat_sdk.cards.Card(...)` dict. Unit-testable with no network.
-- `notify_pending_approval(chat, booking, trip, flight) -> None` — posts the card
-  to the configured channel via `chat.channel(f"slack:{channel_id}").post(...)`.
-  Catches and logs any failure; never raises into the booking request path.
-- `resolve_confirm(session, booking_log_id, actor_display_name) -> str` — calls
-  `repository.confirm_booking` then `dbos_runtime.execute_booking_durable`; catches
-  `BookingError` (e.g. already confirmed from the frontend — the existing 409
-  `invalid_transition`) and returns a human-readable outcome string instead of
-  raising. Pure w.r.t. Slack — no `ActionEvent` dependency, so it's testable with
-  the same fixtures as existing booking-repository tests.
-- `resolve_reject(session, booking_log_id, actor_display_name) -> str` — same
-  shape, calls `repository.cancel_booking`.
-- `register_handlers(chat) -> None` — thin `@chat.on_action(...)` wrappers: extract
-  `booking_log_id` from `ActionEvent.value`, `actor_display_name` from
-  `ActionEvent.user`, call the resolve_* function above, then `edit()` the
-  original message (via `ActionEvent.thread` / `message_id`) to show the outcome
-  and remove the buttons.
+- `build_approval_blocks(trip, flight, booking) -> dict` — pure function, returns
+  the Block Kit `blocks` array (header, a `section` with `fields` for route/
+  carrier/price/departs/expiry, a `divider`, an `actions` block with the two
+  buttons). Unit-testable with no network.
+- `notify_pending_approval(settings, booking, trip, flight) -> None` — `httpx`
+  POST to `https://slack.com/api/chat.postMessage` with
+  `Authorization: Bearer {bot_token}`. Catches and logs any failure; never raises
+  into the booking request path.
+- `verify_slack_signature(raw_body, timestamp, signature, signing_secret) -> bool`
+  — implements Slack's documented `v0:{timestamp}:{raw_body}` HMAC-SHA256 scheme,
+  `hmac.compare_digest` for the comparison, rejects timestamps more than 5 minutes
+  old. Pure, no I/O — directly unit-testable against Slack's own documented
+  example values.
+- `resolve_approve(session, booking_log_id) -> str` — calls
+  `repository.confirm_booking`; on `BookingError`, returns `error.detail` instead
+  of raising. Returns a short outcome string for the updated message.
+- `resolve_reject(session, booking_log_id) -> str` — same shape, calls
+  `repository.cancel_booking`.
 
-  **Note on identity**: `actor_display_name` is Slack-side only — it's used
-  purely to render "Confirmed by @alice" in the edited Slack message. It is
-  *not* written to `BookingTransition.actor_user_id`, because that column is a
-  foreign key to `user_account` and neither `confirm_booking` nor
-  `cancel_booking` currently accept an actor parameter at all (the app has no
-  Slack-identity-to-`user_account` mapping today, frontend or otherwise).
-  Building one is out of scope here — it would be a standing identity/auth
-  decision, not something this connector should introduce as a side effect.
-- `build_chat_or_none(settings) -> Chat | None` — constructs the `chat_sdk.Chat`
-  with `create_slack_adapter(SlackAdapterConfig(bot_token=..., signing_secret=...))`
-  if `settings.slack_bot_token` / `slack_signing_secret` / `slack_approvals_channel_id`
-  are all set; otherwise returns `None`. Called once at app startup.
+### `POST /api/slack/interactions` (new route, `app/routes/slack.py`)
+
+1. Read the raw request body (needed for signature verification — must happen
+   before any form-parsing that could alter it).
+2. `verify_slack_signature(...)`; reject with 401 on failure.
+3. Parse the `payload` form field as JSON. Validate `type == "block_actions"`,
+   exactly one action, `channel.id == settings.slack_approvals_channel_id`
+   (defense noted by review: only act on interactions from the configured
+   channel — channel membership is what grants approval authority in this
+   single-user demo, so this check matters), `action_id` is one of the two known
+   IDs, and `value` parses as an integer. Malformed payloads get a 200 with a
+   generic "couldn't process that action" message — Slack expects 200s even for
+   handled failures, to avoid retries.
+4. Open a session via `get_session_factory()` (same pattern `dbos_runtime.py`
+   already uses for out-of-request DB access), call `resolve_approve` /
+   `resolve_reject`.
+5. Return `{"replace_original": true, "text": outcome, "blocks": [...]}` — the
+   original `actions` block replaced by a `context` block showing the outcome
+   text. No clicker identity is shown (see "Out of scope"); no follow-up network
+   call is needed since this response body itself updates the message.
 
 ### Card content
 
+Approve/Reject buttons; copy corrected per review — execution doesn't purchase a
+flight, it hands off to the airline:
+
 ```python
-Card(
-    title="✈️ Flight approval needed",
-    subtitle=f"Trip #{trip.id} · {origin} → {destination}",
-    children=[
-        Fields([
-            Field(label="Route", value=f"{origin} → {destination_airport}"),
-            Field(label="Carrier", value=flight.carrier),
-            Field(label="Price", value=f"${flight.price_usd:,.2f} {flight.currency}"),
-            Field(label="Departs", value=flight.depart_at),
-            Field(label="Stops", value="Nonstop" if flight.stops == 0 else f"{flight.stops} stop(s)"),
-            Field(label="Price hold expires", value=booking.expires_at),
-        ]),
-        Divider(),
-        Text("Approve to confirm and book this fare, or reject to release the hold.", style="muted"),
-        Actions([
-            Button(id="confirm_booking", label="Confirm & Book", style="primary", value=str(booking.id)),
-            Button(id="reject_booking", label="Reject", style="danger", value=str(booking.id)),
-        ]),
+{
+    "blocks": [
+        {"type": "header", "text": {"type": "plain_text", "text": "Flight approval needed"}},
+        {"type": "section", "fields": [
+            {"type": "mrkdwn", "text": f"*Trip:*\n#{trip.id}"},
+            {"type": "mrkdwn", "text": f"*Route:*\n{trip.origin} → {trip.destination_airport}"},
+            {"type": "mrkdwn", "text": f"*Carrier:*\n{flight.carrier}"},
+            {"type": "mrkdwn", "text": f"*Price:*\n${flight.price_usd:,.2f} {flight.currency}"},
+            {"type": "mrkdwn", "text": f"*Departs:*\n{flight.depart_at}"},
+            {"type": "mrkdwn", "text": f"*Price hold expires:*\n{booking.expires_at}"},
+        ]},
+        {"type": "divider"},
+        {"type": "context", "elements": [
+            {"type": "mrkdwn", "text": "Approve to confirm this fare, or reject to release the hold. Approving does not purchase the flight — you'll continue in the app to complete it with the airline."},
+        ]},
+        {"type": "actions", "block_id": "booking_actions", "elements": [
+            {"type": "button", "action_id": "approve_booking", "style": "primary",
+             "text": {"type": "plain_text", "text": "Approve flight"}, "value": str(booking.id)},
+            {"type": "button", "action_id": "reject_booking", "style": "danger",
+             "text": {"type": "plain_text", "text": "Reject"}, "value": str(booking.id)},
+        ]},
     ],
-)
+}
 ```
 
-After resolution, the handler replaces the `Actions` block with a `Text` line:
-`"✅ Confirmed & booked by @alice · 3:42 PM"`, `"✖️ Rejected by @bob"`, or
-`"⚠️ Already handled — current state: CONFIRMED"` for the race case.
+Outcome text after resolution is whatever `resolve_approve`/`resolve_reject`
+returns — either a plain "Approved — continue in the app to complete booking
+with the airline." / "Rejected — the fare hold has been released." on success,
+or the real `BookingError.detail` text on conflict (e.g. "Cannot confirm a
+booking in state EXECUTED.") — reusing the API's own error text rather than
+inventing parallel copy that could drift from it.
 
 ### Config (`app/config.py`)
 
@@ -154,23 +205,20 @@ slack_approvals_channel_id: str | None = None
 
 ### `app/main.py` wiring
 
-In `create_app()`, if `build_chat_or_none(settings)` returns a `Chat`, mount:
+`POST /api/slack/interactions` is always mounted (it's a thin, cheap route); it
+502s/no-ops gracefully if Slack isn't configured, since `notify_pending_approval`
+already checks configuration before ever posting, so no interaction should exist
+to receive in that case. Keeps the wiring unconditional and simple rather than
+branching route registration on config.
 
-```python
-@app.post("/api/slack/events")
-async def slack_events(request: Request):
-    return await chat.webhooks["slack"](request)
-```
+### Connector toggle (kept, minimal)
 
-If it returns `None`, the route isn't mounted at all — hitting it 404s, which is
-the correct signal that Slack isn't configured on this deployment.
-
-### Connector toggle
+Explicit, twice-confirmed requirement — kept, but shrunk: no separate repository
+module, no dedicated test file beyond what the two routes need.
 
 **New table** `connector_setting` (single row): `slack_enabled: bool = False`.
-New repository functions `get_slack_enabled(session)` / `set_slack_enabled(session, enabled)`.
 
-**New routes** (`app/routes/connectors.py`):
+**New routes** (`app/routes/connectors.py`, direct queries, no repository layer):
 - `GET /api/connectors` → `{"slack": {"configured": bool, "enabled": bool}}`.
   `configured` reflects whether the three env vars are set; `enabled` reflects the
   DB row.
@@ -178,7 +226,8 @@ New repository functions `get_slack_enabled(session)` / `set_slack_enabled(sessi
 
 `request_booking` checks `configured and enabled` (one query) before calling
 `notify_pending_approval` — so flipping the toggle off is provably silent, not
-just theoretically so.
+just theoretically so, which is the actual point of having a live toggle instead
+of an env-var-only flag.
 
 ### Frontend: Connectors tab
 
@@ -192,18 +241,38 @@ just theoretically so.
   `getConnectors()` / `setSlackConnectorEnabled(enabled)` client functions,
   matching the existing typed-client pattern.
 
+## Contract-first workflow (per `AGENTS.md`)
+
+This repo's documented process is `specs/openapi.yaml` (contract) →
+`features/*.feature` (Gherkin) → red → green. Missed in the first pass of this
+design; the implementation plan must do, in order:
+
+1. Add `POST /api/slack/interactions`, `GET /api/connectors`, and
+   `PATCH /api/connectors/slack` to `backend/specs/openapi.yaml`.
+2. Add a Gherkin scenario to `backend/features/booking_hitl.feature` covering:
+   signed approval succeeds and moves the booking to `CONFIRMED`; invalid
+   signature is rejected; wrong channel ID is rejected.
+3. Red → green from there, consistent with how the rest of the booking flow was
+   built.
+
 ## Testing
 
 - `test_slack_hitl.py`:
-  - `build_approval_card` — asserts title/fields/button ids/values, no network.
-  - `resolve_confirm` / `resolve_reject` — against the real test DB and
+  - `build_approval_blocks` — asserts block structure/button ids/values, no
+    network, and asserts the copy does not claim purchase.
+  - `verify_slack_signature` — against Slack's own documented example
+    request/signature pair, plus a tampered-body and an expired-timestamp case.
+  - `resolve_approve` / `resolve_reject` — against the real test DB and
     `booking_repository`, same fixtures as existing booking tests. Covers the
-    already-confirmed race (second resolve call returns the "already handled"
-    string instead of raising).
-- `test_connectors_routes.py` — toggle persists across GET after PATCH, 409 when
-  unconfigured, mirrors existing route-test conventions.
-- Not tested: chat-sdk's own webhook signature verification / `block_actions`
-  parsing — that's the SDK's tested responsibility, not ours to re-verify.
+    real conflict case (e.g. approve arrives after the frontend already
+    executed) by asserting the returned string matches `BookingError.detail`.
+- `test_slack_interactions_route.py` (or as Gherkin steps per above): signed
+  `block_actions` payload confirms a booking; invalid signature → 401; wrong
+  channel ID → rejected without touching the booking.
+- Connectors routes: covered by the Gherkin scenario / a small route test,
+  toggle persists across GET after PATCH, 409 when unconfigured.
+- Not tested: Slack's own delivery guarantees or retry behavior — only our
+  verification and resolution logic.
 
 ## Slack app setup (manual, one-time, documented separately)
 
@@ -213,11 +282,12 @@ just theoretically so.
 3. Basic Information → copy the Signing Secret.
 4. Create/choose the approvals channel, `/invite @YourBot`, copy its Channel ID.
 5. Interactivity & Shortcuts → enable → Request URL =
-   `https://<ngrok-id>.ngrok.io/api/slack/events`.
+   `https://<ngrok-id>.ngrok.io/api/slack/interactions`.
 6. `ngrok http 8000`; set `SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET`,
    `SLACK_APPROVALS_CHANNEL_ID` in `.env`; restart backend; flip the Connectors
    toggle on.
 
 ## Dependency
 
-Add `chat-sdk[slack]` to `backend/pyproject.toml`.
+None new. `httpx` (already a dependency) for the outbound POST; stdlib `hmac`/
+`hashlib` for signature verification.
