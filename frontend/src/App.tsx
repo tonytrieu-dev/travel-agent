@@ -15,6 +15,7 @@ import type {
   TripRequestOut,
 } from "./api/types"
 import { BookingModule } from "./components/BookingModule"
+import { ConnectorsPanel } from "./components/ConnectorsPanel"
 import { ExecutionPanel } from "./components/ExecutionPanel"
 import { FlightSearch } from "./components/FlightSearch"
 import { Footer } from "./components/Footer"
@@ -28,11 +29,12 @@ function extractErrorMessage(error: unknown): string {
 
 const ACTIVE_TRIP_ID_STORAGE_KEY = "travel-agent.activeTripId"
 
-type TabKey = "trip" | "execution"
+type TabKey = "trip" | "execution" | "connectors"
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "trip", label: "Plan a trip" },
   { key: "execution", label: "Agent execution history" },
+  { key: "connectors", label: "Connectors" },
 ]
 
 function App() {
@@ -248,6 +250,8 @@ function App() {
                 Create a trip first — the agent's execution trace will appear here once it runs.
               </p>
             ))}
+
+          {activeTab === "connectors" && <ConnectorsPanel />}
         </main>
 
         <Footer />
