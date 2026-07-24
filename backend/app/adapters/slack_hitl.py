@@ -92,7 +92,7 @@ def build_approval_blocks(
                     {"type": "mrkdwn", "text": f"*Stops:*\n{stops_text}"},
                     {
                         "type": "mrkdwn",
-                        "text": f"*Price hold expires:*\n{booking.expires_at.isoformat()}",
+                        "text": f"*Approval expires:*\n{booking.expires_at.isoformat()}",
                     },
                 ],
             },
@@ -103,7 +103,7 @@ def build_approval_blocks(
                     {
                         "type": "mrkdwn",
                         "text": (
-                            "Approve to confirm this fare, or reject to release the hold. "
+                            "Approve to confirm this fare, or reject to cancel the request. "
                             "Approving does not complete the booking — you'll continue in "
                             "the app to finish it with the airline."
                         ),
