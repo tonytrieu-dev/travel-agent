@@ -7,18 +7,18 @@ import json
 from typing import Any
 
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from app.adapters.slack_hitl import (
-    build_resolution_blocks,
     parse_block_action,
     resolve_approve,
     resolve_reject,
+    update_approval_message,
     verify_slack_signature,
 )
 from app.config import get_settings
 from app.db import get_session_factory
-from app.schemas import SlackAuthErrorOut, SlackInteractionOut
+from app.schemas import SlackAuthErrorOut
 
 router = APIRouter(prefix="/api/slack", tags=["slack"])
 
@@ -29,10 +29,9 @@ _UNCONFIGURED_OR_UNSIGNED = JSONResponse(
 
 @router.post(
     "/interactions",
-    response_model=SlackInteractionOut,
     responses={401: {"model": SlackAuthErrorOut}},
 )
-async def slack_interactions(request: Request) -> JSONResponse:
+async def slack_interactions(request: Request) -> Response:
     settings = get_settings()
     if not (
         settings.slack_bot_token
@@ -52,15 +51,15 @@ async def slack_interactions(request: Request) -> JSONResponse:
     form = await request.form()
     payload_raw = form.get("payload")
     if not isinstance(payload_raw, str):
-        return JSONResponse(content=build_resolution_blocks("Couldn't process that action."))
+        return Response(status_code=200)
     try:
         payload: dict[str, Any] = json.loads(payload_raw)
     except json.JSONDecodeError:
-        return JSONResponse(content=build_resolution_blocks("Couldn't process that action."))
+        return Response(status_code=200)
 
     parsed = parse_block_action(payload, expected_channel_id=settings.slack_approvals_channel_id)
     if parsed is None:
-        return JSONResponse(content=build_resolution_blocks("Couldn't process that action."))
+        return Response(status_code=200)
     action_id, booking_log_id = parsed
 
     async with get_session_factory()() as session:
@@ -69,4 +68,5 @@ async def slack_interactions(request: Request) -> JSONResponse:
         else:
             outcome = await resolve_reject(session, booking_log_id)
 
-    return JSONResponse(content=build_resolution_blocks(outcome))
+    await update_approval_message(settings, payload, outcome)
+    return Response(status_code=200)

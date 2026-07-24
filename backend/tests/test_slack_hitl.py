@@ -15,6 +15,7 @@ from app.adapters.slack_hitl import (
     parse_block_action,
     resolve_approve,
     resolve_reject,
+    update_approval_message,
     verify_slack_signature,
 )
 from app.config import Settings
@@ -249,3 +250,51 @@ def test_notify_pending_approval_swallows_a_slack_outage_without_raising(
     )
 
     asyncio.run(notify_pending_approval(settings, booking, trip, flight))
+
+
+def test_update_approval_message_replaces_buttons_with_resolution(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: dict[str, Any] = {}
+
+    async def _fake_post(self, url, json=None, headers=None) -> httpx.Response:
+        calls.update(url=url, json=json)
+        return httpx.Response(200, json={"ok": True})
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", _fake_post)
+    settings = Settings(
+        cerebras_api_key="x", searchapi_api_key="x", tavily_api_key="x",
+        database_url="postgresql+asyncpg://x/x",
+        slack_bot_token="xoxb-test", slack_signing_secret="secret",
+        slack_approvals_channel_id="C123",
+    )
+
+    asyncio.run(
+        update_approval_message(
+            settings,
+            {
+                "channel": {"id": "wrong-channel"},
+                "message": {
+                    "ts": "wrong-timestamp",
+                    "blocks": [
+                        {"type": "header", "text": {"type": "plain_text", "text": "Flight"}},
+                        {"type": "context", "elements": []},
+                        {"type": "actions", "elements": [{"type": "button"}]},
+                    ],
+                },
+                "container": {"channel_id": "C123", "message_ts": "123.456"},
+            },
+            "Approved — continue in the app.",
+        )
+    )
+
+    assert calls["url"].endswith("/chat.update")
+    assert calls["json"]["channel"] == "C123"
+    assert calls["json"]["ts"] == "123.456"
+    assert calls["json"]["blocks"][0]["type"] == "header"
+    assert "actions" not in str(calls["json"]["blocks"])
+    assert "Decision recorded" not in str(calls["json"])
+    assert calls["json"]["blocks"][-1]["text"]["text"] == (
+        ":white_check_mark: *Approved* — continue in the app to complete booking "
+        "with the airline."
+    )

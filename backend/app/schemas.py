@@ -342,11 +342,5 @@ class ExecutionPanelOut(BaseModel):
     events: list[ExecutionEventOut] = Field(default_factory=list)
 
 
-class SlackInteractionOut(BaseModel):
-    replace_original: bool
-    text: str
-    blocks: list[dict[str, Any]]
-
-
 class SlackAuthErrorOut(BaseModel):
     detail: str

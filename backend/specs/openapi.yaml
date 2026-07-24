@@ -315,11 +315,8 @@ paths:
       responses:
         '200':
           description: >-
-            The interaction was processed (or was a recognized-but-unactionable payload) —
-            the response body replaces the original Slack message.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/SlackInteractionOut' }
+            The interaction was processed. The original Slack message is updated through
+            chat.update and this response is an empty acknowledgment.
         '401':
           description: Missing/invalid Slack signature, or Slack is not configured.
           content:
@@ -636,16 +633,6 @@ components:
         events:
           type: array
           items: { $ref: '#/components/schemas/ExecutionEventOut' }
-
-    SlackInteractionOut:
-      type: object
-      required: [replace_original, text, blocks]
-      properties:
-        replace_original: { type: boolean }
-        text: { type: string }
-        blocks:
-          type: array
-          items: { type: object, additionalProperties: true }
 
     SlackAuthErrorOut:
       type: object

@@ -134,14 +134,67 @@ def build_approval_blocks(
     }
 
 
-def build_resolution_blocks(outcome_text: str) -> dict[str, Any]:
+def build_resolution_message(
+    outcome_text: str, original_blocks: list[dict[str, Any]]
+) -> dict[str, Any]:
+    if outcome_text.startswith("Approved"):
+        status = (
+            ":white_check_mark: *Approved* — continue in the app to complete booking "
+            "with the airline."
+        )
+    elif outcome_text.startswith("Rejected"):
+        status = ":no_entry_sign: *Rejected* — return to the app to choose another flight."
+    else:
+        status = f":warning: {outcome_text}"
     return {
-        "replace_original": True,
-        "text": outcome_text,
+        "text": status,
         "blocks": [
-            {"type": "section", "text": {"type": "mrkdwn", "text": outcome_text}},
+            *[
+                block
+                for block in original_blocks
+                if block.get("type") not in {"actions", "context"}
+            ],
+            {
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": status},
+            },
         ],
     }
+
+
+async def update_approval_message(
+    settings: Settings, payload: dict[str, Any], outcome_text: str
+) -> bool:
+    resolution = build_resolution_message(
+        outcome_text, payload.get("message", {}).get("blocks") or []
+    )
+    container = payload.get("container", {})
+    channel_id = container.get("channel_id") or payload.get("channel", {}).get("id")
+    message_ts = container.get("message_ts") or payload.get("message", {}).get("ts")
+    if not channel_id or not message_ts or not settings.slack_bot_token:
+        return False
+    try:
+        async with httpx.AsyncClient(timeout=SLACK_API_TIMEOUT_SECONDS) as client:
+            response = await client.post(
+                "https://slack.com/api/chat.update",
+                headers={
+                    "Authorization": f"Bearer {settings.slack_bot_token.get_secret_value()}"
+                },
+                json={
+                    "channel": channel_id,
+                    "ts": message_ts,
+                    "text": resolution["text"],
+                    "blocks": resolution["blocks"],
+                    "attachments": [],
+                },
+            )
+            if response.is_error or not response.json().get("ok", False):
+                logger.warning("Slack chat.update failed for booking action: %s", response.text)
+                return False
+            return True
+    except (httpx.HTTPError, ValueError) as error:
+        logger.warning("Slack chat.update failed for booking action: %r", error)
+        return False
 
 
 def parse_block_action(

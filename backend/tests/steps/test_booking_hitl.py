@@ -35,6 +35,11 @@ def _approval_form_body(log_id: int) -> bytes:
         {
             "type": "block_actions",
             "channel": {"id": _TEST_CHANNEL_ID},
+            "container": {
+                "type": "message",
+                "channel_id": _TEST_CHANNEL_ID,
+                "message_ts": "123.456",
+            },
             "actions": [{"action_id": "approve_booking", "value": str(log_id)}],
         }
     )
@@ -222,6 +227,11 @@ def _slack_configured(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(config, "get_settings", lambda: settings)
     monkeypatch.setattr("app.routes.slack.get_settings", lambda: settings)
 
+    async def _update_message(*args, **kwargs) -> bool:
+        return True
+
+    monkeypatch.setattr("app.routes.slack.update_approval_message", _update_message)
+
 
 @when("a correctly signed Slack approval for that booking arrives")
 def _signed_approval(client, log_id: int, bag: dict) -> None:
@@ -253,13 +263,13 @@ def _unsigned_approval(client, log_id: int, bag: dict) -> None:
     )
 
 
-@then(parsers.parse("the Slack response is {status:d} with replace_original true"))
-def _slack_response_replace_original(bag: dict, status: int) -> None:
+@then("the Slack response is an empty 200 acknowledgment")
+def _slack_response_acknowledgment(bag: dict) -> None:
     response = bag["response"]
-    assert response.status_code == status, (
-        f"expected {status}, got {response.status_code}: {response.text}"
+    assert response.status_code == 200, (
+        f"expected 200, got {response.status_code}: {response.text}"
     )
-    assert response.json()["replace_original"] is True
+    assert response.content == b""
 
 
 @then(parsers.parse("the Slack response is {status:d}"))

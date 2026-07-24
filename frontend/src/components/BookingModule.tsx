@@ -111,6 +111,7 @@ export function BookingModule({ trip, selectedOffer, onSearchAgain }: BookingMod
     ? cheapestPerProvider(bookingLog.booking_options).filter((option) => {
         const request = option.booking_request
         return (
+          bookingOptionLabel(option)?.toLowerCase() === selectedOffer.carrier.toLowerCase() &&
           typeof request === "object" &&
           request !== null &&
           typeof (request as Record<string, unknown>).url === "string" &&

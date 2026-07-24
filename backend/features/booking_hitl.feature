@@ -41,7 +41,7 @@ Feature: Human-in-the-loop booking gate
     Given a booking still pending user confirmation
     And Slack is configured with a known signing secret and channel
     When a correctly signed Slack approval for that booking arrives
-    Then the Slack response is 200 with replace_original true
+    Then the Slack response is an empty 200 acknowledgment
     And the booking ends CONFIRMED
 
   Scenario: An unsigned Slack request is rejected without touching the booking
