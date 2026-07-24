@@ -109,6 +109,20 @@ real run also goes through), and are all cited activities grounded in real searc
 against the real Cerebras API, so it spends real quota — mind your request limits before running
 repeatedly.
 
+### 7. (Optional) Slack human-in-the-loop approvals
+
+Booking approval can be routed through Slack instead of the in-app UI. Slack's Interactivity
+callback needs a public HTTPS URL, so local development requires a tunnel:
+
+```bash
+ngrok http 8000
+```
+
+Use the printed `https://*.ngrok.io` URL as the Slack app's Request URL. Full setup steps
+(app creation, tokens, channel config) are in [`docs/SLACK_SETUP.md`](docs/SLACK_SETUP.md).
+Nothing here is required for the app to run — without it, the Connectors tab shows the Slack
+toggle greyed out and booking approval stays in-app.
+
 ## Key decisions
 
 - **HITL is a REST state machine, not an agent tool.** Booking moves through
