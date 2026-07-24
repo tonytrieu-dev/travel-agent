@@ -14,7 +14,7 @@ from sqlmodel import col
 
 from app.agent.planner import agent as planner_agent
 from app.dbos_runtime import run_planner_durable
-from app.models import AgentRun, AgentRunStep, ExecutionEvent, ExecutionEventKind
+from app.models import AgentRun, AgentRunStep, ExecutionEvent
 from app.schemas import ClarificationOut
 from tests.db_helpers import TEST_DATABASE_URL, seed_trip
 
@@ -83,10 +83,7 @@ async def test_run_planner_durable_persists_a_real_agent_run_for_the_panel(
     )
     assert events
     assert all(event.agent_run_id == agent_run.id for event in events)
-    assert any(
-        event.kind is ExecutionEventKind.PROTOCOL and event.name == "Pydantic AI"
-        for event in events
-    )
+    assert all(event.name != "Pydantic AI" for event in events)
     assert any(
         event.name == "web_search" and event.provider == "Tavily" for event in events
     )
@@ -134,13 +131,6 @@ async def test_run_planner_durable_persists_a_failed_run_with_its_steps_so_far(c
                 if agent_run is not None
                 else []
             )
-            events = list(
-                await session.scalars(
-                    select(ExecutionEvent).where(
-                        col(ExecutionEvent.trip_request_id) == trip_id
-                    )
-                )
-            )
     finally:
         await engine.dispose()
 
@@ -150,7 +140,6 @@ async def test_run_planner_durable_persists_a_failed_run_with_its_steps_so_far(c
     )
     assert agent_run.status == "failed"
     assert len(agent_runs) == 1
-    assert events and all(event.agent_run_id == agent_run.id for event in events)
     assert len(steps) == 1, (
         f"the one exchange that completed before the crash must survive as a real step, got "
         f"{len(steps)} steps"

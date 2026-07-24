@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react"
-import { ApiError, createTrip, getTrip, planTrip, searchTripFlights, updateTrip } from "./api/client"
+import {
+  ApiError,
+  createTrip,
+  getTripSnapshot,
+  planTrip,
+  searchTripFlights,
+  updateTrip,
+} from "./api/client"
 import type {
   FlightOfferOut,
   FlightSearchOut,
@@ -51,8 +58,12 @@ function App() {
   useEffect(() => {
     const storedTripId = localStorage.getItem(ACTIVE_TRIP_ID_STORAGE_KEY)
     if (!storedTripId) return
-    getTrip(Number(storedTripId))
-      .then(setTrip)
+    getTripSnapshot(Number(storedTripId))
+      .then((snapshot) => {
+        setTrip(snapshot.trip)
+        setFlightSearchResult(snapshot.flight_search)
+        setPlanResult(snapshot.plan)
+      })
       .catch(() => localStorage.removeItem(ACTIVE_TRIP_ID_STORAGE_KEY))
   }, [])
 
@@ -109,17 +120,6 @@ function App() {
     }
   }
 
-  // Restoring `trip` only refetches the trip row itself; rehydrate what it says already exists.
-  useEffect(() => {
-    if (!trip) return
-    if (trip.status === "flights_searched" || trip.status === "itinerary_ready") {
-      handleSearchFlights()
-    }
-    if (trip.status === "itinerary_ready") {
-      handleRequestPlan()
-    }
-  }, [trip?.id])
-
   const handleAnswerClarification = async (answers: ClarificationAnswers) => {
     if (!trip) return
     setIsPlanning(true)
@@ -159,7 +159,7 @@ function App() {
             Travel Agent
           </h1>
           <p className="mt-3 text-sm leading-6 text-slate-500">
-            AI trip planner with human-in-the-loop booking
+            AI trip planner with human approval before airline checkout
           </p>
         </div>
 

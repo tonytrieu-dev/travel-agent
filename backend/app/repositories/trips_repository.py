@@ -149,6 +149,42 @@ def _complete_flight_results(
     ]
 
 
+async def get_trip_snapshot(
+    session: AsyncSession, trip_id: int
+) -> tuple[TripRequest, list[FlightSearchResult], Itinerary | None, bool]:
+    trip = await get_trip(session, trip_id)
+    batch_started_at = await session.scalar(
+        select(FlightSearchResult.created_at)
+        .where(
+            col(FlightSearchResult.trip_request_id) == trip_id,
+            col(FlightSearchResult.offer_index) == 0,
+        )
+        .order_by(col(FlightSearchResult.created_at).desc())
+        .limit(1)
+    )
+    offers = (
+        list(
+            await session.scalars(
+                select(FlightSearchResult).where(
+                    col(FlightSearchResult.trip_request_id) == trip_id,
+                    col(FlightSearchResult.created_at) >= batch_started_at,
+                )
+            )
+        )
+        if batch_started_at is not None
+        else []
+    )
+    itinerary = await session.scalar(
+        select(Itinerary).where(col(Itinerary.trip_request_id) == trip_id)
+    )
+    is_stale = (
+        batch_started_at < utcnow() - timedelta(minutes=FLIGHT_CACHE_TTL_MINUTES)
+        if batch_started_at is not None
+        else False
+    )
+    return trip, _cheapest_first(offers), itinerary, is_stale
+
+
 def offer_summary(offer: FlightSearchResult | NormalizedFlightOffer) -> dict:
     return {
         "carrier": offer.carrier,

@@ -12,13 +12,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.activities_tavily import TavilyActivityProvider
 from app.adapters.flights_searchapi import get_flight_provider
-from app.agent.execution_log import execution_context, record_event
+from app.agent.execution_log import execution_context
 from app.agent.observability import persist_agent_run
 from app.agent.planner import PlannerDeps, agent, default_usage_limits
 from app.config import CEREBRAS_MODEL, get_settings
 from app.db import get_session_factory
 from app.models import AgentRun as ObservedAgentRun
-from app.models import ExecutionEventKind, FlightSearchResult, TripRequest
+from app.models import FlightSearchResult, TripRequest
 from app.rate_limit import acquire_agent_run_slot, release_agent_run_slot
 from app.repositories import booking_repository as repository
 from app.schemas import BookingLogOut, ClarificationOut, ItineraryOut
@@ -89,12 +89,6 @@ async def _run_planner_workflow(trip_id: int, prompt: str) -> ItineraryOut | Cla
             flight_provider=get_flight_provider(settings),
             activity_provider=TavilyActivityProvider(settings.tavily_api_key.get_secret_value()),
             fitness_level=trip.fitness_level if trip is not None else None,
-        )
-        await record_event(
-            ExecutionEventKind.PROTOCOL,
-            "Pydantic AI",
-            "ok",
-            "Tool calling, a ReAct-style loop, and JSON Schema structured output.",
         )
         async with agent.iter(prompt, deps=deps, usage_limits=default_usage_limits()) as agent_run:
             try:

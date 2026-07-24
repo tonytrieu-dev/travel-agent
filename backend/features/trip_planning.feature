@@ -33,6 +33,14 @@ Feature: Trip planning — create, update, search flights, and generate an itine
     Then the response is 200 with offers sourced "cached"
     And the flight provider is never called
 
+  Scenario: Restoring a trip reads saved results without running providers
+    Given an existing trip with stale saved flights and a generated itinerary
+    When the trip snapshot is fetched
+    Then the snapshot contains the stale saved flights and itinerary
+    And the flight provider is never called
+    And the planner is never called
+    And no agent run is recorded for the restore
+
   Scenario: Flight search surfaces the cheapest offer first
     Given an existing trip with no prior flight search
     And the flight provider will return offers priced 812, 499, and 640 USD

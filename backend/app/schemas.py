@@ -254,11 +254,18 @@ class FlightOfferOut(BaseModel):
 class FlightSearchOut(BaseModel):
     offers: list[FlightOfferOut]
     unavailable_reason: str | None = None
+    is_stale: bool = False
 
 
 class PlanReadyOut(BaseModel):
     status: Literal["ready"] = "ready"
     itinerary: ItineraryOut
+
+
+class TripSnapshotOut(BaseModel):
+    trip: TripRequestOut
+    flight_search: FlightSearchOut | None = None
+    plan: PlanReadyOut | None = None
 
 
 class PlanNeedsClarificationOut(BaseModel):

@@ -123,6 +123,23 @@ def _existing_trip_with_itinerary() -> int:
     return run_db(_work)
 
 
+@given(
+    "an existing trip with stale saved flights and a generated itinerary",
+    target_fixture="trip_id",
+)
+def _existing_trip_with_stale_snapshot(bag: dict) -> int:
+    async def _work(session):
+        trip_id = await seed_trip(session, depart_date="2026-09-01")
+        await seed_flight_search_results(session, trip_id, minutes_ago=45)
+        latest_flight_ids = await seed_flight_search_results(session, trip_id, minutes_ago=30)
+        await seed_itinerary(session, trip_id)
+        return trip_id, latest_flight_ids
+
+    trip_id, latest_flight_ids = run_db(_work)
+    bag["latest_flight_ids"] = latest_flight_ids
+    return trip_id
+
+
 @given("flights have already been searched live for that route and those dates")
 def _prior_live_search() -> None:
     async def _work(session):
@@ -135,6 +152,11 @@ def _prior_live_search() -> None:
 @when("flights are searched for the trip")
 def _search_flights(client, trip_id: int, bag: dict) -> None:
     bag["response"] = client.post(f"/api/trips/{trip_id}/flights/search")
+
+
+@when("the trip snapshot is fetched")
+def _get_trip_snapshot(client, trip_id: int, bag: dict) -> None:
+    bag["response"] = client.get(f"/api/trips/{trip_id}/snapshot")
 
 
 @then(parsers.parse('the response is 200 with offers sourced "{source}"'))
@@ -206,6 +228,22 @@ def _flight_provider_never_called(flight_search_spy: FlightSearchSpy) -> None:
         f"inserted directly into the DB, not through this spy); got {flight_search_spy.calls} "
         f"calls"
     )
+
+
+@then("the snapshot contains the stale saved flights and itinerary")
+def _snapshot_contains_saved_state(bag: dict) -> None:
+    response = bag["response"]
+    assert response.status_code == 200, f"expected 200, got {response.status_code}: {response.text}"
+    body = response.json()
+    assert [offer["id"] for offer in body["flight_search"]["offers"]] == bag["latest_flight_ids"]
+    assert body["flight_search"]["is_stale"] is True
+    assert body["plan"]["status"] == "ready"
+    assert body["plan"]["itinerary"]["days"]
+
+
+@then("no agent run is recorded for the restore")
+def _restore_records_no_run(trip_id: int) -> None:
+    assert run_db(lambda session: get_agent_runs(session, trip_id)) == []
 
 
 @given("the planner will produce a ready itinerary")

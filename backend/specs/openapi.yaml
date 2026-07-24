@@ -104,6 +104,26 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetail' }
 
+  /api/trips/{trip_id}/snapshot:
+    get:
+      operationId: get_trip_snapshot
+      summary: >-
+        Restore the trip and its latest persisted flights and itinerary without starting a new
+        search, planner run, execution record, or third-party API call.
+      parameters:
+        - { name: trip_id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: The persisted trip state; stale flight prices are identified explicitly.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TripSnapshotOut' }
+        '404':
+          description: No such trip.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
   /api/trips/{trip_id}/plan:
     post:
       operationId: plan_trip
@@ -431,12 +451,13 @@ components:
 
     FlightSearchOut:
       type: object
-      required: [offers]
+      required: [offers, is_stale]
       properties:
         offers:
           type: array
           items: { $ref: '#/components/schemas/FlightOfferOut' }
         unavailable_reason: { type: [string, 'null'] }
+        is_stale: { type: boolean }
 
     ActivityOut:
       type: object
@@ -471,6 +492,20 @@ components:
       properties:
         status: { type: string, enum: [ready] }
         itinerary: { $ref: '#/components/schemas/ItineraryOut' }
+
+    TripSnapshotOut:
+      type: object
+      required: [trip, flight_search, plan]
+      properties:
+        trip: { $ref: '#/components/schemas/TripRequestOut' }
+        flight_search:
+          oneOf:
+            - { $ref: '#/components/schemas/FlightSearchOut' }
+            - type: 'null'
+        plan:
+          oneOf:
+            - { $ref: '#/components/schemas/PlanReadyOut' }
+            - type: 'null'
 
     PlanNeedsClarificationOut:
       type: object

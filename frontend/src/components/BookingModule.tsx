@@ -29,7 +29,7 @@ function bookingOptionPrice(option: Record<string, unknown>): number {
 
 // SearchApi returns one booking_option per fare class/OTA, so the same provider often appears
 // several times — collapse to the cheapest option per provider instead of a wall of duplicate
-// "Book with X" buttons.
+// provider checkout buttons.
 function cheapestPerProvider(options: Record<string, unknown>[]): Record<string, unknown>[] {
   const cheapestByLabel = new Map<string, Record<string, unknown>>()
   options.forEach((option, index) => {
@@ -83,8 +83,8 @@ export function BookingModule({ trip, selectedOffer, onSearchAgain }: BookingMod
   if (!selectedOffer) {
     return (
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-slate-900">Book this trip</h2>
-        <p className="mt-2 text-sm text-slate-500">Select a flight offer above to start booking.</p>
+        <h2 className="text-lg font-semibold text-slate-900">Continue to airline booking</h2>
+        <p className="mt-2 text-sm text-slate-500">Select a flight offer above to review it.</p>
       </section>
     )
   }
@@ -140,7 +140,7 @@ export function BookingModule({ trip, selectedOffer, onSearchAgain }: BookingMod
 
   return (
     <section className="rounded-xl border-2 border-indigo-200 bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-semibold text-slate-900">Book this trip</h2>
+      <h2 className="text-lg font-semibold text-slate-900">Continue to airline booking</h2>
       <p className="mt-2 text-sm leading-6 text-slate-600">
         {selectedOffer.carrier} · ${selectedOffer.price_usd.toFixed(2)} {selectedOffer.currency}
       </p>
@@ -232,7 +232,7 @@ export function BookingModule({ trip, selectedOffer, onSearchAgain }: BookingMod
             disabled={isLoading}
             className="rounded-md bg-indigo-600 px-4 py-2.5 font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
           >
-            {isLoading ? "Reviewing…" : "Book this flight again"}
+            {isLoading ? "Reviewing…" : "Review this flight again"}
           </button>
         </div>
       )}
@@ -254,7 +254,7 @@ export function BookingModule({ trip, selectedOffer, onSearchAgain }: BookingMod
                         type="submit"
                         className="rounded-md bg-indigo-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                       >
-                        Book with {label}
+                        Continue with {label}
                       </button>
                     </form>
                   </li>

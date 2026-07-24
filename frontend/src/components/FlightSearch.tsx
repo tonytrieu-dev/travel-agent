@@ -20,6 +20,13 @@ function formatDateTime(isoString: string): string {
   })
 }
 
+function searchButtonLabel(isLoading: boolean, searchResult: FlightSearchOut | null): string {
+  if (isLoading) return "Searching…"
+  if (searchResult?.is_stale) return "Refresh prices"
+  if (searchResult) return "Search for new flight"
+  return "Search flights"
+}
+
 function FlightDirection({ label, legs }: { label: string; legs: FlightLegOut[] }) {
   const firstLeg = legs[0]
   const lastLeg = legs.at(-1)
@@ -63,11 +70,11 @@ export function FlightSearch({
         </div>
         <button
           type="button"
-          onClick={searchResult ? onSearchNewFlight : onSearchFlights}
+          onClick={!searchResult || searchResult.is_stale ? onSearchFlights : onSearchNewFlight}
           disabled={isLoading}
           className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
         >
-          {isLoading ? "Searching…" : searchResult ? "Search for new flight" : "Search flights"}
+          {searchButtonLabel(isLoading, searchResult)}
         </button>
       </div>
 
@@ -80,6 +87,12 @@ export function FlightSearch({
       {searchResult?.unavailable_reason && (
         <p className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">
           {searchResult.unavailable_reason}
+        </p>
+      )}
+
+      {searchResult?.is_stale && (
+        <p role="alert" className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          These saved prices may be outdated. Refresh prices before continuing to airline booking.
         </p>
       )}
 
@@ -106,6 +119,7 @@ export function FlightSearch({
                       name="flight-offer"
                       checked={selectedOfferId === offer.id}
                       onChange={() => onSelectOffer(offer)}
+                      disabled={searchResult.is_stale}
                       className="h-4 w-4"
                     />
                     <div className="space-y-3">

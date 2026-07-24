@@ -89,6 +89,7 @@ export interface FlightOfferOut {
 export interface FlightSearchOut {
   offers: FlightOfferOut[]
   unavailable_reason?: string | null
+  is_stale: boolean
 }
 
 export interface ActivityOut {
@@ -111,6 +112,12 @@ export interface ItineraryOut {
 export interface PlanReadyOut {
   status: "ready"
   itinerary: ItineraryOut
+}
+
+export interface TripSnapshotOut {
+  trip: TripRequestOut
+  flight_search: FlightSearchOut | null
+  plan: PlanReadyOut | null
 }
 
 export interface PlanNeedsClarificationOut {

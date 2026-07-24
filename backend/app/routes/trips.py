@@ -31,6 +31,7 @@ from app.schemas import (
     FlightLegOut,
     FlightOfferOut,
     FlightSearchOut,
+    ItineraryOut,
     PlanNeedsClarificationOut,
     PlanOut,
     PlanReadyOut,
@@ -38,6 +39,7 @@ from app.schemas import (
     TripRequestCreate,
     TripRequestOut,
     TripRequestUpdate,
+    TripSnapshotOut,
 )
 
 router = APIRouter(prefix="/api", tags=["trips"])
@@ -87,6 +89,25 @@ def _to_flight_offer_out(offer: Any) -> FlightOfferOut:
     offer_out = FlightOfferOut.model_validate(offer)
     offer_out.legs = [FlightLegOut(**leg) for leg in derive_flight_legs(offer.raw_offer)]
     return offer_out
+
+
+@router.get("/trips/{trip_id}/snapshot", response_model=TripSnapshotOut, responses=_NOT_FOUND)
+async def get_trip_snapshot(
+    trip_id: int, session: AsyncSession = Depends(get_session)
+) -> TripSnapshotOut:
+    trip, offers, itinerary, is_stale = await repository.get_trip_snapshot(session, trip_id)
+    return TripSnapshotOut(
+        trip=TripRequestOut.model_validate(trip),
+        flight_search=FlightSearchOut(
+            offers=[_to_flight_offer_out(offer) for offer in offers],
+            is_stale=is_stale,
+        )
+        if offers
+        else None,
+        plan=PlanReadyOut(itinerary=ItineraryOut(days=itinerary.days))
+        if itinerary is not None
+        else None,
+    )
 
 
 @router.post(

@@ -7,6 +7,7 @@ import type {
   ProblemDetail,
   TripRequestCreate,
   TripRequestOut,
+  TripSnapshotOut,
   TripRequestUpdate,
 } from "./types"
 
@@ -47,8 +48,16 @@ export function createTrip(tripRequestCreate: TripRequestCreate): Promise<TripRe
   })
 }
 
-export function getTrip(tripId: number): Promise<TripRequestOut> {
-  return request<TripRequestOut>(`/trips/${tripId}`)
+const tripSnapshotRequests = new Map<number, Promise<TripSnapshotOut>>()
+
+export function getTripSnapshot(tripId: number): Promise<TripSnapshotOut> {
+  const existingRequest = tripSnapshotRequests.get(tripId)
+  if (existingRequest) return existingRequest
+  const snapshotRequest = request<TripSnapshotOut>(`/trips/${tripId}/snapshot`).finally(() =>
+    tripSnapshotRequests.delete(tripId),
+  )
+  tripSnapshotRequests.set(tripId, snapshotRequest)
+  return snapshotRequest
 }
 
 export function updateTrip(
