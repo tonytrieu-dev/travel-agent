@@ -27,6 +27,9 @@ dev = [
     "pyrefly>=0.16",
 ]
 
+[tool.ruff.lint.isort]
+known-first-party = ["app", "evals", "tests"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
