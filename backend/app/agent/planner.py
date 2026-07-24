@@ -24,12 +24,8 @@ from app.config import (
     get_settings,
 )
 from app.models import ExecutionEventKind, FitnessLevel, TripRequest
-from app.repositories.trips_repository import (
-    flight_provider_name,
-    get_recent_flight_results,
-    offer_summary,
-)
 from app.schemas import ClarificationOut, ItineraryOut
+from app.services.flight_search import FlightSearchService, offer_summary
 
 _IATA_CODE_PATTERN = re.compile(r"^[A-Z]{3}$")
 _FLIGHT_ACTIVITY_PATTERN = re.compile(
@@ -77,50 +73,20 @@ async def search_flights(
             f"departure_id={departure_id!r} arrival_id={arrival_id!r}"
         )
 
-    # Route/dates never change mid-plan — reuse an existing search instead of repeating it.
+    # Route/dates never change mid-plan, and this tool must never write offers or reach across
+    # trips (see FlightSearchService.search's persist/allow_cross_trip_cache — the route path,
+    # not this tool, owns full persistence and cross-trip reuse).
     session, trip_id = current_trip("search_flights")
-    cached_offers = await get_recent_flight_results(session, trip_id)
-    if cached_offers:
-        await record_event(
-            ExecutionEventKind.API_CALL,
-            "search_flights",
-            "ok",
-            f"{len(cached_offers)} offers (reused from this trip's earlier search)",
-            data={"offers": [offer_summary(offer) for offer in cached_offers]},
-            provider=flight_provider_name(ctx.deps.flight_provider),
-        )
-        return {
-            "offers": [offer_summary(offer) for offer in cached_offers],
-            "unavailable_reason": None,
-            "source": "cached",
-        }
-
-    # Trust boundary: on a cache miss, search the STORED trip's own route/dates — never the
-    # model-supplied tool arguments. Those arguments are validated for shape above, but a model
-    # that passes a different (well-formed) departure_id/arrival_id must not be able to redirect
-    # the search away from the trip the user actually created.
     trip = await session.get(TripRequest, trip_id)
     if trip is None:
         raise ModelRetry(f"trip {trip_id} is gone; cannot search flights for it")
-    started_at = time.monotonic()
-    outcome = await ctx.deps.flight_provider.search_offers(
-        trip.origin, trip.destination_airport, trip.depart_date, trip.return_date
-    )
-    duration_ms = round((time.monotonic() - started_at) * 1000)
-    await record_event(
-        ExecutionEventKind.API_CALL,
-        "search_flights",
-        "ok" if outcome.unavailable_reason is None else "unavailable",
-        f"{len(outcome.offers)} offers" if outcome.unavailable_reason is None
-        else outcome.unavailable_reason,
-        duration_ms,
-        data={"offers": [offer_summary(offer) for offer in outcome.offers]},
-        provider=flight_provider_name(ctx.deps.flight_provider),
+    outcome = await FlightSearchService(session, ctx.deps.flight_provider).search(
+        trip_id, persist=False, allow_cross_trip_cache=False
     )
     return {
         "offers": [offer_summary(offer) for offer in outcome.offers],
         "unavailable_reason": outcome.unavailable_reason,
-        "source": "live",
+        "source": "cached" if outcome.source == "same_trip_cache" else "live",
     }
 
 

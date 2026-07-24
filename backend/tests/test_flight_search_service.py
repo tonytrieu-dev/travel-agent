@@ -215,3 +215,36 @@ def test_incomplete_round_trip_offers_are_filtered_out_of_cache_reads() -> None:
         "the incomplete cached offer must not short-circuit the search — the provider must "
         "actually be invoked, not just happen to return an empty result by coincidence"
     )
+
+
+def test_route_and_planner_tool_modes_agree_on_offer_ordering_and_shape() -> None:
+    """Both callers must go through the same cheapest-first/round-trip-filter logic — this
+    pins that persist=False/allow_cross_trip_cache=False changes only side effects, not the
+    returned offers' content or order."""
+
+    async def _work(session):
+        trip_id = await seed_trip(session)
+        offers = [
+            NormalizedFlightOffer(
+                carrier="B", price_usd=500.0, currency="USD", depart_at="2026-08-01T09:00:00",
+                arrive_at="2026-08-01T21:00:00", stops=0, booking_token="b", raw_offer={},
+            ),
+            NormalizedFlightOffer(
+                carrier="A", price_usd=200.0, currency="USD", depart_at="2026-08-01T10:00:00",
+                arrive_at="2026-08-01T22:00:00", stops=1, booking_token="a", raw_offer={},
+            ),
+        ]
+        async with execution_context(session, trip_id):
+            route_outcome = await FlightSearchService(
+                session, FlightSearchSpy(offers=offers)
+            ).search(trip_id)
+        other_trip_id = await seed_trip(session)
+        async with execution_context(session, other_trip_id):
+            tool_outcome = await FlightSearchService(
+                session, FlightSearchSpy(offers=offers)
+            ).search(other_trip_id, persist=False, allow_cross_trip_cache=False)
+        return route_outcome, tool_outcome
+
+    route_outcome, tool_outcome = run_db(_work)
+    assert [offer.carrier for offer in route_outcome.offers] == ["A", "B"]
+    assert [offer.carrier for offer in tool_outcome.offers] == ["A", "B"]
