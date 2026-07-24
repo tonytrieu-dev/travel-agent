@@ -148,3 +148,70 @@ def test_provider_is_called_with_the_stored_trips_criteria_not_anything_else() -
         "outbound_date": "2026-08-01",
         "return_date": None,
     }, f"provider must be called with the trip's own stored criteria, got {provider.last_search_params}"
+
+
+def test_cross_trip_cache_reuses_identical_route_without_calling_provider() -> None:
+    async def _work(session):
+        from tests.db_helpers import seed_flight_search_results
+
+        source_trip_id = await seed_trip(session)
+        await seed_flight_search_results(session, source_trip_id)
+        other_trip_id = await seed_trip(session)  # same default JFK->CDG route/dates
+        provider = FlightSearchSpy()
+        service = FlightSearchService(session, provider)
+        async with execution_context(session, other_trip_id):
+            outcome = await service.search(other_trip_id)
+        return provider, outcome
+
+    provider, outcome = run_db(_work)
+    assert provider.calls == 0
+    assert outcome.source == "cross_trip_cache"
+    assert outcome.offers[0].carrier == "AF"
+
+
+def test_cross_trip_cache_disabled_for_planner_tool_falls_through_to_live() -> None:
+    async def _work(session):
+        from tests.db_helpers import seed_flight_search_results
+
+        source_trip_id = await seed_trip(session)
+        await seed_flight_search_results(session, source_trip_id)
+        other_trip_id = await seed_trip(session)
+        provider = FlightSearchSpy()
+        service = FlightSearchService(session, provider)
+        async with execution_context(session, other_trip_id):
+            outcome = await service.search(other_trip_id, persist=False, allow_cross_trip_cache=False)
+        return provider, outcome
+
+    provider, outcome = run_db(_work)
+    assert provider.calls == 1, "planner-tool searches must never reach across trips"
+    assert outcome.source == "live"
+
+
+def test_incomplete_round_trip_offers_are_filtered_out_of_cache_reads() -> None:
+    async def _work(session):
+        from app.models import FlightSearchResult
+
+        trip_id = await seed_trip(session, return_date="2026-08-08")
+        session.add(
+            FlightSearchResult(
+                trip_request_id=trip_id, offer_index=0, carrier="INCOMPLETE", price_usd=50.0,
+                currency="USD", depart_at="2026-08-01T09:00:00", arrive_at="2026-08-01T21:00:00",
+                stops=0, booking_token="tok", raw_offer={},  # no return_flights paired
+            )
+        )
+        await session.commit()
+        # offers=[] so a fall-through to live search is unambiguous: if the filter failed to
+        # drop the incomplete cached offer, outcome.offers would be non-empty here.
+        provider = FlightSearchSpy(offers=[])
+        service = FlightSearchService(session, provider)
+        async with execution_context(session, trip_id):
+            outcome = await service.search(trip_id)
+        return provider, outcome
+
+    provider, outcome = run_db(_work)
+    assert outcome.offers == [], "an unpaired round-trip offer must never be served from cache"
+    assert outcome.source == "live", "filtering the incomplete cached offer forces a live search"
+    assert provider.calls == 1, (
+        "the incomplete cached offer must not short-circuit the search — the provider must "
+        "actually be invoked, not just happen to return an empty result by coincidence"
+    )

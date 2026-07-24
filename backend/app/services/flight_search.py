@@ -105,6 +105,29 @@ class FlightSearchService:
                 same_trip_cache, run_started_at, run_started_monotonic,
             )
             return TripFlightSearchOutcome(same_trip_cache, None, "same_trip_cache")
+        if allow_cross_trip_cache:
+            cross_trip_offers = await self._get_cross_trip_cache(trip)
+            if cross_trip_offers:
+                results = [
+                    FlightSearchResult(
+                        trip_request_id=trip_id, offer_index=source_offer.offer_index,
+                        carrier=source_offer.carrier, price_usd=source_offer.price_usd,
+                        currency=source_offer.currency, depart_at=source_offer.depart_at,
+                        arrive_at=source_offer.arrive_at, stops=source_offer.stops,
+                        booking_token=source_offer.booking_token, raw_offer=source_offer.raw_offer,
+                        source=FlightResultSource.CACHED,
+                    )
+                    for source_offer in cross_trip_offers
+                ]
+                self._session.add_all(results)
+                trip.status = TripStatus.FLIGHTS_SEARCHED
+                await self._session.commit()
+                await self._log(
+                    trip, agent_run, "ok",
+                    f"{len(results)} offers (cached from an identical route/date search)",
+                    results, run_started_at, run_started_monotonic,
+                )
+                return TripFlightSearchOutcome(_cheapest_first(results), None, "cross_trip_cache")
         provider_started = time.monotonic()
         outcome = await self._provider.search_offers(
             trip.origin, trip.destination_airport, trip.depart_date, trip.return_date
@@ -145,6 +168,32 @@ class FlightSearchService:
             )
         )
         return _cheapest_first(_complete_flight_results(results, trip.return_date))
+
+    async def _get_cross_trip_cache(self, trip: TripRequest) -> list[FlightSearchResult]:
+        cutoff = utcnow() - timedelta(minutes=FLIGHT_CACHE_TTL_MINUTES)
+        source_trip_id = await self._session.scalar(
+            select(FlightSearchResult.trip_request_id)
+            .join(TripRequest, col(FlightSearchResult.trip_request_id) == col(TripRequest.id))
+            .where(
+                col(TripRequest.origin) == trip.origin,
+                col(TripRequest.destination_airport) == trip.destination_airport,
+                col(TripRequest.depart_date) == trip.depart_date,
+                col(TripRequest.return_date) == trip.return_date,
+                col(FlightSearchResult.created_at) >= cutoff,
+            )
+            .order_by(col(FlightSearchResult.created_at).desc())
+            .limit(1)
+        )
+        if source_trip_id is None:
+            return []
+        source_offers = list(
+            await self._session.scalars(
+                select(FlightSearchResult).where(
+                    col(FlightSearchResult.trip_request_id) == source_trip_id
+                )
+            )
+        )
+        return _complete_flight_results(source_offers, trip.return_date)
 
     async def _log(
         self,
