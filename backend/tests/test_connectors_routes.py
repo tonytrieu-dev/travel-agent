@@ -41,6 +41,7 @@ def test_patch_slack_connector_without_credentials_is_409(
     unconfigured_settings = config.Settings(
         cerebras_api_key="x", searchapi_api_key="x", tavily_api_key="x",
         database_url=config.get_settings().database_url,
+        slack_bot_token=None, slack_signing_secret=None, slack_approvals_channel_id=None,
     )
     monkeypatch.setattr("app.routes.connectors.get_settings", lambda: unconfigured_settings)
 

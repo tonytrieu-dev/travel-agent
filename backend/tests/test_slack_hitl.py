@@ -9,6 +9,8 @@ from typing import Any
 
 import httpx
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.adapters.slack_hitl import (
     build_approval_blocks,
     notify_pending_approval,
@@ -21,7 +23,6 @@ from app.adapters.slack_hitl import (
 from app.config import Settings
 from app.models import FlightSearchResult, HITLBookingLog, TripRequest
 from app.state import BookingState
-from sqlalchemy.ext.asyncio import AsyncSession
 from tests.db_helpers import get_booking, run_db, seed_booking
 
 # Slack's own documented example (https://docs.slack.dev/authentication/verifying-requests-from-slack/).
@@ -222,7 +223,9 @@ def test_notify_pending_approval_swallows_a_slack_outage_without_raising(
 ) -> None:
     """Regression guard: a Slack outage or bad token must never turn a successful booking
     request into a 500 for the human waiting on the frontend — matches the tolerant pattern
-    every other adapter in this codebase already follows (see activities_tavily.py)."""
+    every other adapter in this codebase already follows (see activities_tavily.py). It must
+    still report the failure back as False, though, so the caller isn't left thinking the
+    human was notified when they weren't."""
 
     async def _fake_post(self, url, json=None, headers=None) -> httpx.Response:
         raise httpx.ConnectError("simulated Slack outage")
@@ -249,7 +252,9 @@ def test_notify_pending_approval_swallows_a_slack_outage_without_raising(
         slack_approvals_channel_id="C123",
     )
 
-    asyncio.run(notify_pending_approval(settings, booking, trip, flight))
+    notified = asyncio.run(notify_pending_approval(settings, booking, trip, flight))
+
+    assert notified is False, "a swallowed Slack outage must still report False, not silently succeed"
 
 
 def test_update_approval_message_replaces_buttons_with_resolution(

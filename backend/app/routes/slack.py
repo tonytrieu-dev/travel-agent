@@ -1,6 +1,6 @@
 """Slack interactivity callback for the booking-approval message. Verifies Slack's webhook
 signature before doing anything else, then approves or rejects the booking named by the
-clicked button. Never executes a booking here — see docs/superpowers/specs for why.
+clicked button. Never executes a booking here — see docs/DECISIONS.md for why.
 """
 
 import json
@@ -10,14 +10,13 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, Response
 
 from app.adapters.slack_hitl import (
-    parse_block_action,
-    resolve_approve,
-    resolve_reject,
+    resolve_block_action,
     update_approval_message,
     verify_slack_signature,
 )
 from app.config import get_settings
 from app.db import get_session_factory
+from app.routes.connectors import slack_configured
 from app.schemas import SlackAuthErrorOut
 
 router = APIRouter(prefix="/api/slack", tags=["slack"])
@@ -33,12 +32,10 @@ _UNCONFIGURED_OR_UNSIGNED = JSONResponse(
 )
 async def slack_interactions(request: Request) -> Response:
     settings = get_settings()
-    if not (
-        settings.slack_bot_token
-        and settings.slack_signing_secret
-        and settings.slack_approvals_channel_id
-    ):
+    if not slack_configured(settings):
         return _UNCONFIGURED_OR_UNSIGNED
+    assert settings.slack_signing_secret is not None
+    assert settings.slack_approvals_channel_id is not None
 
     raw_body = await request.body()
     timestamp = request.headers.get("X-Slack-Request-Timestamp", "")
@@ -57,16 +54,12 @@ async def slack_interactions(request: Request) -> Response:
     except json.JSONDecodeError:
         return Response(status_code=200)
 
-    parsed = parse_block_action(payload, expected_channel_id=settings.slack_approvals_channel_id)
-    if parsed is None:
-        return Response(status_code=200)
-    action_id, booking_log_id = parsed
-
     async with get_session_factory()() as session:
-        if action_id == "approve_booking":
-            outcome = await resolve_approve(session, booking_log_id)
-        else:
-            outcome = await resolve_reject(session, booking_log_id)
+        outcome = await resolve_block_action(
+            session, payload, expected_channel_id=settings.slack_approvals_channel_id
+        )
 
+    if outcome is None:
+        return Response(status_code=200)
     await update_approval_message(settings, payload, outcome)
     return Response(status_code=200)

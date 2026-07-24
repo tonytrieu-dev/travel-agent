@@ -11,11 +11,12 @@ import time
 from typing import Any
 
 import httpx
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.config import SLACK_API_TIMEOUT_SECONDS, Settings
 from app.models import FlightSearchResult, HITLBookingLog, TripRequest
 from app.repositories import booking_repository as repository
 from app.repositories.booking_repository import BookingError
-from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -217,9 +218,27 @@ def parse_block_action(
     return action_id, booking_log_id
 
 
+async def resolve_block_action(
+    session: AsyncSession, payload: dict[str, Any], expected_channel_id: str
+) -> str | None:
+    """Owns decode -> dispatch -> resolve for a Slack interaction payload. Returns the
+    resolution message to show in Slack, or None if the payload wasn't a recognized
+    approve/reject click (the caller should just 200 it and move on)."""
+    parsed = parse_block_action(payload, expected_channel_id=expected_channel_id)
+    if parsed is None:
+        return None
+    action_id, booking_log_id = parsed
+    if action_id == _APPROVE_ACTION_ID:
+        return await resolve_approve(session, booking_log_id)
+    return await resolve_reject(session, booking_log_id)
+
+
 async def notify_pending_approval(
     settings: Settings, booking: HITLBookingLog, trip: TripRequest, flight: FlightSearchResult
-) -> None:
+) -> bool:
+    """Returns whether the Slack message was actually posted. A booking request must never
+    fail because Slack is unreachable, but the caller still needs to know the human wasn't
+    notified there, so it can fall back to telling them to use the in-app buttons instead."""
     assert settings.slack_bot_token is not None
     assert settings.slack_approvals_channel_id is not None
     blocks = build_approval_blocks(trip, flight, booking)
@@ -232,5 +251,7 @@ async def notify_pending_approval(
                 },
                 json={"channel": settings.slack_approvals_channel_id, **blocks},
             )
+        return True
     except httpx.HTTPError as error:
         logger.warning("slack notify_pending_approval failed: %r for booking=%r", error, booking.id)
+        return False

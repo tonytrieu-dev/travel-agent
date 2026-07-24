@@ -4,10 +4,10 @@ BookingError, rendered as a ProblemDetail by the app-level handler in main.py.
 """
 
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.slack_hitl import notify_pending_approval
@@ -16,18 +16,20 @@ from app.db import get_session
 from app.dbos_runtime import execute_booking_durable
 from app.models import (
     BookingTransition,
-    ConnectorSetting,
     FlightSearchResult,
     HITLBookingLog,
     TripRequest,
 )
 from app.repositories import booking_repository as repository
+from app.routes.connectors import slack_notifications_enabled
 from app.schemas import (
     BookingLogOut,
     BookingRequestCreate,
     BookingTransitionOut,
     ProblemDetail,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["booking"])
 
@@ -67,21 +69,15 @@ async def request_booking(
 
 async def _notify_slack_if_enabled(session: AsyncSession, booking: HITLBookingLog) -> None:
     settings = get_settings()
-    if not (
-        settings.slack_bot_token
-        and settings.slack_signing_secret
-        and settings.slack_approvals_channel_id
-    ):
-        return
-    connector_row = await session.scalar(select(ConnectorSetting))
-    if connector_row is None or not connector_row.slack_enabled:
+    if not await slack_notifications_enabled(session, settings):
         return
     trip = await session.get(TripRequest, booking.trip_request_id)
     flight = await session.get(FlightSearchResult, booking.flight_search_result_id)
     assert trip is not None and flight is not None, (
         "request_booking already validated these exist"
     )
-    await notify_pending_approval(settings, booking, trip, flight)
+    if not await notify_pending_approval(settings, booking, trip, flight):
+        logger.warning("booking=%r requested but Slack was not notified", booking.id)
 
 
 @router.get("/bookings/{log_id}", response_model=BookingLogOut, responses=_NOT_FOUND)

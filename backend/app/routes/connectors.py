@@ -31,7 +31,7 @@ class ConnectorError(Exception):
         super().__init__(detail)
 
 
-def _slack_configured(settings: Settings) -> bool:
+def slack_configured(settings: Settings) -> bool:
     return bool(
         settings.slack_bot_token
         and settings.slack_signing_secret
@@ -48,12 +48,22 @@ async def _get_or_create_row(session: AsyncSession) -> ConnectorSetting:
     return row
 
 
+async def slack_notifications_enabled(session: AsyncSession, settings: Settings) -> bool:
+    """The single definition of "should we post to Slack": configured on this deployment
+    *and* toggled on in ``connector_setting`` — every caller shares this instead of
+    re-deriving the pair independently."""
+    if not slack_configured(settings):
+        return False
+    row = await _get_or_create_row(session)
+    return row.slack_enabled
+
+
 @router.get("", response_model=ConnectorsOut)
 async def get_connectors(session: AsyncSession = Depends(get_session)) -> ConnectorsOut:
     settings = get_settings()
     row = await _get_or_create_row(session)
     return ConnectorsOut(
-        slack=ConnectorStatusOut(configured=_slack_configured(settings), enabled=row.slack_enabled)
+        slack=ConnectorStatusOut(configured=slack_configured(settings), enabled=row.slack_enabled)
     )
 
 
@@ -62,7 +72,7 @@ async def set_slack_connector(
     body: ConnectorToggleUpdate, session: AsyncSession = Depends(get_session)
 ) -> ConnectorsOut:
     settings = get_settings()
-    if body.enabled and not _slack_configured(settings):
+    if body.enabled and not slack_configured(settings):
         raise ConnectorError(
             ErrorCode.CONNECTOR_NOT_CONFIGURED,
             409,
@@ -74,5 +84,5 @@ async def set_slack_connector(
     session.add(row)
     await session.commit()
     return ConnectorsOut(
-        slack=ConnectorStatusOut(configured=_slack_configured(settings), enabled=row.slack_enabled)
+        slack=ConnectorStatusOut(configured=slack_configured(settings), enabled=row.slack_enabled)
     )
