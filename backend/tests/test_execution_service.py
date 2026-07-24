@@ -3,7 +3,9 @@ persist_agent_run() so callers stop reaching into the ContextVar-based module fu
 directly. current_trip()/record_event() stay as working compatibility shims — planner tools
 still call them and must keep working unchanged."""
 
-from app.agent.execution_log import ExecutionService, current_trip
+
+
+from app.agent.execution_log import ExecutionService
 from app.models import ExecutionEventKind
 from tests.db_helpers import run_db, seed_trip
 
@@ -22,13 +24,25 @@ def test_start_run_creates_an_agent_run_bound_to_the_trip() -> None:
 
 def test_record_event_persists_through_the_bound_contextvar() -> None:
     async def _work(session):
+        from sqlalchemy import select
+        from sqlmodel import col
+
+        from app.models import ExecutionEvent
+
         trip_id = await seed_trip(session)
         service = ExecutionService(session)
         async with service.start_run(trip_id, model="test-model") as run:
             await run.record_event(ExecutionEventKind.API_CALL, "probe", "ok", "detail")
-            # current_trip() must resolve to the same session/trip the run is bound to.
-            bound_session, bound_trip_id = current_trip("test")
-        return trip_id, bound_trip_id
+        row = await session.scalar(
+            select(ExecutionEvent).where(
+                col(ExecutionEvent.trip_request_id) == trip_id,
+                col(ExecutionEvent.name) == "probe",
+            )
+        )
+        return row
 
-    trip_id, bound_trip_id = run_db(_work)
-    assert bound_trip_id == trip_id
+    event = run_db(_work)
+    assert event is not None, "ExecutionRun.record_event must actually persist an ExecutionEvent row"
+    assert event.kind == ExecutionEventKind.API_CALL
+    assert event.status == "ok"
+    assert event.detail == "detail"
