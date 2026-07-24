@@ -9,9 +9,10 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
-from app.state import BookingState
 from sqlalchemy import JSON, Column, Index, UniqueConstraint, text
 from sqlmodel import Field, SQLModel
+
+from app.state import BookingState
 
 
 def utcnow() -> datetime:

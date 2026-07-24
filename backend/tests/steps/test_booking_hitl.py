@@ -12,8 +12,9 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
-from app.state import BookingState
 from pytest_bdd import given, parsers, scenarios, then, when
+
+from app.state import BookingState
 from tests.conftest import BookingOptionsFetchSpy
 from tests.db_helpers import count_transitions_into, get_booking, run_db, seed_booking
 
