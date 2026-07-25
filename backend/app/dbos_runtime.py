@@ -18,12 +18,17 @@ from app.db import get_session_factory
 from app.models import FlightSearchResult, TripRequest
 from app.rate_limit import acquire_agent_run_slot, release_agent_run_slot
 from app.repositories import booking_repository as repository
-from app.schemas import BookingLogOut, ClarificationOut, ItineraryOut, PlanTooComplexOut
+from app.schemas import (
+    BookingLogOut,
+    ClarificationOut,
+    PlannerOutput,
+    PlanTooComplexOut,
+)
 
 
 async def _persist_failed_run(
     run: ExecutionRun,
-    agent_run: AgentRun[PlannerDeps, ItineraryOut | ClarificationOut | PlanTooComplexOut],
+    agent_run: AgentRun[PlannerDeps, PlannerOutput],
 ) -> None:
     # Keeps whatever tool calls ran before the crash on the execution panel, not just successes.
     await run.persist_result(
@@ -68,9 +73,7 @@ async def execute_booking_durable(log_id: int) -> BookingLogOut:
 
 
 @DBOS.workflow(name="run_planner")
-async def _run_planner_workflow(
-    trip_id: int, prompt: str
-) -> ItineraryOut | ClarificationOut | PlanTooComplexOut:
+async def _run_planner_workflow(trip_id: int, prompt: str) -> PlannerOutput:
     settings = get_settings()
     async with (
         get_session_factory()() as session,
@@ -114,9 +117,7 @@ async def _run_planner_workflow(
     return result.output
 
 
-async def run_planner_durable(
-    trip_id: int, prompt: str
-) -> ItineraryOut | ClarificationOut | PlanTooComplexOut:
+async def run_planner_durable(trip_id: int, prompt: str) -> PlannerOutput:
     """Not itself a DBOS workflow: the concurrency slot is plain in-process state, and acquiring
     it inside a replayable workflow body risks a double-acquire if DBOS re-enters that body
     during its own internal record/persist resolution (observed empirically) — so the slot wraps

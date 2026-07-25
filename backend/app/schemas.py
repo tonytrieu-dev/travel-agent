@@ -303,6 +303,10 @@ PlanOut = Annotated[
     Field(discriminator="status"),
 ]
 
+# What a planner run can return: the itinerary, a question, or an honest "too big for one pass".
+# Threaded unchanged through dbos_runtime → trips_repository → the /plan route.
+PlannerOutput = ItineraryOut | ClarificationOut | PlanTooComplexOut
+
 
 class AgentRunStepOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)

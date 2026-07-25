@@ -26,13 +26,14 @@ from app.schemas import (
     ClarificationOut,
     ErrorCode,
     ItineraryOut,
+    PlannerOutput,
     PlanTooComplexOut,
     TripRequestCreate,
     TripRequestUpdate,
     validate_trip_dates,
 )
 
-PlannerRunner = Callable[[int, str], Awaitable[ItineraryOut | ClarificationOut | PlanTooComplexOut]]
+PlannerRunner = Callable[[int, str], Awaitable[PlannerOutput]]
 
 
 class TripError(Exception):
@@ -179,7 +180,7 @@ def _build_planner_prompt(trip: TripRequest) -> str:
 
 async def get_or_create_itinerary(
     session: AsyncSession, trip_id: int, run_planner: PlannerRunner
-) -> ItineraryOut | ClarificationOut | PlanTooComplexOut:
+) -> PlannerOutput:
     trip = await session.get(TripRequest, trip_id)
     if trip is None:
         raise TripError(ErrorCode.TRIP_NOT_FOUND, 404, f"No trip {trip_id}.")
