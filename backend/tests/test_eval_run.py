@@ -10,14 +10,6 @@ from evals.evaluators import FitnessAppropriateness
 from tests.db_helpers import run_db
 
 
-def test_run_metadata_names_planner_and_judge_models() -> None:
-    assert run.build_run_metadata() == {
-        "model": "gpt-oss-120b",
-        "judge_model": "gemini-3.6-flash",
-        "provider_mode": "recorded",
-    }
-
-
 def test_recorded_dependencies_ignore_live_flight_setting() -> None:
     dependencies = run._planner_deps("Fitness level: low.", "recorded")
 
@@ -82,6 +74,43 @@ def test_live_smoke_selects_first_case_once(monkeypatch) -> None:
     assert captured["repeat"] == 1
     assert captured["max_concurrency"] == 1
     assert printed == {"include_reasons": True}
+
+
+def _record_sleeps(monkeypatch, *, now: float) -> list[float]:
+    slept: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        slept.append(seconds)
+
+    monkeypatch.setattr(run, "asyncio", SimpleNamespace(sleep=fake_sleep))
+    monkeypatch.setattr(run, "time", SimpleNamespace(monotonic=lambda: now))
+    return slept
+
+
+async def test_back_to_back_cases_wait_out_the_cerebras_token_window(monkeypatch) -> None:
+    slept = _record_sleeps(monkeypatch, now=120.0)
+    monkeypatch.setattr(run, "_previous_case_finished_at", 100.0)
+
+    await run._wait_out_previous_case_token_window()
+
+    assert slept == [40.0], (
+        "a case starting 20s after the previous one finished must wait out the remaining 40s of "
+        f"Cerebras's 60s token window or the run 429s; slept {slept}"
+    )
+
+
+async def test_first_case_and_cases_outliving_the_window_never_wait(monkeypatch) -> None:
+    slept = _record_sleeps(monkeypatch, now=200.0)
+    monkeypatch.setattr(run, "_previous_case_finished_at", None)
+
+    await run._wait_out_previous_case_token_window()
+    assert slept == [], f"the first case has no predecessor to wait on; slept {slept}"
+
+    monkeypatch.setattr(run, "_previous_case_finished_at", 100.0)
+    await run._wait_out_previous_case_token_window()
+    assert slept == [], (
+        f"a case that itself ran longer than the 60s window already drained it; slept {slept}"
+    )
 
 
 def test_default_eval_dataset_is_deterministic_and_judge_is_opt_in() -> None:

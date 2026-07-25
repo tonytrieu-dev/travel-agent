@@ -1,5 +1,7 @@
 import argparse
+import asyncio
 import re
+import time
 from functools import partial
 from typing import Literal
 
@@ -79,14 +81,35 @@ def _planner_deps(prompt: str, provider_mode: ProviderMode) -> PlannerDeps:
     )
 
 
+# Cerebras meters gpt-oss-120b at 30_000 tokens/minute — the whole budget one case may spend.
+CEREBRAS_TOKEN_WINDOW_SECONDS = 60.0
+
+_previous_case_finished_at: float | None = None
+
+
+async def _wait_out_previous_case_token_window() -> None:
+    if _previous_case_finished_at is None:
+        return
+    seconds_remaining = CEREBRAS_TOKEN_WINDOW_SECONDS - (
+        time.monotonic() - _previous_case_finished_at
+    )
+    if seconds_remaining > 0:
+        await asyncio.sleep(seconds_remaining)
+
+
 async def task(
     prompt: str, *, provider_mode: ProviderMode = "recorded"
 ) -> ItineraryOut | ClarificationOut:
+    global _previous_case_finished_at
+    await _wait_out_previous_case_token_window()
     deps = _planner_deps(prompt, provider_mode)
-    async with get_session_factory()() as session:
-        trip_id = await _open_eval_trip(session)
-        async with execution_context(session, trip_id):
-            result = await agent.run(prompt, deps=deps, usage_limits=default_usage_limits())
+    try:
+        async with get_session_factory()() as session:
+            trip_id = await _open_eval_trip(session)
+            async with execution_context(session, trip_id):
+                result = await agent.run(prompt, deps=deps, usage_limits=default_usage_limits())
+    finally:
+        _previous_case_finished_at = time.monotonic()
     set_eval_attribute(PLANNER_TRACE_ATTRIBUTE, extract_planner_trace(result.all_messages()))
     return result.output
 
