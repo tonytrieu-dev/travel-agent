@@ -1,7 +1,39 @@
-import { useState, type FormEvent } from "react"
+import { useState, type ChangeEvent, type FormEvent, type ReactNode } from "react"
 import type { FitnessLevel, TripRequestCreate } from "../api/types"
+import { ChevronDownIcon } from "./ChevronDownIcon"
 
 const IATA_CODE_PATTERN = /^[A-Z]{3}$/
+
+// Every label/control in this form shares one set of classes so spacing and focus styling stay
+// identical across text, number, date, and select fields.
+const FIELD_LABEL = "flex flex-col gap-2 text-sm font-medium text-slate-700"
+const FIELD_BASE =
+  "rounded-md border border-slate-300 py-2 text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+const FIELD_INPUT = `${FIELD_BASE} px-3`
+// pl/pr split rather than px, so pr-10 can reserve room for the chevron without fighting px-3.
+const FIELD_SELECT = `${FIELD_BASE} w-full appearance-none pl-3 pr-10`
+
+interface SelectFieldProps {
+  label: string
+  value: string
+  onChange: (event: ChangeEvent<HTMLSelectElement>) => void
+  required?: boolean
+  children: ReactNode
+}
+
+function SelectField({ label, value, onChange, required, children }: SelectFieldProps) {
+  return (
+    <label className={FIELD_LABEL}>
+      {label}
+      <div className="relative">
+        <select value={value} onChange={onChange} required={required} className={FIELD_SELECT}>
+          {children}
+        </select>
+        <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
+      </div>
+    </label>
+  )
+}
 
 // Budget is presented as a select per the UI spec, but the backend field (budget_usd) is a
 // plain number — each band maps to a representative dollar figure sent to the API.
@@ -83,27 +115,27 @@ export function Questionnaire({ onSubmit, isSubmitting, errorMessage }: Question
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+    <form
+      onSubmit={handleSubmit}
+      className="space-y-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
+    >
       <h2 className="text-lg font-semibold text-slate-900">Plan a trip</h2>
 
-      <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-        Trip type
-        <select
-          value={tripType}
-          onChange={(event) => {
-            const value = event.target.value as "round-trip" | "one-way"
-            setTripType(value)
-            if (value === "one-way") setReturnDate("")
-          }}
-          className="rounded-md border border-slate-300 py-2 pl-3 pr-8 text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-        >
-          <option value="round-trip">Round-trip</option>
-          <option value="one-way">One-way</option>
-        </select>
-      </label>
+      <SelectField
+        label="Trip type"
+        value={tripType}
+        onChange={(event) => {
+          const value = event.target.value as "round-trip" | "one-way"
+          setTripType(value)
+          if (value === "one-way") setReturnDate("")
+        }}
+      >
+        <option value="round-trip">Round-trip</option>
+        <option value="one-way">One-way</option>
+      </SelectField>
 
-      <div className="grid grid-cols-2 gap-4">
-        <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+      <div className="grid grid-cols-2 gap-5">
+        <label className={FIELD_LABEL}>
           Depart
           <input
             type="text"
@@ -112,11 +144,11 @@ export function Questionnaire({ onSubmit, isSubmitting, errorMessage }: Question
             maxLength={3}
             placeholder="JFK"
             required
-            className="rounded-md border border-slate-300 px-3 py-2 uppercase tracking-widest text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            className={`${FIELD_INPUT} uppercase tracking-widest`}
           />
         </label>
 
-        <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+        <label className={FIELD_LABEL}>
           Arrive
           <input
             type="text"
@@ -125,12 +157,12 @@ export function Questionnaire({ onSubmit, isSubmitting, errorMessage }: Question
             maxLength={3}
             placeholder="NRT"
             required
-            className="rounded-md border border-slate-300 px-3 py-2 uppercase tracking-widest text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            className={`${FIELD_INPUT} uppercase tracking-widest`}
           />
         </label>
       </div>
 
-      <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+      <label className={FIELD_LABEL}>
         Destination
         <input
           type="text"
@@ -138,38 +170,38 @@ export function Questionnaire({ onSubmit, isSubmitting, errorMessage }: Question
           onChange={(event) => setDestination(event.target.value)}
           placeholder="Tokyo, Japan"
           required
-          className="rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          className={FIELD_INPUT}
         />
       </label>
 
-      <div className={`grid gap-4 ${tripType === "one-way" ? "grid-cols-1" : "grid-cols-2"}`}>
-        <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+      <div className={`grid gap-5 ${tripType === "one-way" ? "grid-cols-1" : "grid-cols-2"}`}>
+        <label className={FIELD_LABEL}>
           Depart date
           <input
             type="date"
             value={departDate}
             onChange={(event) => setDepartDate(event.target.value)}
             required
-            className="rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            className={FIELD_INPUT}
           />
         </label>
 
         {tripType === "round-trip" && (
-          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+          <label className={FIELD_LABEL}>
             Return date
             <input
               type="date"
               value={returnDate}
               onChange={(event) => setReturnDate(event.target.value)}
               required
-              className="rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className={FIELD_INPUT}
             />
           </label>
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+        <label className={FIELD_LABEL}>
           Age
           <input
             type="number"
@@ -178,39 +210,33 @@ export function Questionnaire({ onSubmit, isSubmitting, errorMessage }: Question
             value={age}
             onChange={(event) => setAge(event.target.value)}
             required
-            className="rounded-md border border-slate-300 px-3 py-2 text-slate-900 [appearance:textfield] focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            className={`${FIELD_INPUT} [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
           />
         </label>
 
-        <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-          Fitness level
-          <select
-            value={fitnessLevel}
-            onChange={(event) => setFitnessLevel(event.target.value as FitnessLevel | "")}
-            required
-            className="rounded-md border border-slate-300 py-2 pl-3 pr-8 text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-          >
-            <option value="">—</option>
-            <option value="low">Low</option>
-            <option value="moderate">Moderate</option>
-            <option value="high">High</option>
-          </select>
-        </label>
+        <SelectField
+          label="Fitness level"
+          value={fitnessLevel}
+          onChange={(event) => setFitnessLevel(event.target.value as FitnessLevel | "")}
+          required
+        >
+          <option value="">—</option>
+          <option value="low">Low</option>
+          <option value="moderate">Moderate</option>
+          <option value="high">High</option>
+        </SelectField>
 
-        <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-          Budget (optional)
-          <select
-            value={budgetLabel}
-            onChange={(event) => setBudgetLabel(event.target.value)}
-            className="rounded-md border border-slate-300 py-2 pl-3 pr-8 text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-          >
-            {BUDGET_BANDS.map((band) => (
-              <option key={band.label} value={band.label}>
-                {band.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <SelectField
+          label="Budget (optional)"
+          value={budgetLabel}
+          onChange={(event) => setBudgetLabel(event.target.value)}
+        >
+          {BUDGET_BANDS.map((band) => (
+            <option key={band.label} value={band.label}>
+              {band.label}
+            </option>
+          ))}
+        </SelectField>
       </div>
 
       {(validationMessage || errorMessage) && (

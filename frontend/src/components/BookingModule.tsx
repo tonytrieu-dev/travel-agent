@@ -16,7 +16,7 @@ interface BookingModuleProps {
   onSearchAgain: () => void
 }
 
-const POLL_INTERVAL_MS = 5_000
+const POLL_INTERVAL_MS = 1_000
 
 // SearchApi's real booking link isn't a plain URL: booking_request.url is Google's redirect
 // endpoint, and it only resolves to the real airline/OTA checkout when POSTed with post_data

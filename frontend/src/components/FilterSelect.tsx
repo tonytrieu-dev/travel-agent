@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { ChevronDownIcon } from "./ChevronDownIcon"
 
 interface FilterSelectOption {
   value: string
@@ -41,20 +42,7 @@ export function FilterSelect({ value, onChange, options, ariaLabel }: FilterSele
         className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white py-1.5 pr-2.5 pl-3 text-sm text-slate-600"
       >
         {selectedLabel}
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 20 20"
-          fill="none"
-          className="h-4 w-4 text-slate-400"
-        >
-          <path
-            d="M5.5 7.5L10 12L14.5 7.5"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+        <ChevronDownIcon />
       </button>
 
       {isOpen && (
