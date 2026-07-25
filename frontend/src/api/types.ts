@@ -128,7 +128,7 @@ export interface PlanNeedsClarificationOut {
 
 export type PlanOut = PlanReadyOut | PlanNeedsClarificationOut
 
-export type AgentStepKind = "model" | "tool"
+export type AgentStepKind = "model" | "tool" | "output"
 
 export type ExecutionEventKind = "api_call" | "db_query" | "protocol" | "hitl"
 

@@ -205,7 +205,11 @@ SDK.
 ## Agent Execution Panel
 
 Watch the agent work, live or after the fact: each run card combines metrics, model calls, tool
-calls, and its own API/protocol activity. Backed entirely by real persisted data
+calls, the structured output, and its own API/protocol activity. The output is its own
+`AgentStepKind.OUTPUT` rather than a tool call — pydantic-ai delivers a result by calling a
+synthetic `final_result_<Type>` tool, so grouping it with `search_flights`/`web_search` made the
+itinerary look like an agent tool invocation. A refused attempt is recorded `rejected`, which is
+what a retry-exhausted run looks like. Backed entirely by real persisted data
 (`agent_run`/`agent_run_step`/`execution_event`), not live in-memory state, so it reflects exactly
 what happened — including runs from before the current process started.
 

@@ -594,7 +594,7 @@ components:
 
     AgentStepKind:
       type: string
-      enum: [model, tool]
+      enum: [model, tool, output]
 
     ExecutionEventKind:
       type: string

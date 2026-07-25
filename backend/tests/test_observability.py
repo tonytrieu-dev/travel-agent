@@ -121,3 +121,84 @@ def test_persisted_agent_run_sums_tokens_and_orders_one_step_per_tool_call() -> 
         f"a tool step's output_summary must carry its real ToolReturnPart content, not be "
         f"dropped; got {tool_steps[0].output_summary!r}"
     )
+
+
+def _rejected_then_accepted_output_history() -> list:
+    """A real failure shape from production run 37: the model delivers its itinerary via the
+    synthetic `final_result_ItineraryOut` tool, validation refuses it (no ToolReturnPart, a retry
+    prompt instead), the model is called again, and the second attempt is accepted.
+    """
+    t0 = datetime(2026, 7, 24, 23, 43, 0, tzinfo=UTC)
+    return [
+        ModelRequest(parts=[UserPromptPart(content="Plan my trip to Tokyo")], timestamp=t0),
+        ModelResponse(
+            parts=[
+                ToolCallPart(
+                    tool_name="final_result_ItineraryOut",
+                    args={"days": []},
+                    tool_call_id="out_1",
+                )
+            ],
+            usage=RequestUsage(input_tokens=100, output_tokens=10),
+            model_name="gpt-oss-120b",
+            timestamp=t0 + timedelta(seconds=1),
+        ),
+        ModelResponse(
+            parts=[
+                ToolCallPart(
+                    tool_name="final_result_ItineraryOut",
+                    args={"days": [{"day_number": 1}]},
+                    tool_call_id="out_2",
+                )
+            ],
+            usage=RequestUsage(input_tokens=140, output_tokens=12),
+            model_name="gpt-oss-120b",
+            timestamp=t0 + timedelta(seconds=3),
+        ),
+        ModelRequest(
+            parts=[
+                ToolReturnPart(
+                    tool_name="final_result_ItineraryOut",
+                    content="Final result processed.",
+                    tool_call_id="out_2",
+                    timestamp=t0 + timedelta(seconds=4),
+                )
+            ]
+        ),
+    ]
+
+
+def test_structured_output_is_its_own_kind_not_an_agent_tool_call() -> None:
+    """The execution panel groups steps by kind, so classifying `final_result_*` as TOOL listed
+    the itinerary alongside search_flights/web_search as if the agent had called a tool. It is the
+    run's output; a refused attempt must also read as rejected rather than "no result".
+    """
+
+    async def _work(session):
+        trip_id = await seed_trip(session)
+        agent_run = await persist_agent_run(
+            session,
+            trip_request_id=trip_id,
+            model="gpt-oss-120b",
+            message_history=_rejected_then_accepted_output_history(),
+            usage=RunUsage(input_tokens=240, output_tokens=22),
+        )
+        return list(
+            await session.scalars(
+                select(AgentRunStep)
+                .where(col(AgentRunStep.agent_run_id) == agent_run.id)
+                .order_by(col(AgentRunStep.seq))
+            )
+        )
+
+    steps = run_db(_work)
+
+    assert not [step for step in steps if step.kind is AgentStepKind.TOOL], (
+        "final_result_* is pydantic-ai's output delivery mechanism, not an agent tool; no TOOL "
+        f"step may be derived from it, got {[(s.kind, s.name) for s in steps]}"
+    )
+    output_steps = [step for step in steps if step.kind is AgentStepKind.OUTPUT]
+    assert [step.status for step in output_steps] == ["rejected", "completed"], (
+        "a refused output attempt (no ToolReturnPart) must be 'rejected' and the accepted one "
+        f"'completed', in run order; got {[(s.name, s.status) for s in output_steps]}"
+    )

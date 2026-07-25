@@ -47,6 +47,9 @@ class ExecutionEventKind(StrEnum):
 class AgentStepKind(StrEnum):
     MODEL = "model"
     TOOL = "tool"
+    # The agent's structured result, which pydantic-ai delivers as a synthetic `final_result*`
+    # tool call — protocol-level a tool, but not one of the agent's real tools.
+    OUTPUT = "output"
 
 
 # ── Core ─────────────────────────────────────────────────────────────────────────────────

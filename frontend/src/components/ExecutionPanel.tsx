@@ -26,6 +26,7 @@ const STATUS_LABELS: Record<string, string> = {
   failed: "Failed",
   no_result: "No result",
   unavailable: "Unavailable",
+  rejected: "Rejected — retried",
 }
 
 function statusLabel(status: string): string {
@@ -35,7 +36,8 @@ function statusLabel(status: string): string {
 function statusStyles(status: string): string {
   if (status === "ok" || status === "completed") return "bg-emerald-100 text-emerald-700"
   if (status === "failed") return "bg-red-100 text-red-700"
-  if (status === "no_result" || status === "unavailable") return "bg-amber-100 text-amber-700"
+  if (status === "no_result" || status === "unavailable" || status === "rejected")
+    return "bg-amber-100 text-amber-700"
   return "bg-slate-100 text-slate-700"
 }
 
@@ -157,6 +159,7 @@ function RunEventSection({ events }: { events: ExecutionEventOut[] }) {
 function AgentRunCard({ run, tripLabel }: { run: AgentRunOut; tripLabel: string }) {
   const modelSteps = run.steps.filter((step) => step.kind === "model")
   const toolSteps = run.steps.filter((step) => step.kind === "tool")
+  const outputSteps = run.steps.filter((step) => step.kind === "output")
 
   return (
     <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-4">
@@ -200,6 +203,7 @@ function AgentRunCard({ run, tripLabel }: { run: AgentRunOut; tripLabel: string 
       <div className="space-y-5">
         <RunStepSection title="Model calls" steps={modelSteps} />
         <RunStepSection title="Tool calls" steps={toolSteps} />
+        <RunStepSection title="Final output" steps={outputSteps} />
         <RunEventSection events={run.events} />
       </div>
     </div>
