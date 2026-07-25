@@ -31,6 +31,7 @@ from app.schemas import (
     FlightLegOut,
     FlightOfferOut,
     FlightSearchOut,
+    GlobalExecutionPanelOut,
     ItineraryOut,
     PlanNeedsClarificationOut,
     PlanOut,
@@ -66,6 +67,16 @@ async def create_trip(
     assert user.id is not None, "get_current_user must always return a persisted user"
     trip = await repository.create_trip(session, user.id, body)
     return TripRequestOut.model_validate(trip)
+
+
+@router.get("/trips", response_model=list[TripRequestOut])
+async def list_trips(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> list[TripRequestOut]:
+    assert user.id is not None, "get_current_user must always return a persisted user"
+    trips = await repository.list_trips(session, user.id)
+    return [TripRequestOut.model_validate(trip) for trip in trips]
 
 
 @router.get("/trips/{trip_id}", response_model=TripRequestOut, responses=_NOT_FOUND)
@@ -189,3 +200,17 @@ async def get_trip_execution(
 ) -> ExecutionPanelOut:
     runs_with_details, events = await repository.get_execution_panel(session, trip_id)
     return _to_panel_out(trip_id, runs_with_details, events)
+
+
+@router.get("/execution", response_model=GlobalExecutionPanelOut)
+async def get_all_execution(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> GlobalExecutionPanelOut:
+    assert user.id is not None, "get_current_user must always return a persisted user"
+    runs_with_details = await repository.list_execution_runs_for_user(session, user.id)
+    return GlobalExecutionPanelOut(
+        agent_runs=[
+            _to_agent_run_out(run, steps, events) for run, steps, events in runs_with_details
+        ]
+    )

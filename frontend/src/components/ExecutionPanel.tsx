@@ -1,9 +1,15 @@
-import { useTripExecution } from "../hooks/useTripExecution"
-import type { AgentRunOut, AgentRunStepOut, ExecutionEventOut } from "../api/types"
+import { useMemo, useState } from "react"
+import { useAllExecution } from "../hooks/useAllExecution"
+import type { AgentRunOut, AgentRunStepOut, ExecutionEventOut, TripRequestOut } from "../api/types"
+import { FilterSelect } from "./FilterSelect"
 
 interface ExecutionPanelProps {
-  tripId: number
+  trips: TripRequestOut[]
   isRunActive: boolean
+}
+
+function tripLabel(trip: TripRequestOut): string {
+  return `${trip.origin} → ${trip.destination_airport}`
 }
 
 const EVENT_KIND_LABELS: Record<string, string> = {
@@ -16,6 +22,7 @@ const EVENT_KIND_LABELS: Record<string, string> = {
 const STATUS_LABELS: Record<string, string> = {
   ok: "Successful",
   completed: "Completed",
+  running: "Running",
   failed: "Failed",
   no_result: "No result",
   unavailable: "Unavailable",
@@ -147,7 +154,7 @@ function RunEventSection({ events }: { events: ExecutionEventOut[] }) {
   )
 }
 
-function AgentRunCard({ run }: { run: AgentRunOut }) {
+function AgentRunCard({ run, tripLabel }: { run: AgentRunOut; tripLabel: string }) {
   const modelSteps = run.steps.filter((step) => step.kind === "model")
   const toolSteps = run.steps.filter((step) => step.kind === "tool")
 
@@ -155,7 +162,12 @@ function AgentRunCard({ run }: { run: AgentRunOut }) {
     <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-4">
       <div className="flex items-center justify-between">
         <div>
-          <p className="font-semibold text-slate-900">Run #{run.id}</p>
+          <div className="flex items-center gap-2">
+            <p className="font-semibold text-slate-900">Run #{run.id}</p>
+            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-500">
+              {tripLabel}
+            </span>
+          </div>
           <p className="text-xs text-slate-500">{new Date(run.started_at).toLocaleString()}</p>
         </div>
         <span
@@ -194,33 +206,64 @@ function AgentRunCard({ run }: { run: AgentRunOut }) {
   )
 }
 
-export function ExecutionPanel({ tripId, isRunActive }: ExecutionPanelProps) {
-  const { panelData, errorMessage, refresh } = useTripExecution({
-    tripId,
-    enabled: true,
-    isRunActive,
-  })
+export function ExecutionPanel({ trips, isRunActive }: ExecutionPanelProps) {
+  const { runs: allRuns, errorMessage } = useAllExecution({ isRunActive })
+  const [routeSearch, setRouteSearch] = useState("")
+  const [statusFilter, setStatusFilter] = useState("all")
 
-  const runs = panelData?.agent_runs ?? []
+  const tripsById = useMemo(() => new Map(trips.map((trip) => [trip.id, trip])), [trips])
+  const runTripLabel = (run: AgentRunOut) => {
+    const trip = tripsById.get(run.trip_request_id)
+    return trip ? tripLabel(trip) : `Trip #${run.trip_request_id}`
+  }
+  // The set of distinct statuses that have actually occurred, not a hardcoded enum — stays
+  // correct if a new status value ever shows up without needing a matching code change here.
+  const statusOptions = useMemo(
+    () => [...new Set(allRuns.map((run) => run.status))].sort(),
+    [allRuns],
+  )
+  const trimmedRouteSearch = routeSearch.trim().toLowerCase()
+  // A dropdown listing every trip doesn't scale past a handful of entries — a text filter over
+  // the (already-visible) route label does, regardless of how many trips exist.
+  const runs = allRuns.filter(
+    (run) =>
+      (statusFilter === "all" || run.status === statusFilter) &&
+      (!trimmedRouteSearch || runTripLabel(run).toLowerCase().includes(trimmedRouteSearch)),
+  )
+  const isFiltered = statusFilter !== "all" || trimmedRouteSearch.length > 0
 
   return (
-    <section className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-slate-900">Agent execution history</h2>
-          <p className="text-sm text-slate-500">
-            Every agent run for this trip, newest first. Model usage and external tool activity are
-            reported separately.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={refresh}
-          className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-        >
-          Refresh
-        </button>
+    <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold text-slate-900">Agent execution history</h2>
+        {trips.length > 0 && (
+          <div className="flex items-center gap-2">
+            <input
+              type="search"
+              value={routeSearch}
+              onChange={(event) => setRouteSearch(event.target.value)}
+              placeholder="Filter by route (e.g. JFK)"
+              aria-label="Filter by route"
+              className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 placeholder:text-slate-400"
+            />
+            {statusOptions.length > 0 && (
+              <FilterSelect
+                value={statusFilter}
+                onChange={setStatusFilter}
+                ariaLabel="Filter by status"
+                options={[
+                  { value: "all", label: "All statuses" },
+                  ...statusOptions.map((status) => ({ value: status, label: statusLabel(status) })),
+                ]}
+              />
+            )}
+          </div>
+        )}
       </div>
+      <p className="-mt-2 text-sm text-slate-500">
+        Every agent run across every trip, newest first. Model usage and external tool activity
+        are reported inline within each run.
+      </p>
 
       {errorMessage && (
         <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -230,12 +273,14 @@ export function ExecutionPanel({ tripId, isRunActive }: ExecutionPanelProps) {
 
       {runs.length === 0 && (
         <p className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">
-          No activity yet. Search for flights or generate an itinerary to see execution history.
+          {isFiltered
+            ? "No runs match this filter."
+            : "No activity yet. Search for flights or generate an itinerary to see execution history."}
         </p>
       )}
 
       {runs.map((run) => (
-        <AgentRunCard key={run.id} run={run} />
+        <AgentRunCard key={run.id} run={run} tripLabel={runTripLabel(run)} />
       ))}
     </section>
   )

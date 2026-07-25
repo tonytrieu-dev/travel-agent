@@ -145,6 +145,7 @@ export interface AgentRunStepOut {
 
 export interface AgentRunOut {
   id: number
+  trip_request_id: number
   status: string
   model: string
   total_input_tokens: number
@@ -174,6 +175,10 @@ export interface ExecutionPanelOut {
   trip_request_id: number
   agent_runs: AgentRunOut[]
   events: ExecutionEventOut[]
+}
+
+export interface GlobalExecutionPanelOut {
+  agent_runs: AgentRunOut[]
 }
 
 export interface BookingRequestCreate {

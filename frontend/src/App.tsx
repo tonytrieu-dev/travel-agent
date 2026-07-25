@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import {
   ApiError,
   createTrip,
   getTripSnapshot,
+  listTrips,
   planTrip,
   searchTripFlights,
   updateTrip,
@@ -21,6 +22,7 @@ import { FlightSearch } from "./components/FlightSearch"
 import { ItineraryPanel, type ClarificationAnswers } from "./components/ItineraryPanel"
 import { LiveActivity } from "./components/LiveActivity"
 import { Questionnaire } from "./components/Questionnaire"
+import { YourTripsPanel } from "./components/YourTripsPanel"
 
 function extractErrorMessage(error: unknown): string {
   return error instanceof ApiError ? error.message : "Something went wrong. Please try again."
@@ -28,10 +30,11 @@ function extractErrorMessage(error: unknown): string {
 
 const ACTIVE_TRIP_ID_STORAGE_KEY = "travel-agent.activeTripId"
 
-type TabKey = "trip" | "execution" | "connectors"
+type TabKey = "trip" | "trips" | "execution" | "connectors"
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "trip", label: "Plan a trip" },
+  { key: "trips", label: "Your trips" },
   { key: "execution", label: "Agent execution history" },
   { key: "connectors", label: "Connectors" },
 ]
@@ -42,6 +45,8 @@ function App() {
   const [trip, setTrip] = useState<TripRequestOut | null>(null)
   const [isCreatingTrip, setIsCreatingTrip] = useState(false)
   const [createTripError, setCreateTripError] = useState<string | null>(null)
+
+  const [trips, setTrips] = useState<TripRequestOut[]>([])
 
   const [flightSearchResult, setFlightSearchResult] = useState<FlightSearchOut | null>(null)
   const [isSearchingFlights, setIsSearchingFlights] = useState(false)
@@ -54,18 +59,31 @@ function App() {
 
   const isRunActive = isSearchingFlights || isPlanning
 
+  // Shared by the hard-refresh restore below and by clicking a trip in the sidebar list — both
+  // need to load a trip's snapshot into state and remember it as the active trip.
+  const restoreTrip = useCallback((tripId: number) => {
+    return getTripSnapshot(tripId).then((snapshot) => {
+      setTrip(snapshot.trip)
+      setFlightSearchResult(snapshot.flight_search)
+      setPlanResult(snapshot.plan)
+      localStorage.setItem(ACTIVE_TRIP_ID_STORAGE_KEY, String(tripId))
+    })
+  }, [])
+
   // Restore the active trip after a hard refresh so the execution history survives — React state
   // alone would lose the trip id and leave the ExecutionPanel with nothing to re-fetch.
   useEffect(() => {
     const storedTripId = localStorage.getItem(ACTIVE_TRIP_ID_STORAGE_KEY)
     if (!storedTripId) return
-    getTripSnapshot(Number(storedTripId))
-      .then((snapshot) => {
-        setTrip(snapshot.trip)
-        setFlightSearchResult(snapshot.flight_search)
-        setPlanResult(snapshot.plan)
-      })
-      .catch(() => localStorage.removeItem(ACTIVE_TRIP_ID_STORAGE_KEY))
+    restoreTrip(Number(storedTripId)).catch(() =>
+      localStorage.removeItem(ACTIVE_TRIP_ID_STORAGE_KEY),
+    )
+  }, [restoreTrip])
+
+  useEffect(() => {
+    listTrips()
+      .then(setTrips)
+      .catch(() => {})
   }, [])
 
   const handleCreateTrip = async (tripRequestCreate: TripRequestCreate) => {
@@ -75,6 +93,7 @@ function App() {
       const createdTrip = await createTrip(tripRequestCreate)
       setTrip(createdTrip)
       localStorage.setItem(ACTIVE_TRIP_ID_STORAGE_KEY, String(createdTrip.id))
+      setTrips((previousTrips) => [createdTrip, ...previousTrips])
     } catch (error) {
       setCreateTripError(extractErrorMessage(error))
     } finally {
@@ -141,6 +160,15 @@ function App() {
 
   const handleSearchAgain = () => {
     setSelectedOffer(null)
+  }
+
+  const handleSelectTrip = (tripId: number) => {
+    if (trip?.id === tripId) return
+    clearFlightAndBookingState()
+    setPlanResult(null)
+    setPlanError(null)
+    restoreTrip(tripId)
+    setActiveTab("trip")
   }
 
   // When a re-plan comes back needing clarification, the trip has effectively changed — drop any
@@ -241,14 +269,15 @@ function App() {
             </>
           )}
 
-          {activeTab === "execution" &&
-            (trip ? (
-              <ExecutionPanel tripId={trip.id} isRunActive={isRunActive} />
-            ) : (
-              <p className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">
-                Create a trip first — the agent's execution trace will appear here once it runs.
-              </p>
-            ))}
+          {activeTab === "trips" && (
+            <YourTripsPanel
+              trips={trips}
+              selectedTripId={trip?.id ?? null}
+              onSelectTrip={handleSelectTrip}
+            />
+          )}
+
+          {activeTab === "execution" && <ExecutionPanel trips={trips} isRunActive={isRunActive} />}
 
           {activeTab === "connectors" && <ConnectorsPanel />}
         </main>

@@ -26,10 +26,14 @@ over REST; there is no server-rendered coupling between them.
 
 ## Requirements → implementation
 
-- **Cheapest flights:** `trips_repository.py::cheapest_first` sorts every offer ascending by
-  `price_usd` on every path (fresh search, own-trip reuse, cross-trip cache) — a backend
-  guarantee, not just provider ordering. The UI lists offers in that order, so the cheapest is
-  always shown first.
+- **Cheapest flights:** `FlightSearchService` (`app/services/flight_search.py`) — the one
+  implementation behind both `POST /flights/search` and the planner's `search_flights` tool —
+  sorts every offer ascending by `price_usd` via `trips_repository.py::cheapest_first` (shared,
+  not duplicated) on every path: fresh search, own-trip TTL reuse, cross-trip cache. A backend
+  guarantee, not just provider ordering; the UI lists offers in that order, so the cheapest is
+  always shown first. The two callers differ only in `persist`/`allow_cross_trip_cache`: the route
+  persists and reaches across trips, the planner tool trusts only this trip's own recent search
+  and never writes offers (see "The agent has only two read-only tools" in `DECISIONS.md`).
 - **Itinerary from a real API, tailored to age/fitness:** `web_search` (Tavily) grounds every
   activity in a real, cited source; `output_type=[ItineraryOut, ClarificationOut]` plus the
   `reject_unsafe_intensity` guardrail tie activity intensity to the traveler's fitness level.
@@ -41,6 +45,44 @@ over REST; there is no server-rendered coupling between them.
 - **Slack HITL connector (bonus):** an optional, DB-toggled Slack approval message with
   Confirm/Reject buttons offers the same gate through Slack instead of the UI; see "Slack HITL
   connector" below.
+
+## Architectural patterns
+
+Five patterns are enforced explicitly, each chosen over a simpler alternative for a reason named
+in [DECISIONS.md](DECISIONS.md) — this section is the map from pattern name to where it lives in
+code; DECISIONS.md has the "why this, not X" reasoning for each.
+
+1. **Dependency Injection** (FastAPI `Depends`) — DB sessions (`get_session`) and external clients
+   (flight provider, booking-options fetcher) are injected into route handlers, never constructed
+   inside them. `agent/planner.py`'s `PlannerDeps` extends the same idea into the agent: the
+   planner takes its `FlightProvider`/`ActivityProvider` as constructor args, so a test can hand it
+   a fake without touching the model call.
+2. **Finite State Machine** (`app/state.py`) — `ALLOWED_TRANSITIONS` is the single source of truth
+   for booking state (`PENDING → CONFIRMED → EXECUTED`, +`CANCELLED`/`EXPIRED`); every transition
+   is a guard clause (illegal move → 409) plus an append-only audit row in the same transaction.
+   See "HITL booking" below and "HITL booking is a REST state machine, not an agent tool" in
+   DECISIONS.md.
+3. **Repository pattern** (`app/repositories/*`) — all Postgres access lives behind
+   `trips_repository.py`/`booking_repository.py`; route handlers call the repository and shape a
+   response, never build a query or own a transaction boundary themselves.
+4. **Strategy pattern** (`FlightProvider` in `app/adapters/flights_searchapi.py`) — one `Protocol`,
+   two interchangeable implementations (`LiveSearchApiProvider`, `RecordedProvider`) selected once
+   at composition by `USE_LIVE_FLIGHT_API`. `FlightSearchService`, the route, and the planner tool
+   all depend on the interface via DI and never branch on the toggle themselves.
+5. **Durable execution, not Saga** (DBOS) — `execute_booking_durable` and the planner run are
+   `@DBOS.workflow`s so a crash mid-run resumes instead of losing state. **Honest framing:** a
+   single-DB booking write is already atomic (one ACID transaction + `SELECT ... FOR UPDATE`), so
+   this is durable-execution for crash recovery, not classic Saga compensation — compensation
+   (release a hold, refund a charge) only becomes load-bearing once a real airline booking is
+   multi-step (hold → charge → confirm), which is out of this take-home's scope (see "Deferred by
+   design" in DECISIONS.md). `execute_booking`'s structure — an isolated external step plus an
+   isolated state transition — is deliberately shaped so adding real Saga compensation later would
+   be additive, not a rewrite.
+
+`FlightSearchService`/`ExecutionService` (see "Flight search and execution-run lifecycle are
+extracted services" in DECISIONS.md) are a sixth, smaller pattern in the same family — extracting
+duplicated logic behind one interface — but weren't part of the original five; they're a
+refactor-era addition once the duplication became real, not a pattern picked up front.
 
 ## APIs & AI protocols
 
@@ -75,8 +117,8 @@ over REST; there is no server-rendered coupling between them.
   resume after a crash.
 - **Observability** — `AgentRun`/`AgentRunStep` rows are derived from the real message history and
   usage, powering the execution panel.
-- **Eval scoring (`pydantic-evals`)** — deterministic evaluators (output-type, citation grounding)
-  plus an `LLMJudge` for fitness-appropriateness. See `backend/evals/`.
+- **Eval scoring (`pydantic-evals`)** — deterministic evaluators plus an `LLMJudge` for
+  fitness-appropriateness. See [EVALS.md](EVALS.md) for the exact-vs-subjective split and why.
 
 ## Request/agent flow
 
@@ -84,13 +126,19 @@ over REST; there is no server-rendered coupling between them.
 (`get_or_create_itinerary` returns an existing `Itinerary` row as-is). Otherwise it calls
 `run_planner_durable` (`app/dbos_runtime.py`), which acquires a concurrency slot
 (`acquire_agent_run_slot`, caps concurrent real LLM calls) and runs the `@DBOS.workflow`-wrapped
-planner: `agent.iter(...)` drives a ReAct-style loop over `search_flights`/`web_search`, capped by
+planner: `ExecutionService(session).start_run(...)` binds an `ExecutionRun` for the trip, then
+`agent.iter(...)` drives a ReAct-style loop over `search_flights`/`web_search`, capped by
 `MAX_TOOL_STEPS`/`MAX_CONTEXT_TOKENS`. The output resolves to the `ItineraryOut | ClarificationOut`
 union — a `ClarificationOut` returns questions without persisting an itinerary; an `ItineraryOut`
-persists and moves the trip to `ITINERARY_READY`. Every tool call records an `ExecutionEvent`, and
-`persist_agent_run` derives `AgentRun`/`AgentRunStep` rows from the real message history and usage
-(never fabricated). The concurrency slot releases in a `finally`, outside the DBOS-wrapped call —
-see [DECISIONS.md](DECISIONS.md) for why that placement matters.
+persists and moves the trip to `ITINERARY_READY`. Every tool call records an `ExecutionEvent`
+through the bound run, and `ExecutionRun.persist_result` (wrapping `persist_agent_run`) derives
+`AgentRun`/`AgentRunStep` rows from the real message history and usage on both the success and
+crash-recovery failure paths (never fabricated) — `ExecutionService`/`ExecutionRun`
+(`app/agent/execution_log.py`) is the one place that finalizes a run, so there's exactly one
+finalization path to reason about, not two. The concurrency slot releases in a `finally`, outside
+the DBOS-wrapped call — see [DECISIONS.md](DECISIONS.md) for why that placement matters.
+`POST /flights/search` (outside the agent loop) still binds its own run through the lower-level
+`execution_context()` directly, since it isn't wrapped in a DBOS workflow.
 
 **Booking a flight** (the HITL gate): a REST state machine, not an agent capability. See
 "HITL booking" below.
@@ -98,7 +146,12 @@ see [DECISIONS.md](DECISIONS.md) for why that placement matters.
 **Watching a run**: `GET /api/trips/{id}/execution` reads every `AgentRun` with its owned
 `AgentRunStep`s and `ExecutionEvent`s, shaped into `ExecutionPanelOut` with derived context usage
 and estimated cost. The response also retains the trip-wide event stream for LiveActivity; the
-execution panel renders events only inside their owning run.
+execution panel renders events only inside their owning run. `GET /api/execution` is the same
+shape across every trip the user owns (`GlobalExecutionPanelOut`) — it backs the "Agent execution
+history" tab, which is global rather than scoped to whichever trip is currently active (see
+"Trip history is a list endpoint plus a global execution feed" in `DECISIONS.md`). The tab filters
+that list client-side by route text and run status; `GET /api/trips` (also newest-first,
+user-scoped) backs the sibling "Your trips" tab, filtered client-side by a date-range dropdown.
 
 ## Data model
 

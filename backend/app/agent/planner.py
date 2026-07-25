@@ -98,13 +98,22 @@ async def web_search(
     # Clamp both ends: the ceiling protects the provider token budget, and the floor of 1 keeps a
     # model-supplied 0 or negative from reaching Tavily (which would waste the call on no results).
     clamped_max_results = max(1, min(max_results, MAX_WEB_SEARCH_RESULTS))
-    results = await ctx.deps.activity_provider.search(query, max_results=clamped_max_results)
+    session, trip_id = current_trip("web_search")
+    trip = await session.get(TripRequest, trip_id)
+    if trip is None:
+        raise ModelRetry(f"trip {trip_id} is gone; cannot search activities for it")
+    # A free-text destination (e.g. "Ontario") can collide with a same-named place elsewhere;
+    # anchor on the unambiguous airport code so results can't silently drift to the wrong place.
+    anchored_query = f"{query} near {trip.destination_airport} airport"
+    results = await ctx.deps.activity_provider.search(
+        anchored_query, max_results=clamped_max_results
+    )
     duration_ms = round((time.monotonic() - started_at) * 1000)
     await record_event(
         ExecutionEventKind.API_CALL,
         "web_search",
         "ok",
-        f"{len(results)} results for query={query!r}",
+        f"{len(results)} results for query={anchored_query!r}",
         duration_ms,
         data={"results": [{"title": result.title, "url": result.url} for result in results]},
         provider=_activity_provider_name(ctx.deps.activity_provider),

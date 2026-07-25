@@ -323,6 +323,7 @@ class AgentRunOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    trip_request_id: int
     status: str
     model: str
     total_input_tokens: int
@@ -340,6 +341,13 @@ class ExecutionPanelOut(BaseModel):
     trip_request_id: int
     agent_runs: list[AgentRunOut] = Field(default_factory=list)
     events: list[ExecutionEventOut] = Field(default_factory=list)
+
+
+class GlobalExecutionPanelOut(BaseModel):
+    """Every agent run across every trip the user owns — backs the execution history tab, which
+    is global rather than scoped to whichever trip is currently active."""
+
+    agent_runs: list[AgentRunOut] = Field(default_factory=list)
 
 
 class SlackAuthErrorOut(BaseModel):

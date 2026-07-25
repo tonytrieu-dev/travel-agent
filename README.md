@@ -23,8 +23,12 @@ moves forward.
    retrieve real booking options, as three separate steps. The agent never books anything itself;
    approval only unlocks a deterministic, audited workflow that hands off to the airline/OTA for
    the actual purchase. A 30-minute price-staleness window expires stale requests automatically.
-5. **Watch the agent work** — an execution panel shows the run's tool calls, token usage,
-   context-budget utilization, and timing, live.
+5. **Watch the agent work** — an execution panel shows every run's tool calls, token usage,
+   context-budget utilization, and timing, live. It's global across all of your trips (filterable
+   by route and status), not just the one you're currently planning.
+6. **Revisit any past trip** — a "Your trips" tab lists everything you've created, newest first
+   and filterable by date range, so a trip never disappears just because a newer one replaced it
+   as the active one in the planner.
 
 ## Stack
 
@@ -37,7 +41,8 @@ moves forward.
   [tavily.com/#pricing](https://www.tavily.com/#pricing)).
 - **Frontend:** React 19 + Vite + Tailwind CSS v4, TypeScript. A structured trip form drives the
   agent; a live activity feed streams its tool calls inline on the trip page, and a separate
-  execution panel (with a live indicator in the sidebar nav) shows the full run trace.
+  execution panel shows the full run trace across every trip. A "Your trips" tab lists every trip
+  you've created, so switching or revisiting one never loses its history.
 - **Evals:** `pydantic-evals` — deterministic + LLM-judged scoring of agent quality, separate
   from the pytest suite that gates system correctness.
 

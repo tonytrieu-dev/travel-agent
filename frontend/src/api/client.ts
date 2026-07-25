@@ -4,6 +4,7 @@ import type {
   ConnectorsOut,
   ExecutionPanelOut,
   FlightSearchOut,
+  GlobalExecutionPanelOut,
   PlanOut,
   ProblemDetail,
   TripRequestCreate,
@@ -49,6 +50,10 @@ export function createTrip(tripRequestCreate: TripRequestCreate): Promise<TripRe
   })
 }
 
+export function listTrips(): Promise<TripRequestOut[]> {
+  return request<TripRequestOut[]>("/trips")
+}
+
 export function getTripSnapshot(tripId: number): Promise<TripSnapshotOut> {
   return request<TripSnapshotOut>(`/trips/${tripId}/snapshot`)
 }
@@ -77,6 +82,10 @@ export function planTrip(tripId: number): Promise<PlanOut> {
 
 export function getTripExecution(tripId: number): Promise<ExecutionPanelOut> {
   return request<ExecutionPanelOut>(`/trips/${tripId}/execution`)
+}
+
+export function getAllExecution(): Promise<GlobalExecutionPanelOut> {
+  return request<GlobalExecutionPanelOut>("/execution")
 }
 
 export function requestBooking(

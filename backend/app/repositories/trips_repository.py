@@ -59,6 +59,18 @@ async def get_trip(session: AsyncSession, trip_id: int) -> TripRequest:
     return trip
 
 
+async def list_trips(session: AsyncSession, user_id: int) -> list[TripRequest]:
+    """Every trip this user has created, newest first — lets the UI recover a trip that a newer
+    one has since overwritten as the client's "active" pointer."""
+    return list(
+        await session.scalars(
+            select(TripRequest)
+            .where(col(TripRequest.user_id) == user_id)
+            .order_by(col(TripRequest.created_at).desc())
+        )
+    )
+
+
 # Changing any of these invalidates a trip's flight search and itinerary: the stored offers were
 # priced for the old route/dates, and the itinerary was researched for the old destination.
 _CRITERIA_FIELDS = ("origin", "destination", "destination_airport", "depart_date", "return_date")
@@ -189,21 +201,16 @@ async def get_or_create_itinerary(
     return output
 
 
-async def get_execution_panel(
-    session: AsyncSession, trip_id: int
-) -> tuple[
-    list[tuple[AgentRun, list[AgentRunStep], list[ExecutionEvent]]],
-    list[ExecutionEvent],
-]:
-    """Every run with its own steps/events, plus the same event stream for LiveActivity."""
-    trip = await session.get(TripRequest, trip_id)
-    if trip is None:
-        raise TripError(ErrorCode.TRIP_NOT_FOUND, 404, f"No trip {trip_id}.")
-
+async def _execution_runs_for_trips(
+    session: AsyncSession, trip_ids: list[int]
+) -> list[tuple[AgentRun, list[AgentRunStep], list[ExecutionEvent]]]:
+    """Every run across the given trips, newest first, each with its own steps/events."""
+    if not trip_ids:
+        return []
     agent_runs = list(
         await session.scalars(
             select(AgentRun)
-            .where(col(AgentRun.trip_request_id) == trip_id)
+            .where(col(AgentRun.trip_request_id).in_(trip_ids))
             .order_by(col(AgentRun.started_at).desc())
         )
     )
@@ -217,6 +224,36 @@ async def get_execution_panel(
     steps_by_run_id: dict[int, list[AgentRunStep]] = defaultdict(list)
     for step in all_steps:
         steps_by_run_id[step.agent_run_id].append(step)
+    all_events = list(
+        await session.scalars(
+            select(ExecutionEvent)
+            .where(col(ExecutionEvent.trip_request_id).in_(trip_ids))
+            .order_by(col(ExecutionEvent.seq))
+        )
+    )
+    events_by_run_id: dict[int, list[ExecutionEvent]] = defaultdict(list)
+    for event in all_events:
+        if event.agent_run_id is not None:
+            events_by_run_id[event.agent_run_id].append(event)
+    return [
+        (run, steps_by_run_id[run.id], events_by_run_id[run.id])
+        for run in agent_runs
+        if run.id
+    ]
+
+
+async def get_execution_panel(
+    session: AsyncSession, trip_id: int
+) -> tuple[
+    list[tuple[AgentRun, list[AgentRunStep], list[ExecutionEvent]]],
+    list[ExecutionEvent],
+]:
+    """Every run with its own steps/events, plus the same event stream for LiveActivity."""
+    trip = await session.get(TripRequest, trip_id)
+    if trip is None:
+        raise TripError(ErrorCode.TRIP_NOT_FOUND, 404, f"No trip {trip_id}.")
+
+    runs_with_details = await _execution_runs_for_trips(session, [trip_id])
     events = list(
         await session.scalars(
             select(ExecutionEvent)
@@ -224,13 +261,13 @@ async def get_execution_panel(
             .order_by(col(ExecutionEvent.seq))
         )
     )
-    events_by_run_id: dict[int, list[ExecutionEvent]] = defaultdict(list)
-    for event in events:
-        if event.agent_run_id is not None:
-            events_by_run_id[event.agent_run_id].append(event)
-    runs_with_details = [
-        (run, steps_by_run_id[run.id], events_by_run_id[run.id])
-        for run in agent_runs
-        if run.id
-    ]
     return runs_with_details, events
+
+
+async def list_execution_runs_for_user(
+    session: AsyncSession, user_id: int
+) -> list[tuple[AgentRun, list[AgentRunStep], list[ExecutionEvent]]]:
+    """Every agent run across every trip this user owns, newest first — the execution history tab
+    is global so a run doesn't disappear just because a newer trip has replaced it as "active"."""
+    trip_ids = [trip.id for trip in await list_trips(session, user_id) if trip.id is not None]
+    return await _execution_runs_for_trips(session, trip_ids)

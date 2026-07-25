@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { useTripExecution } from "../hooks/useTripExecution"
+import { RunStatusDot } from "./RunStatusDot"
 
 interface LiveActivityProps {
   tripId: number
@@ -34,14 +35,7 @@ export function LiveActivity({ tripId, isRunActive }: LiveActivityProps) {
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          {isRunActive ? (
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-75" />
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-indigo-500" />
-            </span>
-          ) : (
-            <span className="h-2.5 w-2.5 rounded-full bg-slate-300" />
-          )}
+          <RunStatusDot isActive={isRunActive} />
           <h2 className="text-lg font-semibold text-slate-900">
             {isRunActive ? "Agent working…" : "Agent activity"}
           </h2>

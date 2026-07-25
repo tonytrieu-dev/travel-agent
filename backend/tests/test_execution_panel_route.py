@@ -171,3 +171,44 @@ def test_execution_panel_for_nonexistent_trip_is_404(client) -> None:
 
     assert response.status_code == 404, f"expected 404, got {response.status_code}: {response.text}"
     assert response.json()["code"] == "trip_not_found"
+
+
+def _create_trip_payload(**overrides: object) -> dict:
+    payload: dict[str, object] = {
+        "origin": "JFK",
+        "destination": "Paris",
+        "destination_airport": "CDG",
+        "depart_date": "2026-08-01",
+        "age": 30,
+        "fitness_level": "moderate",
+    }
+    payload.update(overrides)
+    return payload
+
+
+def test_global_execution_spans_every_trip_the_user_owns_newest_first(client) -> None:
+    """The execution history tab is global: a run must still surface after a newer trip has
+    replaced it as the client's "active" trip, and runs from a trip seeded under a different
+    user (seed_trip creates its own ad-hoc user) must never leak in."""
+    other_users_trip_id = run_db(lambda session: seed_trip(session))
+    other_users_run_id = run_db(lambda session: seed_agent_run(session, other_users_trip_id))
+
+    first_trip_id = client.post("/api/trips", json=_create_trip_payload()).json()["id"]
+    first_run_id = run_db(lambda session: seed_agent_run(session, first_trip_id))
+    second_trip_id = client.post("/api/trips", json=_create_trip_payload()).json()["id"]
+    second_run_id = run_db(lambda session: seed_agent_run(session, second_trip_id))
+
+    response = client.get("/api/execution")
+
+    assert response.status_code == 200, f"expected 200, got {response.status_code}: {response.text}"
+    runs = response.json()["agent_runs"]
+    run_ids = [run["id"] for run in runs]
+    assert other_users_run_id not in run_ids, (
+        "GET /api/execution must scope to the authenticated user, not return every run in the DB"
+    )
+    assert run_ids == [second_run_id, first_run_id], (
+        f"expected the two owned runs newest-first regardless of trip, got {run_ids}"
+    )
+    assert [run["trip_request_id"] for run in runs] == [second_trip_id, first_trip_id], (
+        "each run must report which trip it belongs to so the UI can label it in the global view"
+    )

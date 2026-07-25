@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col
 
 from app.agent.observability import persist_agent_run
-from app.models import AgentRun, ExecutionEvent, ExecutionEventKind, utcnow
+from app.models import AgentRun, ExecutionEvent, ExecutionEventKind, TripRequest, utcnow
 
 
 @dataclass
@@ -24,10 +24,8 @@ class _ExecutionContext:
     session: AsyncSession
     trip_request_id: int
     agent_run: AgentRun | None
-    next_seq: int
-    # pydantic_ai runs tool calls from the same model turn concurrently (see
-    # search_flights/web_search running together); AsyncSession isn't safe for concurrent
-    # use, so every record_event() write must go through this lock, one at a time.
+    # AsyncSession isn't safe for concurrent use; serializes record_event() within this context
+    # only — cross-context seq safety is the FOR UPDATE claim in record_event(), not this lock.
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 
@@ -49,19 +47,11 @@ async def execution_context(
         await session.commit()
         assert agent_run.id is not None
 
-    result = await session.execute(
-        select(func.max(ExecutionEvent.seq)).where(
-            col(ExecutionEvent.trip_request_id) == trip_request_id
-        )
-    )
-    starting_seq = (result.scalar_one_or_none() or 0) + 1
-
     token = _current.set(
         _ExecutionContext(
             session=session,
             trip_request_id=trip_request_id,
             agent_run=agent_run,
-            next_seq=starting_seq,
         )
     )
     try:
@@ -107,11 +97,23 @@ async def record_event(
 ) -> None:
     context = _bound_context("record_event")
     async with context.lock:
+        # FOR UPDATE on the trip row serializes seq allocation across concurrent runs (e.g. a
+        # double-submitted /plan) — a locally-cached counter would let two runs read the same
+        # starting point and hand out colliding seq values.
+        await context.session.execute(
+            select(TripRequest).where(col(TripRequest.id) == context.trip_request_id).with_for_update()
+        )
+        result = await context.session.execute(
+            select(func.max(ExecutionEvent.seq)).where(
+                col(ExecutionEvent.trip_request_id) == context.trip_request_id
+            )
+        )
+        next_seq = (result.scalar_one_or_none() or 0) + 1
         context.session.add(
             ExecutionEvent(
                 trip_request_id=context.trip_request_id,
                 agent_run_id=context.agent_run.id if context.agent_run is not None else None,
-                seq=context.next_seq,
+                seq=next_seq,
                 kind=kind,
                 name=name,
                 provider=provider,
@@ -121,7 +123,6 @@ async def record_event(
                 data=data,
             )
         )
-        context.next_seq += 1
         await context.session.commit()
 
 

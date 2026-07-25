@@ -5,11 +5,12 @@ run and resume correctly across multiple runs on the same trip.
 import asyncio
 
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlmodel import col
 
 from app.agent.execution_log import execution_context, record_event
 from app.models import ExecutionEvent, ExecutionEventKind
-from tests.db_helpers import run_db, seed_trip
+from tests.db_helpers import TEST_DATABASE_URL, run_db, seed_trip
 
 
 async def _events_for(session, trip_id: int) -> list[ExecutionEvent]:
@@ -74,3 +75,48 @@ def test_concurrent_record_event_calls_get_sequential_non_colliding_seq() -> Non
 
     seqs = run_db(_work)
     assert seqs == [1, 2, 3], f"concurrent record_event calls must not collide on seq; got {seqs}"
+
+
+async def test_two_concurrent_runs_on_the_same_trip_never_collide_on_seq() -> None:
+    """A double-submitted /plan opens two execution_context()s for the same trip on two separate
+    DB connections, not one — the in-process asyncio.Lock above can't serialize across those, so
+    this is the case a locally-cached "next seq" counter would race on and hand out duplicate
+    seq values, scrambling the trip's append-only event order."""
+
+    async def _seed() -> int:
+        engine = create_async_engine(TEST_DATABASE_URL)
+        try:
+            async with async_sessionmaker(engine, expire_on_commit=False)() as session:
+                trip_id = await seed_trip(session)
+                await session.commit()
+                return trip_id
+        finally:
+            await engine.dispose()
+
+    async def _run_events(trip_id: int, label: str) -> None:
+        engine = create_async_engine(TEST_DATABASE_URL)
+        try:
+            async with async_sessionmaker(engine, expire_on_commit=False)() as session:
+                async with execution_context(session, trip_id):
+                    for index in range(3):
+                        await record_event(
+                            ExecutionEventKind.PROTOCOL, f"{label}_{index}", "ok", label
+                        )
+        finally:
+            await engine.dispose()
+
+    trip_id = await _seed()
+    await asyncio.gather(_run_events(trip_id, "run_a"), _run_events(trip_id, "run_b"))
+
+    engine = create_async_engine(TEST_DATABASE_URL)
+    try:
+        async with async_sessionmaker(engine, expire_on_commit=False)() as session:
+            events = await _events_for(session, trip_id)
+    finally:
+        await engine.dispose()
+
+    seqs = [event.seq for event in events]
+    assert seqs == list(range(1, 7)), (
+        f"two concurrent runs on the same trip must claim distinct, contiguous seq values via "
+        f"the trip-row lock, not race on a cached counter; got {seqs}"
+    )

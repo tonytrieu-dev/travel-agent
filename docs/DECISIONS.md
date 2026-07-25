@@ -2,6 +2,25 @@
 
 Load-bearing choices, each with the alternative and why it was rejected.
 
+## Dependency Injection over constructing dependencies inline
+DB sessions and external clients (`FlightProvider`, `ActivityProvider`, the booking-options
+fetcher) are injected — via FastAPI `Depends` in routes, via constructor/dataclass args
+(`PlannerDeps`) in the agent — never instantiated inside the function that uses them.
+**Alternative:** construct them where needed (e.g. `LiveSearchApiProvider()` directly inside a
+route or the planner tool). **Rejected** — that couples every call site to one concrete
+implementation, so testing the booking state machine's concurrency (`test_double_execute_books_once`)
+or the planner's tool-calling loop would require mocking internals instead of handing in a real
+fake object that behaves like the thing it replaces.
+
+## Repository pattern over inline queries in routes
+All Postgres access lives in `app/repositories/*` (`trips_repository.py`, `booking_repository.py`);
+route handlers call a repository function and shape the HTTP response, never build a query or own
+a transaction boundary directly. **Alternative:** query the ORM directly from route handlers, the
+FastAPI default. **Rejected** — the state machine's guard-clause-plus-audit-write pattern
+(see below) has to be atomic and consistent everywhere a transition happens; centralizing DB access
+in one layer is what makes "every transition writes an audit row in the same transaction" a
+property of the repository, not something each route has to remember to do correctly on its own.
+
 ## HITL booking is a REST state machine, not an agent tool
 The booking write moves through `PENDING → CONFIRMED → EXECUTED` (or `CANCELLED`/`EXPIRED`) via
 explicit `/bookings/*` calls driven by human clicks. **Alternative:** expose booking as an agent
@@ -24,6 +43,24 @@ design). **Rejected** — every itinerary needs them to pace activities, so the 
 round trip was guaranteed on nearly every real trip; validating at intake removes that round trip
 entirely instead of just making it reliable. Scoped to the API boundary only: `TripRequest.age`/
 `.fitness_level` stay nullable in the DB so existing incomplete rows keep reading fine.
+
+## Flight search and execution-run lifecycle are extracted services, not inline route/tool logic
+`FlightSearchService` (`app/services/flight_search.py`) and `ExecutionService`/`ExecutionRun`
+(`app/agent/execution_log.py`) sit behind `POST /flights/search`, the planner's `search_flights`
+tool, and the DBOS-wrapped planner run. **Alternative:** leave the caching/persistence/ordering
+logic inline in `routes/trips.py` and `agent/planner.py`, as it originally was. **Rejected** — the
+route and the planner tool need the *same* cheapest-first/cache/round-trip-completeness behavior
+(same-trip TTL reuse, cross-trip identical-search reuse, honest-unavailable degradation) and had
+drifted into two near-duplicate implementations; one service parameterized by
+`persist`/`allow_cross_trip_cache` is the single place that logic can be verified once
+(`test_route_and_planner_tool_modes_agree_on_offer_ordering_and_shape` pins the two callers can't
+silently diverge again). Same reasoning for `ExecutionService`: before the extraction, the DBOS
+workflow and its failure-path cleanup had two separate ways to finalize an `AgentRun`
+(`persist_agent_run` called directly from two branches); `ExecutionRun.persist_result` is now the
+one path, so `_persist_failed_run` and the success path can't fall out of sync on what "finalized"
+means. Both extractions were scoped to change no observable behavior — the full plan and
+task-by-task TDD trail live in
+`docs/superpowers/plans/2026-07-24-flight-search-execution-services.md`.
 
 ## The agent has only two read-only tools
 Only `search_flights` and `web_search` are registered on the planner, both with strict JSON
@@ -126,6 +163,25 @@ from whether Slack credentials exist in settings. **Alternative:** treat "creden
 with the env vars set would silently start posting to Slack; the toggle lets an operator configure
 Slack once and still flip it off at runtime without a restart or an env change.
 
+## Trip history is a list endpoint plus a global execution feed, not per-trip-only
+`GET /api/trips` lists every trip the (single demo) user owns, newest first; `GET /api/execution`
+mirrors that scoping across every `AgentRun` those trips own, also newest first — both live in
+`trips_repository.py` next to the existing per-trip `get_trip`/`get_execution_panel`, sharing the
+same user-scoping query rather than introducing a second concept. **Why global execution, not just
+per-trip:** the frontend used to require a trip to be "active" (in `localStorage`) before its
+execution history was visible at all — switching trips, or never having picked one, hid the tab
+entirely. A tab that only ever shows one trip's history can't answer "what has this agent done,
+period," which is the actual job of an execution/observability view. **Alternative considered:**
+keep it per-trip and add a trip switcher. **Rejected** — that still frames execution history as a
+property of one trip instead of an audit trail, and duplicates the trip-switching UI the new
+"Your trips" tab already provides. **Filtering is client-side, not query params:** both the route
+search and status filter on the execution tab, and the date-range filter on "Your trips," filter
+the already-fetched list in the browser rather than adding query parameters to either GET. At this
+scale (one user, dozens of trips) a server-side filtered query is speculative infrastructure;
+revisit if the trip count grows enough that shipping every trip/run to the client stops being
+cheap. The one thing kept server-side either way: user-scoping, since that's a security boundary,
+not a display preference.
+
 ## Rate limiting protects scarce third-party quota
 `enforce_request_rate_limit` (`app/rate_limit.py`) applies a per-IP request cap plus a global
 concurrency cap on real LLM calls, gating `/plan` and `/flights/search`. **Alternative:** no
@@ -134,7 +190,18 @@ is a one-time search allotment, not a renewing rate limit, so a burst of retries
 double-clicks, a buggy client) would permanently burn quota rather than just wait out a window;
 limiting at the app boundary protects that budget before a request ever reaches SearchApi.
 
-## Deferred by design
-Episodic/semantic/procedural agent memory, full auth (only `get_current_user` changes), and
-payment processing — each pays off across many sessions or needs infrastructure the take-home
-doesn't. Trap-doors are left where they'd slot in.
+## Added vs. deferred, to stay in scope
+Two things were added **beyond** the take-home's minimum ask, deliberately, as scoped "strong
+plus" bonuses: HITL booking (see "HITL booking is a REST state machine" above) and the optional
+Slack connector (see "Custom Slack HITL adapter" below) — both explicitly named in the take-home
+brief as differentiators, not required. Both were kept narrow on purpose (booking is a *handoff*,
+not a real purchase; Slack is one workspace, one button, hand-rolled instead of a multi-platform
+SDK) so the bonus demonstrates the pattern without ballooning into a second project.
+
+Everything below was considered and **deferred**, not attempted-and-abandoned — each pays off
+across many sessions or needs infrastructure a take-home doesn't have, and building it now would
+be scope creep against the actual ask: episodic/semantic/procedural agent memory, full auth (only
+`get_current_user` changes to support it later), payment processing, and Saga-style compensation
+for a multi-step real airline booking (see "Durable execution, not Saga" in `ARCHITECTURE.md`).
+Trap-doors are left where they'd slot in, so "deferred" means a known extension point, not a gap
+nobody thought about.

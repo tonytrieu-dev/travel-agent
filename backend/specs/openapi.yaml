@@ -9,6 +9,19 @@ info:
 
 paths:
   /api/trips:
+    get:
+      operationId: list_trips
+      summary: >-
+        Every trip the demo user has created, newest first — lets the UI recover a trip that a
+        newer one has since overwritten as the client's "active" pointer.
+      responses:
+        '200':
+          description: The user's trips, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/TripRequestOut' }
     post:
       operationId: create_trip
       summary: Create a trip request (the demo user is resolved server-side, not supplied by the client).
@@ -180,6 +193,19 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/execution:
+    get:
+      operationId: get_all_execution
+      summary: >-
+        Every agent run across every trip the demo user has created, newest first — the execution
+        history tab is global rather than scoped to whichever trip happens to be active.
+      responses:
+        '200':
+          description: The user's agent runs across all trips, newest first.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GlobalExecutionPanelOut' }
 
   /api/trips/{trip_id}/booking/request:
     post:
@@ -589,9 +615,10 @@ components:
 
     AgentRunOut:
       type: object
-      required: [id, status, model, total_input_tokens, total_output_tokens, total_ms, started_at]
+      required: [id, trip_request_id, status, model, total_input_tokens, total_output_tokens, total_ms, started_at]
       properties:
         id: { type: integer }
+        trip_request_id: { type: integer }
         status: { type: string }
         model: { type: string }
         total_input_tokens: { type: integer }
@@ -633,6 +660,13 @@ components:
         events:
           type: array
           items: { $ref: '#/components/schemas/ExecutionEventOut' }
+
+    GlobalExecutionPanelOut:
+      type: object
+      properties:
+        agent_runs:
+          type: array
+          items: { $ref: '#/components/schemas/AgentRunOut' }
 
     SlackAuthErrorOut:
       type: object
