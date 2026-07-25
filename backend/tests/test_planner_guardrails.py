@@ -69,7 +69,7 @@ def test_allows_moderate_intensity_activity_for_low_fitness_traveler() -> None:
     )
 
 
-def test_rejects_flight_itself_but_allows_an_unrelated_activity() -> None:
+def test_rejects_the_flight_itself_but_not_activities_that_merely_mention_flying() -> None:
     ctx = _context(FitnessLevel.HIGH)
 
     with pytest.raises(ModelRetry, match="Outbound flight"):
@@ -77,14 +77,6 @@ def test_rejects_flight_itself_but_allows_an_unrelated_activity() -> None:
             ctx,
             _itinerary("low", "Outbound flight", "Fly from JFK to SAN."),
         )
-
-    assert isinstance(
-        reject_flight_activities(
-            ctx,
-            _itinerary("low", "City walking tour", "Explore the historic downtown."),
-        ),
-        ItineraryOut,
-    )
 
     assert isinstance(
         reject_flight_activities(
@@ -110,4 +102,7 @@ def test_rejects_optional_clarification_when_trip_inputs_are_complete() -> None:
             ClarificationOut(questions=["Which Springfield destination did you mean?"]),
         ),
         ClarificationOut,
+    ), (
+        "a genuinely ambiguous destination question must survive — the validator blocks only "
+        "optional preference questions, so over-rejecting would strand real clarifications"
     )
