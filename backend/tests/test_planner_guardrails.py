@@ -86,6 +86,17 @@ def test_rejects_flight_itself_but_allows_an_unrelated_activity() -> None:
         ItineraryOut,
     )
 
+    assert isinstance(
+        reject_flight_activities(
+            ctx,
+            _itinerary("low", "USS Midway Museum", "Walk the aircraft carrier's flight deck."),
+        ),
+        ItineraryOut,
+    ), (
+        "a real activity that only mentions flying in its description must not be rejected — "
+        "scanning the description false-positives and traps the model in a retry loop"
+    )
+
 
 def test_rejects_optional_clarification_when_trip_inputs_are_complete() -> None:
     ctx = _context(FitnessLevel.HIGH)

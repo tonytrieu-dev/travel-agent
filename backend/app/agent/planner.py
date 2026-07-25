@@ -186,8 +186,10 @@ def _web_search_urls(messages: list[ModelMessage]) -> set[str]:
     return urls
 
 
-def _is_flight_activity(name: str, description: str) -> bool:
-    return bool(_FLIGHT_ACTIVITY_PATTERN.search(f"{name} {description}"))
+def _is_flight_activity(name: str) -> bool:
+    # Name only: scanning the description false-positives on real activities that mention flying
+    # (USS Midway "flight deck"), which the model can't remove — it retries until it dies.
+    return bool(_FLIGHT_ACTIVITY_PATTERN.search(name))
 
 
 @agent.output_validator
@@ -214,7 +216,7 @@ def reject_flight_activities(
         activity.name
         for day in output.days
         for activity in day.activities
-        if _is_flight_activity(activity.name, activity.description)
+        if _is_flight_activity(activity.name)
     ]
     if flights:
         raise ModelRetry(

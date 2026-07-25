@@ -260,7 +260,7 @@ class NoFlightActivities(Evaluator[str, ItineraryOut | ClarificationOut, CaseMet
             activity.name
             for day in ctx.output.days
             for activity in day.activities
-            if _is_flight_activity(activity.name, activity.description)
+            if _is_flight_activity(activity.name)
         ]
         return EvaluationReason(
             value=not flights,
