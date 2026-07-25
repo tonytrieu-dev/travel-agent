@@ -139,7 +139,6 @@ def _rejected_then_accepted_output_history() -> list:
                     tool_call_id="out_1",
                 )
             ],
-            usage=RequestUsage(input_tokens=100, output_tokens=10),
             model_name="gpt-oss-120b",
             timestamp=t0 + timedelta(seconds=1),
         ),
@@ -151,7 +150,6 @@ def _rejected_then_accepted_output_history() -> list:
                     tool_call_id="out_2",
                 )
             ],
-            usage=RequestUsage(input_tokens=140, output_tokens=12),
             model_name="gpt-oss-120b",
             timestamp=t0 + timedelta(seconds=3),
         ),

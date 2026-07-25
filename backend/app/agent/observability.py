@@ -42,21 +42,10 @@ def _summarize_value(value: object) -> str | None:
     return str(value)
 
 
-_OUTPUT_TOOL_NAME = "final_result"
-
-
 def _is_output_tool(tool_name: str) -> bool:
     """pydantic-ai returns a structured result by calling a synthetic tool named `final_result`,
     or `final_result_<Type>` when `output_type` is a union — the result, not an agent tool."""
-    return tool_name == _OUTPUT_TOOL_NAME or tool_name.startswith(f"{_OUTPUT_TOOL_NAME}_")
-
-
-def _tool_step_status(*, is_output_tool: bool, has_return: bool) -> str:
-    if has_return:
-        return "completed"
-    # An output tool with no return was refused by validation and the model retried; a real tool
-    # with no return simply never produced one.
-    return "rejected" if is_output_tool else "no_result"
+    return tool_name == "final_result" or tool_name.startswith("final_result_")
 
 
 def derive_steps(message_history: list[ModelMessage]) -> list[AgentRunStep]:
@@ -90,14 +79,16 @@ def derive_steps(message_history: list[ModelMessage]) -> list[AgentRunStep]:
                 continue
             tool_return = _find_tool_return(message_history, part.tool_call_id, index + 1)
             is_output_tool = _is_output_tool(part.tool_name)
+            # A refused output attempt has no tool return, and "rejected" says why: validation
+            # refused it and the model was retried. A real tool just never produced a result.
             steps.append(
                 AgentRunStep(
                     seq=seq,
                     kind=AgentStepKind.OUTPUT if is_output_tool else AgentStepKind.TOOL,
                     name=part.tool_name,
-                    status=_tool_step_status(
-                        is_output_tool=is_output_tool, has_return=tool_return is not None
-                    ),
+                    status="completed"
+                    if tool_return is not None
+                    else ("rejected" if is_output_tool else "no_result"),
                     duration_ms=_duration_ms(
                         message.timestamp, tool_return.timestamp if tool_return else None
                     ),
