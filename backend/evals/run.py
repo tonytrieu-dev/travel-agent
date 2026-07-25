@@ -84,17 +84,12 @@ def _planner_deps(prompt: str, provider_mode: ProviderMode) -> PlannerDeps:
 # Cerebras meters gpt-oss-120b at 30_000 tokens/minute — the whole budget one case may spend.
 CEREBRAS_TOKEN_WINDOW_SECONDS = 60.0
 
-_previous_case_finished_at: float | None = None
+_previous_case_finished_at = float("-inf")
 
 
 async def _wait_out_previous_case_token_window() -> None:
-    if _previous_case_finished_at is None:
-        return
-    seconds_remaining = CEREBRAS_TOKEN_WINDOW_SECONDS - (
-        time.monotonic() - _previous_case_finished_at
-    )
-    if seconds_remaining > 0:
-        await asyncio.sleep(seconds_remaining)
+    elapsed = time.monotonic() - _previous_case_finished_at
+    await asyncio.sleep(max(0.0, CEREBRAS_TOKEN_WINDOW_SECONDS - elapsed))
 
 
 async def task(

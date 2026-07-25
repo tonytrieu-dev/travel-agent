@@ -99,17 +99,15 @@ async def test_back_to_back_cases_wait_out_the_cerebras_token_window(monkeypatch
     )
 
 
-async def test_first_case_and_cases_outliving_the_window_never_wait(monkeypatch) -> None:
+async def test_a_case_outliving_the_token_window_never_waits(monkeypatch) -> None:
     slept = _record_sleeps(monkeypatch, now=200.0)
-    monkeypatch.setattr(run, "_previous_case_finished_at", None)
-
-    await run._wait_out_previous_case_token_window()
-    assert slept == [], f"the first case has no predecessor to wait on; slept {slept}"
-
     monkeypatch.setattr(run, "_previous_case_finished_at", 100.0)
+
     await run._wait_out_previous_case_token_window()
-    assert slept == [], (
-        f"a case that itself ran longer than the 60s window already drained it; slept {slept}"
+
+    assert slept == [0.0], (
+        "a case that itself ran longer than the 60s window already drained it and must not "
+        f"idle; slept {slept}"
     )
 
 
