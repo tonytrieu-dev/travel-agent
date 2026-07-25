@@ -117,8 +117,9 @@ refactor-era addition once the duplication became real, not a pattern picked up 
   resume after a crash.
 - **Observability** — `AgentRun`/`AgentRunStep` rows are derived from the real message history and
   usage, powering the execution panel.
-- **Eval scoring (`pydantic-evals`)** — deterministic evaluators plus an `LLMJudge` for
-  fitness-appropriateness. See [EVALS.md](EVALS.md) for the exact-vs-subjective split and why.
+- **Eval scoring (`pydantic-evals`)** — deterministic evaluators by default, plus an opt-in
+  `LLMJudge` for fitness-appropriateness behind `--with-judge`. See [EVALS.md](EVALS.md) for the
+  exact-vs-subjective split and why.
 
 ## Request/agent flow
 
@@ -178,8 +179,11 @@ confirm, then execute" is structural, not a prompt instruction the model could b
 
 **Scope note:** "execute" fetches real booking options from SearchApi and stamps an internal
 `TA-*` reference on the `HITLBookingLog` row — it's a human-confirmed booking *handoff*, not a
-real airline reservation/purchase (no PNR, no payment). Completing a real purchase is out of
-scope for this take-home; see [DECISIONS.md](DECISIONS.md).
+real airline reservation/purchase (no PNR, no payment). Those options render as per-provider
+checkout buttons the traveler clicks through to complete the purchase on the carrier's own site,
+so no fare is ever held here; `BOOKING_TTL_MINUTES` is an internal price-freshness window, checked
+lazily on confirm/execute rather than by any sweeper. Completing a real purchase is out of scope
+for this take-home; see [DECISIONS.md](DECISIONS.md).
 
 ## Slack HITL connector (`app/adapters/slack_hitl.py`, `app/routes/slack.py`, `app/routes/connectors.py`)
 

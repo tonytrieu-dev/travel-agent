@@ -1,10 +1,10 @@
 Feature: Human-in-the-loop booking gate
   The EXECUTED write is the only gated action. A human must confirm first, the quoted fare must
-  still be within its price-hold TTL, and concurrent execute attempts must never double-book or
+  still be within its price-freshness TTL, and concurrent execute attempts must never double-book or
   burn a second booking-options quota call.
 
   Scenario: A concurrent double-execute books exactly once
-    Given a confirmed booking whose price hold is still valid
+    Given a confirmed booking whose quoted price is still fresh
     When execute is called twice concurrently
     Then both execute responses return 200 with the same booking reference
     And the booking-options provider is called exactly once
@@ -24,14 +24,14 @@ Feature: Human-in-the-loop booking gate
     Then a new pending booking is returned for the same flight
 
   Scenario: An expired fare cannot be executed
-    Given a confirmed booking whose price hold has already expired
+    Given a confirmed booking whose quoted price has gone stale
     When execute is called once
     Then the response is 409 with error code "booking_expired"
     And the booking is left EXPIRED with an audit transition into EXPIRED
     And the booking-options provider is never called
 
   Scenario: A booking-options upstream failure still completes the human-confirmed execute
-    Given a confirmed booking whose price hold is still valid
+    Given a confirmed booking whose quoted price is still fresh
     And the booking-options provider will fail
     When execute is called once
     Then the response is 200 with a booking reference and no booking options stored

@@ -273,7 +273,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetail' }
         '409':
-          description: The fare's price-hold TTL has passed, or the transition is illegal.
+          description: The fare's price-freshness TTL has passed, or the transition is illegal.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetail' }
@@ -303,7 +303,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetail' }
         '409':
-          description: Not in CONFIRMED state, or the fare's price-hold TTL has passed.
+          description: Not in CONFIRMED state, or the fare's price-freshness TTL has passed.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetail' }

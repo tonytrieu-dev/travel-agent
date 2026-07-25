@@ -53,7 +53,8 @@ def _expiry_detail(booking: HITLBookingLog) -> str:
     quoted_at = booking.expires_at - timedelta(minutes=BOOKING_TTL_MINUTES)
     return (
         f"This fare was quoted at {quoted_at:%Y-%m-%dT%H:%MZ} and its "
-        f"{BOOKING_TTL_MINUTES}-minute price hold expired at {booking.expires_at:%Y-%m-%dT%H:%MZ}; "
+        f"{BOOKING_TTL_MINUTES}-minute price-freshness window ended at "
+        f"{booking.expires_at:%Y-%m-%dT%H:%MZ}; "
         "search again for current prices."
     )
 

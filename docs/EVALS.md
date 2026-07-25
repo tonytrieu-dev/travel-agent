@@ -58,7 +58,7 @@ proxy is actually measuring what a person would flag, before trusting it to run 
 |---|---|
 | **1. Test set** | `dataset.py` — 4 cases crossing traveler age (24, 78) × fitness level (low, high), same JFK→SAN route/dates |
 | **2. System version** | `gpt-oss-120b` on Cerebras, current prompt (`app/agent/prompts.py`), `search_flights`/`web_search` tools |
-| **3. Evaluator** | 8 exact evaluators by default; optional `LLMJudge` with `--with-judge` |
+| **3. Evaluator** | 7 exact evaluators by default, plus the `PhysicalLoadComparisons` report evaluator; optional `LLMJudge` with `--with-judge` |
 | **4. Scores** | Pass/fail per assertion, plus a `physical_load` metric (sum of activity intensities) |
 | **5. Decision** | Manual: a case failure or judge failure means don't ship that change until understood |
 | **6. Monitoring** | Not built — deferred; the take-home's Agent Execution Panel (`docs/ARCHITECTURE.md`) is the closest analog, but it observes production runs, not eval regressions |

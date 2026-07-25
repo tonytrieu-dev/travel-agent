@@ -55,7 +55,7 @@ def bag() -> dict:
     return {}
 
 
-@given("a confirmed booking whose price hold is still valid", target_fixture="log_id")
+@given("a confirmed booking whose quoted price is still fresh", target_fixture="log_id")
 def _confirmed_valid() -> int:
     return run_db(
         lambda session: seed_booking(
@@ -73,7 +73,7 @@ def _pending() -> int:
     )
 
 
-@given("a confirmed booking whose price hold has already expired", target_fixture="log_id")
+@given("a confirmed booking whose quoted price has gone stale", target_fixture="log_id")
 def _confirmed_expired() -> int:
     return run_db(
         lambda session: seed_booking(
