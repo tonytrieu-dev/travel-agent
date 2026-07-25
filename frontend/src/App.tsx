@@ -15,6 +15,7 @@ import type {
   TripRequestCreate,
   TripRequestOut,
 } from "./api/types"
+import { ApprovalHistoryPanel } from "./components/ApprovalHistoryPanel"
 import { BookingModule } from "./components/BookingModule"
 import { ConnectorsPanel } from "./components/ConnectorsPanel"
 import { ExecutionPanel } from "./components/ExecutionPanel"
@@ -30,12 +31,13 @@ function extractErrorMessage(error: unknown): string {
 
 const ACTIVE_TRIP_ID_STORAGE_KEY = "travel-agent.activeTripId"
 
-type TabKey = "trip" | "trips" | "execution" | "connectors"
+type TabKey = "trip" | "trips" | "execution" | "approvals" | "connectors"
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "trip", label: "Plan a trip" },
   { key: "trips", label: "Your trips" },
   { key: "execution", label: "Agent execution history" },
+  { key: "approvals", label: "Approval history" },
   { key: "connectors", label: "Connectors" },
 ]
 
@@ -132,7 +134,8 @@ function App() {
     try {
       const planOutcome = await planTrip(trip.id)
       setPlanResult(planOutcome)
-      if (planOutcome.status === "needs_clarification") clearFlightAndBookingState()
+      if (planOutcome.status === "needs_clarification" || planOutcome.status === "too_complex")
+        clearFlightAndBookingState()
     } catch (error) {
       setPlanError(extractErrorMessage(error))
     } finally {
@@ -150,7 +153,8 @@ function App() {
       localStorage.setItem(ACTIVE_TRIP_ID_STORAGE_KEY, String(updatedTrip.id))
       const planOutcome = await planTrip(trip.id)
       setPlanResult(planOutcome)
-      if (planOutcome.status === "needs_clarification") clearFlightAndBookingState()
+      if (planOutcome.status === "needs_clarification" || planOutcome.status === "too_complex")
+        clearFlightAndBookingState()
     } catch (error) {
       setPlanError(extractErrorMessage(error))
     } finally {
@@ -278,6 +282,10 @@ function App() {
           )}
 
           {activeTab === "execution" && <ExecutionPanel trips={trips} isRunActive={isRunActive} />}
+
+          {activeTab === "approvals" && (
+            <ApprovalHistoryPanel trips={trips} isRunActive={isRunActive} />
+          )}
 
           {activeTab === "connectors" && <ConnectorsPanel />}
         </main>

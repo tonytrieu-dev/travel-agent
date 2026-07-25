@@ -204,6 +204,13 @@ SDK.
 
 ## Agent Execution Panel
 
+Two separate trails, on purpose. `execution_event`/`agent_run` answer "what did the **agent** do?"
+and back the Agent execution history tab; `booking_transition` answers "what did the **human**
+decide?" and backs the Approval history tab (`GET /api/bookings` → `ApprovalHistoryPanel`, every
+booking this user requested with its transition trail). A human clicking Confirm is not agent
+execution, and keeping the decision in a trigger-enforced append-only table with actor
+attribution is a stronger guarantee than folding it into the agent's tool log.
+
 Watch the agent work, live or after the fact: each run card combines metrics, model calls, tool
 calls, the structured output, and its own API/protocol activity. The output is its own
 `AgentStepKind.OUTPUT` rather than a tool call — pydantic-ai delivers a result by calling a

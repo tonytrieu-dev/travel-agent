@@ -28,7 +28,9 @@ moves forward.
    approving or executing past it marks the booking `EXPIRED` and asks you to search again.
 5. **Watch the agent work** — an execution panel shows every run's tool calls, token usage,
    context-budget utilization, and timing, live. It's global across all of your trips (filterable
-   by route and status), not just the one you're currently planning.
+   by route and status), not just the one you're currently planning. A separate "Approval history"
+   tab shows the other half of the audit trail: every human decision on a booking — who approved
+   what and when — read straight from the append-only `booking_transition` table.
 6. **Revisit any past trip** — a "Your trips" tab lists everything you've created, newest first
    and filterable by date range, so a trip never disappears just because a newer one replaced it
    as the active one in the planner.

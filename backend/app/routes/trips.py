@@ -36,6 +36,7 @@ from app.schemas import (
     PlanNeedsClarificationOut,
     PlanOut,
     PlanReadyOut,
+    PlanTooComplexOut,
     ProblemDetail,
     TripRequestCreate,
     TripRequestOut,
@@ -152,6 +153,8 @@ async def search_trip_flights(
 )
 async def plan_trip(trip_id: int, session: AsyncSession = Depends(get_session)) -> PlanOut:
     output = await repository.get_or_create_itinerary(session, trip_id, run_planner_durable)
+    if isinstance(output, PlanTooComplexOut):
+        return output
     if isinstance(output, ClarificationOut):
         return PlanNeedsClarificationOut(questions=output.questions)
     return PlanReadyOut(itinerary=output)

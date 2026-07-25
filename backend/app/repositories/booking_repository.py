@@ -9,6 +9,7 @@ a second quota call.
 """
 
 import uuid
+from collections import defaultdict
 from collections.abc import Awaitable, Callable
 from datetime import timedelta
 
@@ -142,6 +143,35 @@ async def get_booking_with_transitions(
         )
     )
     return booking, transitions
+
+
+async def list_bookings_with_transitions_for_user(
+    session: AsyncSession, user_id: int
+) -> list[tuple[HITLBookingLog, list[BookingTransition]]]:
+    """Every booking this user requested, newest first, each with its own transition trail — the
+    approval-history tab is global so an approval doesn't disappear once its trip stops being the
+    active one. Two bulk queries grouped in Python rather than one per booking.
+    """
+    bookings = list(
+        await session.scalars(
+            select(HITLBookingLog)
+            .where(col(HITLBookingLog.requested_by_user_id) == user_id)
+            .order_by(col(HITLBookingLog.created_at).desc())
+        )
+    )
+    if not bookings:
+        return []
+    transitions = await session.scalars(
+        select(BookingTransition)
+        .where(col(BookingTransition.booking_log_id).in_([booking.id for booking in bookings]))
+        .order_by(col(BookingTransition.created_at), col(BookingTransition.id))
+    )
+    transitions_by_booking_id: dict[int, list[BookingTransition]] = defaultdict(list)
+    for transition in transitions:
+        transitions_by_booking_id[transition.booking_log_id].append(transition)
+    return [
+        (booking, transitions_by_booking_id[booking.id]) for booking in bookings if booking.id
+    ]
 
 
 async def confirm_booking(session: AsyncSession, log_id: int) -> HITLBookingLog:

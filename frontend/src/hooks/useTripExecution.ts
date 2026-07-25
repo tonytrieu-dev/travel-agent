@@ -28,6 +28,7 @@ export function useTripExecution({
     fetcher,
     isRunActive,
     enabled,
+    errorText: "Could not load execution data.",
   })
 
   return { panelData: data, errorMessage, refresh }

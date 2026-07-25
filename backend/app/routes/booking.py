@@ -14,11 +14,13 @@ from app.adapters.slack_hitl import notify_pending_approval
 from app.config import get_settings
 from app.db import get_session
 from app.dbos_runtime import execute_booking_durable
+from app.dependencies import get_current_user
 from app.models import (
     BookingTransition,
     FlightSearchResult,
     HITLBookingLog,
     TripRequest,
+    User,
 )
 from app.repositories import booking_repository as repository
 from app.routes.connectors import slack_notifications_enabled
@@ -78,6 +80,18 @@ async def _notify_slack_if_enabled(session: AsyncSession, booking: HITLBookingLo
     )
     if not await notify_pending_approval(settings, booking, trip, flight):
         logger.warning("booking=%r requested but Slack was not notified", booking.id)
+
+
+@router.get("/bookings", response_model=list[BookingLogOut])
+async def list_bookings(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> list[BookingLogOut]:
+    """Backs the global approval-history tab: every booking this user requested, each with its
+    append-only transition trail."""
+    assert user.id is not None, "get_current_user must always return a persisted user"
+    bookings = await repository.list_bookings_with_transitions_for_user(session, user.id)
+    return [_to_out(booking, transitions) for booking, transitions in bookings]
 
 
 @router.get("/bookings/{log_id}", response_model=BookingLogOut, responses=_NOT_FOUND)

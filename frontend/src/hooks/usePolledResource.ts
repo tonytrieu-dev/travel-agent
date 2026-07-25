@@ -7,6 +7,8 @@ interface PolledResourceOptions<T> {
   fetcher: (() => Promise<T>) | null
   isRunActive: boolean
   enabled?: boolean
+  /** Shown verbatim on failure, so each caller names what it was actually loading. */
+  errorText: string
 }
 
 interface PolledResourceState<T> {
@@ -20,6 +22,7 @@ export function usePolledResource<T>({
   fetcher,
   isRunActive,
   enabled = true,
+  errorText,
 }: PolledResourceOptions<T>): PolledResourceState<T> {
   const [data, setData] = useState<T | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -33,11 +36,11 @@ export function usePolledResource<T>({
       setData(await fetcher())
       setErrorMessage(null)
     } catch {
-      setErrorMessage("Could not load execution data.")
+      setErrorMessage(errorText)
     } finally {
       isFetchingRef.current = false
     }
-  }, [fetcher])
+  }, [fetcher, errorText])
 
   useEffect(() => {
     if (!enabled || fetcher === null) return

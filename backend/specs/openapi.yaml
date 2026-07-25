@@ -147,18 +147,22 @@ paths:
         - { name: trip_id, in: path, required: true, schema: { type: integer } }
       responses:
         '200':
-          description: Either the ready itinerary or the agent's clarifying questions.
+          description: >-
+            The ready itinerary, the agent's clarifying questions, or an honest report that the
+            trip exceeded the planning token budget.
           content:
             application/json:
               schema:
                 oneOf:
                   - { $ref: '#/components/schemas/PlanReadyOut' }
                   - { $ref: '#/components/schemas/PlanNeedsClarificationOut' }
+                  - { $ref: '#/components/schemas/PlanTooComplexOut' }
                 discriminator:
                   propertyName: status
                   mapping:
                     ready: '#/components/schemas/PlanReadyOut'
                     needs_clarification: '#/components/schemas/PlanNeedsClarificationOut'
+                    too_complex: '#/components/schemas/PlanTooComplexOut'
         '404':
           description: No such trip.
           content:
@@ -236,6 +240,19 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/bookings:
+    get:
+      operationId: list_bookings
+      summary: Every booking this user requested, newest first, each with its append-only transition history (backs the global approval-history tab).
+      responses:
+        '200':
+          description: All bookings with their approval trails.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/BookingLogOut' }
 
   /api/bookings/{log_id}:
     get:
@@ -591,6 +608,13 @@ components:
         questions:
           type: array
           items: { type: string }
+
+    PlanTooComplexOut:
+      type: object
+      required: [status, reason]
+      properties:
+        status: { type: string, enum: [too_complex] }
+        reason: { type: string }
 
     AgentStepKind:
       type: string

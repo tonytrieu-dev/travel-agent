@@ -50,6 +50,10 @@ function cheapestPerProvider(options: Record<string, unknown>[]): Record<string,
   return Array.from(cheapestByLabel.values())
 }
 
+function stateLabel(state: string): string {
+  return state.replaceAll("_", " ").toLowerCase()
+}
+
 function searchAgainMessage(state: string): string | null {
   if (state === "EXPIRED")
     return "This booking expired before it was completed. Please search again for current prices."
@@ -84,7 +88,7 @@ export function BookingModule({ trip, selectedOffer, onSearchAgain }: BookingMod
 
   useEffect(() => {
     if (bookingLog && bookingLog.state !== previousStateRef.current) {
-      setAnnouncement(`Booking is now ${bookingLog.state.replaceAll("_", " ").toLowerCase()}.`)
+      setAnnouncement(`Booking is now ${stateLabel(bookingLog.state)}.`)
       previousStateRef.current = bookingLog.state
     }
   }, [bookingLog])

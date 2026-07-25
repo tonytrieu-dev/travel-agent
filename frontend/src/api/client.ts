@@ -88,6 +88,10 @@ export function getAllExecution(): Promise<GlobalExecutionPanelOut> {
   return request<GlobalExecutionPanelOut>("/execution")
 }
 
+export function listBookings(): Promise<BookingLogOut[]> {
+  return request<BookingLogOut[]>("/bookings")
+}
+
 export function requestBooking(
   tripId: number,
   bookingRequestCreate: BookingRequestCreate,

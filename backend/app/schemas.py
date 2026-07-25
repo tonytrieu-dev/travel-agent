@@ -289,8 +289,18 @@ class PlanNeedsClarificationOut(BaseModel):
     questions: list[str]
 
 
+class PlanTooComplexOut(BaseModel):
+    """The run ran out of token budget before producing an itinerary. Distinct from
+    PlanNeedsClarificationOut: no amount of extra detail from the user fixes this in the same
+    pass — the honest fix is a shorter/simpler trip, not a form to fill out and resubmit."""
+
+    status: Literal["too_complex"] = "too_complex"
+    reason: str
+
+
 PlanOut = Annotated[
-    PlanReadyOut | PlanNeedsClarificationOut, Field(discriminator="status")
+    PlanReadyOut | PlanNeedsClarificationOut | PlanTooComplexOut,
+    Field(discriminator="status"),
 ]
 
 

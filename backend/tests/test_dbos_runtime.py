@@ -15,7 +15,7 @@ from sqlmodel import col
 from app.agent.planner import agent as planner_agent
 from app.dbos_runtime import run_planner_durable
 from app.models import AgentRun, AgentRunStep, ExecutionEvent
-from app.schemas import ClarificationOut
+from app.schemas import ClarificationOut, PlanTooComplexOut
 from tests.db_helpers import TEST_DATABASE_URL, seed_trip
 
 
@@ -183,13 +183,15 @@ async def test_run_planner_durable_asks_for_clarification_instead_of_crashing_wh
     )
 
 
-async def test_run_planner_durable_asks_for_clarification_instead_of_crashing_when_usage_limit_is_exceeded(
+async def test_run_planner_durable_reports_too_complex_instead_of_crashing_when_usage_limit_is_exceeded(
     client, monkeypatch
 ) -> None:
     """gpt-oss-120b on Cerebras is rate-limited to 30K tokens/minute, and pydantic-ai resends the
     growing message history on every step — a real, expected outcome on a research-heavy trip,
     not a bug. UsageLimitExceeded (covers the token, tool-call, and request ceilings alike) must
-    degrade to a distinct ClarificationOut, not propagate a raw crash to /plan.
+    degrade to PlanTooComplexOut, not propagate a raw crash to /plan. Deliberately a different
+    type from the exhausted-retries ClarificationOut above: no amount of extra detail from the
+    user fixes a token-budget overrun, so asking them a question would just resubmit into it.
     """
     trip_id = await _seed_trip_id()
     monkeypatch.setattr(
@@ -206,15 +208,12 @@ async def test_run_planner_durable_asks_for_clarification_instead_of_crashing_wh
     with planner_agent.override(model=FunctionModel(_never_finishes_within_the_request_limit)):
         output = await run_planner_durable(trip_id, "Plan me a trip to Paris.")
 
-    assert isinstance(output, ClarificationOut), (
-        f"an exceeded usage limit must degrade to ClarificationOut instead of raising or "
-        f"returning {type(output)}"
+    assert isinstance(output, PlanTooComplexOut), (
+        f"an exceeded usage limit must degrade to PlanTooComplexOut — a distinct type from the "
+        f"exhausted-retries ClarificationOut, since the two failures have different causes and "
+        f"different asks — instead of raising or returning {type(output)}"
     )
-    assert output.questions != [
-        "I couldn't find enough verified activity information to complete this "
-        "itinerary. Could you narrow the destination or share specific interests "
-        "to search for?"
-    ], "a usage-limit clarification must not reuse the exhausted-output-retries message — the two failures have different causes and different asks"
+    assert output.reason, "PlanTooComplexOut must explain why the trip could not be planned"
 
     engine = create_async_engine(TEST_DATABASE_URL)
     try:

@@ -18,12 +18,12 @@ from app.db import get_session_factory
 from app.models import FlightSearchResult, TripRequest
 from app.rate_limit import acquire_agent_run_slot, release_agent_run_slot
 from app.repositories import booking_repository as repository
-from app.schemas import BookingLogOut, ClarificationOut, ItineraryOut
+from app.schemas import BookingLogOut, ClarificationOut, ItineraryOut, PlanTooComplexOut
 
 
 async def _persist_failed_run(
     run: ExecutionRun,
-    agent_run: AgentRun[PlannerDeps, ItineraryOut | ClarificationOut],
+    agent_run: AgentRun[PlannerDeps, ItineraryOut | ClarificationOut | PlanTooComplexOut],
 ) -> None:
     # Keeps whatever tool calls ran before the crash on the execution panel, not just successes.
     await run.persist_result(
@@ -68,7 +68,9 @@ async def execute_booking_durable(log_id: int) -> BookingLogOut:
 
 
 @DBOS.workflow(name="run_planner")
-async def _run_planner_workflow(trip_id: int, prompt: str) -> ItineraryOut | ClarificationOut:
+async def _run_planner_workflow(
+    trip_id: int, prompt: str
+) -> ItineraryOut | ClarificationOut | PlanTooComplexOut:
     settings = get_settings()
     async with (
         get_session_factory()() as session,
@@ -87,14 +89,12 @@ async def _run_planner_workflow(trip_id: int, prompt: str) -> ItineraryOut | Cla
             except Exception as error:
                 await _persist_failed_run(run, agent_run)
                 if isinstance(error, UsageLimitExceeded):
-                    # A real, expected outcome on a research-heavy trip (see MAX_CONTEXT_TOKENS
-                    # in config.py) — ask the user to narrow scope instead of crashing the request.
-                    return ClarificationOut(
-                        questions=[
-                            "This trip needed more research than fits in one planning pass. "
-                            "Could you narrow the destination, trip length, or interests so I "
-                            "can complete it in fewer steps?"
-                        ]
+                    # A real, expected outcome on a research-heavy trip (MAX_CONTEXT_TOKENS).
+                    return PlanTooComplexOut(
+                        reason=(
+                            "This trip needed more planning work than fits in one pass. "
+                            "Try a shorter trip or a simpler request."
+                        )
                     )
                 if not isinstance(error, UnexpectedModelBehavior):
                     raise
@@ -114,7 +114,9 @@ async def _run_planner_workflow(trip_id: int, prompt: str) -> ItineraryOut | Cla
     return result.output
 
 
-async def run_planner_durable(trip_id: int, prompt: str) -> ItineraryOut | ClarificationOut:
+async def run_planner_durable(
+    trip_id: int, prompt: str
+) -> ItineraryOut | ClarificationOut | PlanTooComplexOut:
     """Not itself a DBOS workflow: the concurrency slot is plain in-process state, and acquiring
     it inside a replayable workflow body risks a double-acquire if DBOS re-enters that body
     during its own internal record/persist resolution (observed empirically) — so the slot wraps

@@ -106,7 +106,9 @@ export function ItineraryPanel({
     <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-slate-900">Itinerary</h2>
-        {(!planResult || planResult.status === "needs_clarification") && (
+        {(!planResult ||
+          planResult.status === "needs_clarification" ||
+          planResult.status === "too_complex") && (
           <button
             type="button"
             onClick={onRequestPlan}
@@ -130,6 +132,13 @@ export function ItineraryPanel({
           questions={planResult.questions}
           onAnswerClarification={onAnswerClarification}
         />
+      )}
+
+      {planResult?.status === "too_complex" && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-6">
+          <h3 className="font-semibold text-slate-900">This trip couldn't be planned</h3>
+          <p className="mt-2 text-sm text-slate-600">{planResult.reason}</p>
+        </div>
       )}
 
       {planResult?.status === "ready" && (

@@ -126,7 +126,12 @@ export interface PlanNeedsClarificationOut {
   questions: string[]
 }
 
-export type PlanOut = PlanReadyOut | PlanNeedsClarificationOut
+export interface PlanTooComplexOut {
+  status: "too_complex"
+  reason: string
+}
+
+export type PlanOut = PlanReadyOut | PlanNeedsClarificationOut | PlanTooComplexOut
 
 export type AgentStepKind = "model" | "tool" | "output"
 
