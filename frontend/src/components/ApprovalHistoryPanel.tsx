@@ -1,6 +1,11 @@
 import { useMemo, useState } from "react"
 import { listBookings } from "../api/client"
-import type { BookingLogOut, BookingState, TripRequestOut } from "../api/types"
+import type {
+  BookingLogOut,
+  BookingState,
+  BookingTransitionOut,
+  TripRequestOut,
+} from "../api/types"
 import { usePolledResource } from "../hooks/usePolledResource"
 import { FilterSelect } from "./FilterSelect"
 
@@ -23,25 +28,35 @@ function stateStyles(state: BookingState): string {
   return "bg-slate-100 text-slate-600"
 }
 
-function stateLabel(state: string): string {
-  return state.replaceAll("_", " ").toLowerCase()
+/** Names the acting principal for an audit reader. A transition with no actor is the system
+ * expiring a stale fare rather than a person deciding — the distinction the trail exists for.
+ * The email is resolved server-side; falling back to the id keeps an anonymized user's decision
+ * attributable rather than silently blank. */
+function actorLabel(transition: BookingTransitionOut): string {
+  if (transition.actor_user_id == null) return "System (automatic)"
+  return transition.actor_email ?? `Account #${transition.actor_user_id}`
 }
 
-/** One booking's append-only transition trail. A null actor is the system expiring a stale fare
- * rather than a person deciding, which is the distinction an auditor cares about. */
+function formatTimestamp(value: string): string {
+  return new Date(value).toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  })
+}
+
 function ApprovalTrail({ booking, routeLabel }: { booking: BookingLogOut; routeLabel: string }) {
   return (
-    <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
-      <div className="flex items-center justify-between gap-2">
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
         <div>
           <div className="flex items-center gap-2">
-            <p className="font-semibold text-slate-900">Booking #{booking.id}</p>
-            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-500">
+            <h3 className="font-semibold text-slate-900">Booking #{booking.id}</h3>
+            <span className="rounded bg-white px-1.5 py-0.5 text-xs font-medium text-slate-500 ring-1 ring-slate-200 ring-inset">
               {routeLabel}
             </span>
           </div>
-          <p className="text-xs text-slate-500">
-            Requested {new Date(booking.created_at).toLocaleString()}
+          <p className="mt-0.5 text-xs text-slate-500">
+            Requested {formatTimestamp(booking.created_at)}
           </p>
         </div>
         <span
@@ -52,30 +67,41 @@ function ApprovalTrail({ booking, routeLabel }: { booking: BookingLogOut; routeL
       </div>
 
       {booking.transitions.length === 0 ? (
-        <p className="text-sm text-slate-500">
-          No approval decisions recorded yet — this booking is still awaiting a human.
+        <p className="px-4 py-4 text-sm text-slate-500">
+          Awaiting a human decision — no approval has been recorded yet.
         </p>
       ) : (
-        <ol className="space-y-2">
-          {booking.transitions.map((transition) => (
-            <li
-              key={`${transition.created_at}-${transition.to_state}`}
-              className="rounded-lg border border-slate-200 bg-slate-50 p-3"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-medium text-slate-900">
-                  {stateLabel(transition.from_state)} → {stateLabel(transition.to_state)}
-                </span>
-                <span className="rounded bg-white px-1.5 py-0.5 text-xs font-medium text-slate-600">
-                  {transition.reason}
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-slate-500">
-                {new Date(transition.created_at).toLocaleString()} ·{" "}
-                {transition.actor_user_id != null ? `user ${transition.actor_user_id}` : "system"}
-              </p>
-            </li>
-          ))}
+        <ol className="px-4 py-4">
+          {booking.transitions.map((transition, index) => {
+            const isLast = index === booking.transitions.length - 1
+            return (
+              <li key={`${transition.created_at}-${transition.to_state}`} className="flex gap-3">
+                {/* Dot-and-rail timeline: the rail is omitted on the last row so it stops at the
+                    final decision instead of trailing into whitespace. */}
+                <div className="flex flex-col items-center pt-1">
+                  <span
+                    aria-hidden="true"
+                    className="h-2 w-2 shrink-0 rounded-full bg-indigo-500 ring-4 ring-indigo-50"
+                  />
+                  {!isLast && <span aria-hidden="true" className="mt-1 w-px flex-1 bg-slate-200" />}
+                </div>
+                <div className={isLast ? "min-w-0" : "min-w-0 pb-5"}>
+                  <p className="text-sm font-medium text-slate-900">
+                    {STATE_LABELS[transition.from_state]}{" "}
+                    <span className="text-slate-400">→</span>{" "}
+                    {STATE_LABELS[transition.to_state]}
+                  </p>
+                  <p className="mt-0.5 text-sm text-slate-600">
+                    <span className="text-slate-400">Actor:</span> {actorLabel(transition)}
+                  </p>
+                  <p className="mt-0.5 text-xs text-slate-400">
+                    {formatTimestamp(transition.created_at)} · recorded as{" "}
+                    <span className="font-mono">{transition.reason}</span>
+                  </p>
+                </div>
+              </li>
+            )
+          })}
         </ol>
       )}
     </div>
@@ -108,10 +134,9 @@ export function ApprovalHistoryPanel({ trips, isRunActive }: ApprovalHistoryPane
     [bookings],
   )
 
-  const visibleBookings =
-    stateFilter === "all"
-      ? bookings
-      : bookings.filter((booking) => booking.state === stateFilter)
+  const visibleBookings = bookings.filter(
+    (booking) => stateFilter === "all" || booking.state === stateFilter,
+  )
 
   if (errorMessage) {
     return (
@@ -131,11 +156,11 @@ export function ApprovalHistoryPanel({ trips, isRunActive }: ApprovalHistoryPane
 
   return (
     <section className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-slate-900">Approval history</h2>
-          <p className="text-sm text-slate-500">
-            Every human decision on a booking, from the append-only audit trail.
+          <p className="mt-0.5 text-sm text-slate-500">
+            Every human-in-the-loop decision on a booking, from the append-only audit trail.
           </p>
         </div>
         <FilterSelect

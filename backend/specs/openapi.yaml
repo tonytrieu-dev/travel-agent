@@ -423,6 +423,7 @@ components:
         to_state: { $ref: '#/components/schemas/BookingState' }
         reason: { type: string }
         actor_user_id: { type: [integer, 'null'] }
+        actor_email: { type: [string, 'null'] }
         created_at: { type: string, format: date-time }
 
     BookingLogOut:

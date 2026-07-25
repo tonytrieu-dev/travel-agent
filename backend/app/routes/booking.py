@@ -47,12 +47,25 @@ _EXECUTE_RESPONSES: dict[int | str, dict[str, Any]] = {
 }
 
 
+def _to_transition_out(
+    transition: BookingTransition, actor_emails: dict[int, str]
+) -> BookingTransitionOut:
+    out = BookingTransitionOut.model_validate(transition)
+    if transition.actor_user_id is not None:
+        out.actor_email = actor_emails.get(transition.actor_user_id)
+    return out
+
+
 def _to_out(
-    booking: HITLBookingLog, transitions: list[BookingTransition] | None = None
+    booking: HITLBookingLog,
+    transitions: list[BookingTransition] | None = None,
+    actor_emails: dict[int, str] | None = None,
 ) -> BookingLogOut:
     out = BookingLogOut.model_validate(booking)
     if transitions is not None:
-        out.transitions = [BookingTransitionOut.model_validate(t) for t in transitions]
+        out.transitions = [
+            _to_transition_out(transition, actor_emails or {}) for transition in transitions
+        ]
     return out
 
 
@@ -91,7 +104,9 @@ async def list_bookings(
     append-only transition trail."""
     assert user.id is not None, "get_current_user must always return a persisted user"
     bookings = await repository.list_bookings_with_transitions_for_user(session, user.id)
-    return [_to_out(booking, transitions) for booking, transitions in bookings]
+    every_transition = [transition for _, transitions in bookings for transition in transitions]
+    actor_emails = await repository.actor_emails_for(session, every_transition)
+    return [_to_out(booking, transitions, actor_emails) for booking, transitions in bookings]
 
 
 @router.get("/bookings/{log_id}", response_model=BookingLogOut, responses=_NOT_FOUND)
@@ -99,7 +114,7 @@ async def get_booking(
     log_id: int, session: AsyncSession = Depends(get_session)
 ) -> BookingLogOut:
     booking, transitions = await repository.get_booking_with_transitions(session, log_id)
-    return _to_out(booking, transitions)
+    return _to_out(booking, transitions, await repository.actor_emails_for(session, transitions))
 
 
 @router.post(

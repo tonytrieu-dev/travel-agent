@@ -116,6 +116,10 @@ class BookingTransitionOut(BaseModel):
     to_state: BookingState
     reason: str
     actor_user_id: int | None = None
+    # Resolved for display so an audit reader sees who decided, not a raw foreign key. Null for a
+    # system action (a TTL expiry has no actor) and for an anonymized user, whose audit rows
+    # deliberately outlive their email (see User.email).
+    actor_email: str | None = None
     created_at: UtcDatetime
 
 

@@ -195,6 +195,7 @@ export interface BookingTransitionOut {
   to_state: BookingState
   reason: string
   actor_user_id?: number | null
+  actor_email?: string | null
   created_at: string
 }
 

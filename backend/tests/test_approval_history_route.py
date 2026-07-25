@@ -3,6 +3,7 @@ authenticated user requested, each carrying its append-only BookingTransition tr
 via the real routes, so the transitions come from the state machine rather than a fixture.
 """
 
+from app.config import DEMO_USER_EMAIL
 from app.state import BookingState
 from tests.db_helpers import run_db, seed_booking, seed_flight_search_results
 
@@ -65,6 +66,10 @@ def test_approval_history_returns_each_owned_bookings_transition_trail_newest_fi
     assert confirmed["transitions"][0]["actor_user_id"] is not None, (
         "a human confirm must record the acting user — a null actor means the system expired it, "
         "which is the distinction the approval trail exists to preserve"
+    )
+    assert confirmed["transitions"][0]["actor_email"] == DEMO_USER_EMAIL, (
+        "the acting principal's identity must be resolved server-side so the audit UI names who "
+        f"decided instead of rendering a raw row id; got {confirmed['transitions'][0]}"
     )
     assert bookings[1]["transitions"] == [], (
         "a booking still awaiting approval has made no decisions yet, so its trail must be empty "

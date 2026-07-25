@@ -24,6 +24,7 @@ from app.models import (
     FlightSearchResult,
     HITLBookingLog,
     TripRequest,
+    User,
     utcnow,
 )
 from app.schemas import ErrorCode
@@ -143,6 +144,28 @@ async def get_booking_with_transitions(
         )
     )
     return booking, transitions
+
+
+async def actor_emails_for(
+    session: AsyncSession, transitions: list[BookingTransition]
+) -> dict[int, str]:
+    """One lookup covering every actor in the given transitions, so rendering "who approved this"
+    can't fan out into a query per audit row. An anonymized user has no email and is simply
+    absent from the map — the audit row itself still stands.
+    """
+    actor_ids = {
+        transition.actor_user_id
+        for transition in transitions
+        if transition.actor_user_id is not None
+    }
+    if not actor_ids:
+        return {}
+    rows = await session.execute(
+        select(col(User.id), col(User.email)).where(
+            col(User.id).in_(actor_ids), col(User.email).is_not(None)
+        )
+    )
+    return {user_id: email for user_id, email in rows if email is not None}
 
 
 async def list_bookings_with_transitions_for_user(
