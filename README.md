@@ -20,11 +20,12 @@ moves forward.
    a day-by-day plan where every activity cites the real source URL it came from. No invented
    activities, no fabricated data.
 4. **Human-approved booking handoff** — review a proposed flight, explicitly approve it, then
-   retrieve real booking options, as three separate steps. The agent never books anything itself;
-   approval only unlocks a deterministic, audited workflow that hands off to the airline/OTA for
-   the actual purchase. A 30-minute price hold guards against acting on a stale fare: confirming
-   or executing past that window transitions the booking to `EXPIRED` and returns a 409 telling
-   you to search again.
+   retrieve real checkout links, as three separate steps. Nothing here books a flight. Approval
+   unlocks a deterministic, audited workflow whose output is airline/OTA checkout links with the
+   chosen flight already attached; you complete the purchase on the carrier's own site, and the
+   reference this app stores is its own audit id, not an airline confirmation number. Because no
+   fare is actually held, a 30-minute freshness window guards against handing you a stale price:
+   approving or executing past it marks the booking `EXPIRED` and asks you to search again.
 5. **Watch the agent work** — an execution panel shows every run's tool calls, token usage,
    context-budget utilization, and timing, live. It's global across all of your trips (filterable
    by route and status), not just the one you're currently planning.
