@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass
 from typing import Literal
 
-from pydantic_ai import Agent, ModelRetry, RunContext
+from pydantic_ai import Agent, ModelRetry, RunContext, ToolOutput
 from pydantic_ai.messages import ModelMessage, ToolReturnPart
 from pydantic_ai.models.cerebras import CerebrasModel
 from pydantic_ai.providers.cerebras import CerebrasProvider
@@ -158,7 +158,10 @@ def _build_agent() -> Agent[PlannerDeps, ItineraryOut | ClarificationOut]:
     built_agent = Agent(
         model,
         deps_type=PlannerDeps,
-        output_type=[ItineraryOut, ClarificationOut],
+        # Pinned to tool output: left on auto, pydantic-ai picks native structured output for
+        # this model and wraps the union in {"result": {"kind": ...}}. gpt-oss-120b fumbles that
+        # envelope, and each retry resends the whole itinerary — 3 fumbles blow the token limit.
+        output_type=[ToolOutput(ItineraryOut), ToolOutput(ClarificationOut)],
         system_prompt=load_system_prompt(),
         retries={"output": MAX_OUTPUT_RETRIES},
     )
