@@ -286,14 +286,14 @@ class FlightSearchTrajectory(Evaluator[str, ItineraryOut | ClarificationOut, Cas
                 value=matches,
                 reason=None if matches else f"expected no search_flights call, got {len(calls)}",
             )
-        matches = bool(calls) and all(
-            call["status"] == "success" and call["arguments"] == expected for call in calls
+        matches = (
+            len(calls) == 1 and calls[0]["status"] == "success" and calls[0]["arguments"] == expected
         )
         return EvaluationReason(
             value=matches,
             reason=None
             if matches
-            else f"expected successful search_flights args {expected}, got {calls}",
+            else f"expected exactly one successful search_flights call with args {expected}, got {calls}",
         )
 
 
@@ -310,12 +310,12 @@ class WebSearchTrajectory(Evaluator[str, ItineraryOut | ClarificationOut, CaseMe
         if trace is None:
             return EvaluationReason(value=False, reason="planner_trace is missing or malformed")
         calls = [call for call in trace["calls"] if call["name"] == "web_search"]
-        if not 1 <= len(calls) <= 3:
+        if len(calls) != 1:
             return EvaluationReason(
-                value=False, reason=f"expected 1-3 web_search calls, got {len(calls)}"
+                value=False, reason=f"expected exactly 1 web_search call, got {len(calls)}"
             )
-        if any(call["status"] != "success" for call in calls):
-            return EvaluationReason(value=False, reason="every web_search call must succeed")
+        if calls[0]["status"] != "success":
+            return EvaluationReason(value=False, reason="the web_search call must succeed")
 
         route_codes: set[str] = set()
         expected_flight = ctx.metadata.get("flight_search")

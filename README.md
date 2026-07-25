@@ -43,8 +43,8 @@ moves forward.
   agent; a live activity feed streams its tool calls inline on the trip page, and a separate
   execution panel shows the full run trace across every trip. A "Your trips" tab lists every trip
   you've created, so switching or revisiting one never loses its history.
-- **Evals:** `pydantic-evals` — deterministic + LLM-judged scoring of agent quality, separate
-  from the pytest suite that gates system correctness.
+- **Evals:** `pydantic-evals` — deterministic scoring by default, with optional LLM-judged
+  fitness-appropriateness scoring, separate from the pytest suite that gates system correctness.
 
 All three external services offer a free tier as of this writing; check each provider's current
 pricing page before relying on exact quota numbers, which change over time. For why each one was
@@ -107,13 +107,14 @@ uv run pyrefly check
 ```bash
 cd backend
 uv run python -m evals.run --repeat 3
+# Optional Gemini judge:
+uv run python -m evals.run --with-judge
 ```
 
-Scores the agent (not just the system) against a small dataset: are itineraries fitness-appropriate
-(scored by an LLM judge, on top of the deterministic `reject_unsafe_intensity` guardrail every
-real run also goes through), and are all cited activities grounded in real search results. Runs
-against the real Cerebras API, so it spends real quota — mind your request limits before running
-repeatedly.
+Scores the agent (not just the system) against a small dataset: are cited activities grounded in
+real search results, are flights searched exactly once, and is the itinerary safe for the
+traveler? The default suite is deterministic; `--with-judge` opts into the Gemini
+`FitnessAppropriateness` evaluator. Runs against the real Cerebras API, so it spends real quota.
 
 ### 7. (Optional) Slack human-in-the-loop approvals
 

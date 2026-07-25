@@ -1,7 +1,9 @@
 from copy import deepcopy
 from types import SimpleNamespace
-from typing import cast
+from typing import Literal, cast
 
+import pytest
+from pydantic import ValidationError
 from pydantic_ai.messages import (
     ModelRequest,
     ModelResponse,
@@ -10,7 +12,6 @@ from pydantic_ai.messages import (
     ToolReturnPart,
 )
 from pydantic_evals.evaluators import (
-    EvaluationReason,
     EvaluatorContext,
     ReportEvaluatorContext,
 )
@@ -52,7 +53,9 @@ def _metadata() -> CaseMetadata:
     }
 
 
-def _itinerary(source_url: str = SOURCE_URL, intensity: str = "low") -> ItineraryOut:
+def _itinerary(
+    source_url: str = SOURCE_URL, intensity: Literal["low", "moderate", "high"] = "low"
+) -> ItineraryOut:
     return ItineraryOut(
         days=[
             ItineraryDayOut(
@@ -188,7 +191,9 @@ def test_good_trace_passes_deterministic_trajectory_evaluators() -> None:
     assert _passes(CitationGrounding(), trace)
 
 
-def test_flight_search_allows_duplicate_successful_calls_with_exact_arguments() -> None:
+def test_flight_search_requires_exactly_one_call_and_rejects_wrong_arguments() -> None:
+    """A second search_flights call is wasted tool-call variance, not a legitimate retry — the
+    planner already has the trip's route/dates and never needs to search them twice."""
     wrong_arguments = _good_trace()
     wrong_arguments["calls"][0]["arguments"]["return_date"] = "2026-09-09"
     duplicate = _good_trace()
@@ -196,16 +201,18 @@ def test_flight_search_allows_duplicate_successful_calls_with_exact_arguments() 
     duplicate["tool_call_count"] += 1
 
     assert not _passes(FlightSearchTrajectory(), wrong_arguments)
-    assert _passes(FlightSearchTrajectory(), duplicate)
+    assert not _passes(FlightSearchTrajectory(), duplicate)
 
 
-def test_web_search_enforces_budget_success_and_no_flight_fact_queries() -> None:
+def test_web_search_requires_exactly_one_successful_broad_non_flight_query() -> None:
+    """A second (even legitimate, broad) web_search call is wasted tool-call variance the planner
+    doesn't need — one broad query is enough to ground an itinerary in real activities."""
     no_search = _good_trace()
     no_search["calls"] = no_search["calls"][:1]
     no_search["tool_call_count"] = 1
-    too_many = _good_trace()
-    too_many["calls"].extend([deepcopy(too_many["calls"][1]) for _ in range(3)])
-    too_many["tool_call_count"] = 5
+    second_broad_search = _good_trace()
+    second_broad_search["calls"].append(deepcopy(second_broad_search["calls"][1]))
+    second_broad_search["tool_call_count"] += 1
     flight_query = _good_trace()
     flight_query["calls"][1]["arguments"]["query"] = "JFK SAN prices"
     narrow_query = _good_trace()
@@ -213,7 +220,7 @@ def test_web_search_enforces_budget_success_and_no_flight_fact_queries() -> None
     retried = _good_trace()
     retried["calls"][1]["status"] = "retry"
 
-    for trace in (no_search, too_many, flight_query, narrow_query, retried):
+    for trace in (no_search, second_broad_search, flight_query, narrow_query, retried):
         assert not _passes(WebSearchTrajectory(), trace)
 
 
@@ -260,12 +267,24 @@ def test_malformed_or_mismatched_trace_evidence_fails_closed() -> None:
     assert not _passes(ToolCallBudget(), trace)
 
 
-def test_physical_load_rejects_unknown_and_unsafe_low_fitness_intensity() -> None:
-    unknown = PhysicalLoad().evaluate(_context(output=_itinerary(intensity="gentle")))
+def test_activity_out_rejects_intensity_outside_the_closed_vocabulary() -> None:
+    """The live eval trace showed the model writing descriptive phrases ("low to moderate (tram
+    seated)") that no downstream check could match against a fixed term list — intensity is now
+    a closed Literal so that failure is caught at parse time, not silently scored as unknown."""
+    with pytest.raises(ValidationError, match="low.*moderate.*high"):
+        ActivityOut(
+            name="Museum",
+            description="Visit the museum.",
+            intensity="gentle",  # type: ignore[arg-type]
+            source_url=SOURCE_URL,
+        )
+
+
+def test_low_fitness_safety_and_no_flight_activities_reject_correctly() -> None:
     low_metadata = _metadata()
     low_metadata["fitness_level"] = FitnessLevel.LOW
     unsafe = LowFitnessSafety().evaluate(
-        _context(output=_itinerary(intensity="strenuous"), metadata=low_metadata)
+        _context(output=_itinerary(intensity="high"), metadata=low_metadata)
     )
     flight = NoFlightActivities().evaluate(
         _context(
@@ -287,10 +306,6 @@ def test_physical_load_rejects_unknown_and_unsafe_low_fitness_intensity() -> Non
             )
         )
     )
-
-    known_intensity = unknown["known_intensity"]
-    assert isinstance(known_intensity, EvaluationReason)
-    assert not known_intensity.value
     assert not unsafe.value
     assert not flight.value
 

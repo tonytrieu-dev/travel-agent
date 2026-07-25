@@ -3,7 +3,8 @@ trip already has flight results — the redundant-search bug that inflated a run
 was found alongside a real 413 crash (see planner.py's search_flights for the full reasoning).
 """
 
-from pydantic_ai import RunContext
+import pytest
+from pydantic_ai import ModelRetry, RunContext
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.usage import RunUsage
 
@@ -50,6 +51,29 @@ def test_reuses_this_trips_cached_flight_results_instead_of_searching_live_again
     assert result["offers"][0]["carrier"] == "AF", (
         f"the returned offer must be the trip's cached result, not the live provider's stand-in "
         f"data; got {result['offers']}"
+    )
+
+
+def test_second_call_in_the_same_run_is_rejected_instead_of_searching_again() -> None:
+    """The live eval trace showed the model re-searching the return leg as a separate call even
+    though the first response already covers both legs — this must be rejected without spending
+    a second live/recorded search, so the model reuses what it already has."""
+
+    async def _work(session):
+        trip_id = await seed_trip(session)
+        provider = FlightSearchSpy()
+        ctx = _context(provider)
+        async with execution_context(session, trip_id):
+            await search_flights(ctx, "JFK", "CDG", "2026-08-01", None)
+            with pytest.raises(ModelRetry):
+                await search_flights(ctx, "CDG", "JFK", "2026-08-08", None)
+        return provider
+
+    provider = run_db(_work)
+
+    assert provider.calls == 1, (
+        f"a second search_flights call in the same run must not reach the provider at all; "
+        f"got {provider.calls} call(s)"
     )
 
 

@@ -5,7 +5,8 @@ the full reasoning.
 
 from dataclasses import dataclass, field
 
-from pydantic_ai import RunContext
+import pytest
+from pydantic_ai import ModelRetry, RunContext
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.usage import RunUsage
 
@@ -22,8 +23,10 @@ class ActivitySearchSpy:
 
     results: list[NormalizedActivityResult] = field(default_factory=list)
     last_query: str | None = None
+    calls: int = 0
 
     async def search(self, query: str, max_results: int = 5) -> list[NormalizedActivityResult]:
+        self.calls += 1
         self.last_query = query
         return self.results
 
@@ -50,4 +53,27 @@ def test_web_search_anchors_the_query_on_the_trips_airport_code() -> None:
     assert provider.last_query is not None and "ONT" in provider.last_query, (
         f"web_search must anchor the model's query on the trip's destination_airport so results "
         f"can't drift to a same-named place elsewhere; got {provider.last_query!r}"
+    )
+
+
+def test_second_call_in_the_same_run_is_rejected_instead_of_searching_again() -> None:
+    """The live eval trace showed the model calling web_search 2-3 times in a single run despite
+    the prompt asking for one broad search — this must be rejected without spending a second
+    provider call, so the model reuses what it already has."""
+
+    async def _work(session):
+        trip_id = await seed_trip(session)
+        provider = ActivitySearchSpy()
+        ctx = _context(provider)
+        async with execution_context(session, trip_id):
+            await web_search(ctx, "things to do")
+            with pytest.raises(ModelRetry):
+                await web_search(ctx, "museums")
+        return provider
+
+    provider = run_db(_work)
+
+    assert provider.calls == 1, (
+        f"a second web_search call in the same run must not reach the provider at all; "
+        f"got {provider.calls} call(s)"
     )

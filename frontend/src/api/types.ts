@@ -96,7 +96,7 @@ export interface FlightSearchOut {
 export interface ActivityOut {
   name: string
   description: string
-  intensity: string
+  intensity: "low" | "moderate" | "high"
   source_url: string
 }
 

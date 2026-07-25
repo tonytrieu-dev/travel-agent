@@ -28,6 +28,7 @@ from evals.dataset import dataset
 from evals.evaluators import (
     PLANNER_TRACE_ATTRIBUTE,
     CaseMetadata,
+    FitnessAppropriateness,
     extract_planner_trace,
 )
 
@@ -98,23 +99,29 @@ def build_run_metadata(provider_mode: ProviderMode = "recorded") -> dict[str, st
     }
 
 
-def _selected_dataset(provider_mode: ProviderMode) -> Dataset[
-    str, ItineraryOut | ClarificationOut, CaseMetadata
-]:
-    if provider_mode == "recorded":
-        return dataset
+def _selected_dataset(
+    provider_mode: ProviderMode, *, with_judge: bool
+) -> Dataset[str, ItineraryOut | ClarificationOut, CaseMetadata]:
+    evaluators = [*dataset.evaluators, FitnessAppropriateness()] if with_judge else dataset.evaluators
+    if provider_mode == "live-smoke":
+        return Dataset(
+            name=f"{dataset.name}_live_smoke",
+            cases=dataset.cases[:1],
+            evaluators=evaluators,
+        )
     return Dataset(
-        name=f"{dataset.name}_live_smoke",
-        cases=dataset.cases[:1],
-        evaluators=dataset.evaluators,
+        name=dataset.name,
+        cases=dataset.cases,
+        evaluators=evaluators,
+        report_evaluators=dataset.report_evaluators,
     )
 
 
-def main(*, repeat: int = 1, live_smoke: bool = False) -> None:
+def main(*, repeat: int = 1, live_smoke: bool = False, with_judge: bool = False) -> None:
     provider_mode: ProviderMode = "live-smoke" if live_smoke else "recorded"
     metadata = build_run_metadata(provider_mode)
     print(f"Run metadata: {metadata}")
-    selected_dataset = _selected_dataset(provider_mode)
+    selected_dataset = _selected_dataset(provider_mode, with_judge=with_judge)
     report = selected_dataset.evaluate_sync(
         partial(task, provider_mode=provider_mode),
         repeat=1 if live_smoke else repeat,
@@ -130,5 +137,10 @@ if __name__ == "__main__":
         "--repeat", type=int, default=1, help="Number of times to run each case (k-repeats)."
     )
     parser.add_argument("--live-smoke", action="store_true")
+    parser.add_argument(
+        "--with-judge",
+        action="store_true",
+        help="Include the Gemini FitnessAppropriateness LLMJudge (requires GEMINI_API_KEY).",
+    )
     args = parser.parse_args()
-    main(repeat=args.repeat, live_smoke=args.live_smoke)
+    main(repeat=args.repeat, live_smoke=args.live_smoke, with_judge=args.with_judge)

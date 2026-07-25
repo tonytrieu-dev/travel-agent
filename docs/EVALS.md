@@ -1,9 +1,12 @@
 # Evals
 
 `backend/evals/` (`dataset.py`, `evaluators.py`, `run.py`) tests the planner agent's behavior, not
-just its code. Run like a test suite (`uv run python -m evals.run --repeat 3`, alongside `pytest`)
-before considering a change to the agent, prompt, or tools done — there's no CI pipeline for this
-take-home, so that discipline is the substitute.
+just its code. The default suite contains deterministic evaluators only. Run it like a test suite
+(`uv run python -m evals.run --repeat 3`, alongside `pytest`) before considering a change to the
+agent, prompt, or tools done.
+
+`FitnessAppropriateness` is optional because it uses an LLM judge. Include it explicitly with
+`uv run python -m evals.run --with-judge` (and add `--repeat 3` when repeat runs are wanted).
 
 ## Why evals, not just unit tests
 
@@ -42,10 +45,10 @@ judgment call, which is exactly the category `LLMJudge` is for.
 ## Why an LLM judge instead of a human judge
 
 A human is more accurate per sample than an LLM judge. That's not actually the deciding factor
-here: a human doesn't scale to being a *repeatable regression check*. This suite runs 4 cases ×
-3 repeats = 12 samples per invocation, and is meant to be re-run after every prompt/model/tool
-change — a human re-grading every run isn't a realistic substitute for that, it's a one-time
-calibration step. The LLM judge is the cheap, repeatable proxy; a human spot-check against the
+here: a human doesn't scale to being a *repeatable regression check*. When enabled, the judge runs
+against 4 cases × 3 repeats = 12 samples per invocation, and is meant to be re-run after every
+prompt/model/tool change — a human re-grading every run isn't a realistic substitute for that,
+it's a one-time calibration step. The LLM judge is the cheap, repeatable proxy; a human spot-check against the
 judge's rubric (`build_fitness_appropriateness_judge` in `evaluators.py`) is how you confirm the
 proxy is actually measuring what a person would flag, before trusting it to run unattended.
 
@@ -55,7 +58,7 @@ proxy is actually measuring what a person would flag, before trusting it to run 
 |---|---|
 | **1. Test set** | `dataset.py` — 4 cases crossing traveler age (24, 78) × fitness level (low, high), same JFK→SAN route/dates |
 | **2. System version** | `gpt-oss-120b` on Cerebras, current prompt (`app/agent/prompts.py`), `search_flights`/`web_search` tools |
-| **3. Evaluator** | 8 exact evaluators + 1 `LLMJudge` (see split above) |
+| **3. Evaluator** | 8 exact evaluators by default; optional `LLMJudge` with `--with-judge` |
 | **4. Scores** | Pass/fail per assertion, plus a `physical_load` metric (sum of activity intensities) |
 | **5. Decision** | Manual: a case failure or judge failure means don't ship that change until understood |
 | **6. Monitoring** | Not built — deferred; the take-home's Agent Execution Panel (`docs/ARCHITECTURE.md`) is the closest analog, but it observes production runs, not eval regressions |
@@ -74,6 +77,9 @@ proxy is actually measuring what a person would flag, before trusting it to run 
   (SearchApi's search allotment is a one-time 100-search budget, not a renewing rate limit — see
   `docs/DECISIONS.md`), so it's a manual, occasional check that recorded fixtures still match
   reality, not something run routinely.
+
+The recorded suite expects exactly one successful `search_flights` call with the case's route and
+dates, plus exactly one successful broad, non-flight `web_search` call for destination activities.
 
 ## A fixture bug the evals caught, in themselves
 
@@ -94,44 +100,32 @@ update evals" loop in practice — the eval didn't just fail the agent, it surfa
 eval's own recorded data, which running the suite end-to-end (rather than trusting individual unit
 tests in isolation) is what exposed.
 
-## A confirmed reliability gap: output-schema envelope retries
+## Output reliability fix
 
-`--repeat 3` on the fixed dataset still fails 9 of 12 case-runs (75%) — but no longer from the
-flight-search loop above; `FlightSearchTrajectory` now passes 100% of completed runs. The new
-failures are `UnexpectedModelBehavior: Exceeded maximum output retries (3)` and
-`UsageLimitExceeded`. Root-caused by hooking `agent.iter()` directly on a single failing case
-(`age_78_low_fitness`) and logging every node, tool call, and `RetryPromptPart` — not guessed at:
+Two reliability issues surfaced by running the live eval repeatedly, not by unit tests:
 
-1. **Attempt 1** (plain text, not a tool call): the model writes `{"days": [...]}` — missing the
-   `result` envelope pydantic-ai's union output type (`ItineraryOut | ClarificationOut`) requires.
-   Retry: *"Field required at ('result',)"*.
-2. **Attempt 2**: `{"result": {"days": [...]}}` — still missing the discriminator fields. Retry:
-   *"Field required at ('result','kind')/('result','data')"*.
-3. **Attempt 3**: the envelope is finally correct — `{"result": {"kind": "ItineraryOut", "data":
-   {...}}}` — but Day 1/Day 7 list "Arrive at San Diego International Airport" and "Check-out and
-   transfer to SAN airport" as itinerary activities. `reject_flight_activities` correctly fires:
-   *"Flights are not itinerary activities... remove them."*
-4. Before a 4th attempt completes, the run dies with `UsageLimitExceeded` (33,132 > 30,000
-   tokens) — each retry resends the entire prior (large) itinerary back into context, so 2 retries
-   spent purely on envelope-shape guessing compound token usage fast, leaving no budget for the
-   3rd retry (the real content fix) to land.
+1. **Duplicate tool calls.** The model sometimes called `search_flights` twice per trip (searching
+   the return leg separately, even though the first response already covers both legs) and
+   `web_search` more than once, burning tool-call and token budget for no new information.
+   `PlannerDeps` now tracks a per-run `_search_flights_called` / `_web_search_called` flag; a
+   second call within the same run raises `ModelRetry` instead of re-hitting the provider.
+2. **Free-text intensity.** `ActivityOut.intensity` was `str`, and the model wrote descriptive
+   phrases ("low to moderate (tram seated)") that no downstream safety check could match against a
+   fixed term list. It's now `Literal["low", "moderate", "high"]`, so pydantic rejects an
+   out-of-vocabulary value at parse time — and the system prompt now states the closed vocabulary
+   directly, so the model gets it right on the first attempt instead of relying on a `ModelRetry`
+   correction loop (each retry resends the full conversation, which is what was driving both
+   `UsageLimitExceeded` and `Exceeded maximum output retries` failures).
 
-Two things are true at once, and worth separating: **`reject_flight_activities` is not the bug —
-it's the guardrail working exactly as designed.** The system prompt already says not to list
-flights as activities; the model did it anyway; the guardrail caught it, the same "the prompt
-alone doesn't hold, enforce it structurally" reasoning behind every other `output_validator` in
-`planner.py`. The actual gap is upstream: `gpt-oss-120b` sometimes emits the final structured
-output as free text instead of a clean tool call, and burns 2 of its 3 output retries just
-guessing pydantic-ai's envelope shape before it can spend a retry on real content. This is a
-specific, evidenced free-tier-model reliability limitation, not a design flaw in the eval, the
-guardrails, or the fixture — and it trades off directly against an existing documented decision
-(`config.py`'s comment: don't raise `MAX_CONTEXT_TOKENS` past Cerebras's real 30K/min limit, that
-just swaps a clean `UsageLimitExceeded` for a raw mid-run 429). A targeted fix — forcing
-`NativeOutput`/`ToolOutput` mode explicitly on the agent instead of relying on pydantic-ai's
-default text-fallback for this model — is a real, untested code change, deliberately not made
-under take-home time pressure without a live-eval run to confirm it actually helps rather than
-surfacing a different Cerebras/gpt-oss quirk. Left here as a known, well-understood gap rather than
-a silently-passing green suite.
+**Live-verified result** (`--repeat 3`, 12 case-runs, `gpt-oss-120b` via Cerebras, recorded
+flight/activity fixtures + live LLM calls): 10/12 completed cleanly with every assertion passing,
+including `known_intensity` on all 12 — zero intensity-vocabulary failures. 2/12
+(`age_24_low_fitness [2/3]`, `age_78_low_fitness [2/3]`) still failed with
+`UnexpectedModelBehavior: Exceeded maximum output retries (3)`, unrelated to intensity. Root cause
+of that residual ~17% isn't isolated yet — the eval report only surfaces the terminal exception,
+not which output-validator triggered each retry attempt. Do not treat this as fully closed; treat
+it as the intensity/duplicate-call failure modes fixed and confirmed, with a smaller, distinct
+retry-exhaustion flake still open.
 
 ## Enterprise scalability, security, and integration
 

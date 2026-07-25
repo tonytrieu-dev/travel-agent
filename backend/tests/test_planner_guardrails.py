@@ -4,6 +4,9 @@ call, no different from "please don't hallucinate"). These tests guard the struc
 that replaced it — same reasoning as the existing citation-grounding validator.
 """
 
+
+from typing import Literal
+
 import pytest
 from pydantic_ai import ModelRetry, RunContext
 from pydantic_ai.models.test import TestModel
@@ -25,7 +28,7 @@ def _context(fitness_level: FitnessLevel | None) -> RunContext[PlannerDeps]:
 
 
 def _itinerary(
-    intensity: str,
+    intensity: Literal["low", "moderate", "high"],
     name: str = "Summit hike",
     description: str = "A steep trail.",
 ) -> ItineraryOut:
@@ -51,7 +54,7 @@ def test_rejects_strenuous_activity_for_low_fitness_traveler() -> None:
     ctx = _context(FitnessLevel.LOW)
 
     with pytest.raises(ModelRetry, match="Summit hike"):
-        reject_unsafe_intensity(ctx, _itinerary("STRENUOUS"))
+        reject_unsafe_intensity(ctx, _itinerary("high"))
 
 
 def test_allows_moderate_intensity_activity_for_low_fitness_traveler() -> None:

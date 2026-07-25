@@ -32,11 +32,14 @@ Match the itinerary to the traveler's age and fitness level. For older or low-fi
 use gentler activities, shorter days, more rest, and less walking. For younger or high-fitness
 travelers, you may include more active days when appropriate.
 
+Set each activity's `intensity` to exactly one of: `low`, `moderate`, `high` — a single word,
+never a range or description (e.g. not "low to moderate" or "gentle").
+
 Use `search_flights` for flight options. Trust its results for flight times, schedules, and
 prices. Do not use `web_search` for flight information.
 
-Use `web_search` before writing the itinerary so activities are real and source-backed. Make 2-3
-broad activity searches total, such as "things to do in {destination}", instead of one search per
+Use `web_search` before writing the itinerary so activities are real and source-backed. Make one
+broad activity search, such as "things to do in {destination}", instead of one search per
 attraction. Set each activity's `source_url` to a URL returned by `web_search`.
 
 Flights are travel logistics, not destination activities. Do not list the flight itself as an

@@ -42,6 +42,12 @@ class PlannerDeps:
     flight_provider: FlightProvider
     activity_provider: ActivityProvider
     fitness_level: FitnessLevel | None = None
+    # Per-run guards, not a persistence-layer cache: the live eval trace showed the model
+    # re-searching the return leg as a separate call even though outbound+return come back in one
+    # search_flights response, and re-issuing web_search beyond the prompt's "one broad search"
+    # guidance — both waste tool-call/token budget the model already has the answer for.
+    _search_flights_called: bool = False
+    _web_search_called: bool = False
 
 
 def _activity_provider_name(provider: ActivityProvider) -> str:
@@ -66,7 +72,15 @@ async def search_flights(
     outbound_date: str,
     return_date: str | None = None,
 ) -> dict:
-    """Search real Google Flights offers between two IATA airport codes."""
+    """Search real Google Flights offers between two IATA airport codes. When return_date is
+    set, the single response already contains both the outbound and return legs — call this at
+    most once per trip; never call it again to search the return leg separately."""
+    if ctx.deps._search_flights_called:
+        raise ModelRetry(
+            "search_flights already ran for this trip earlier in this conversation and its "
+            "result already covers both the outbound and return legs. Reuse that result; do not "
+            "call search_flights again."
+        )
     if not _IATA_CODE_PATTERN.match(departure_id) or not _IATA_CODE_PATTERN.match(arrival_id):
         raise ModelRetry(
             f"departure_id and arrival_id must be 3-letter IATA codes (e.g. JFK), got "
@@ -83,6 +97,7 @@ async def search_flights(
     outcome = await FlightSearchService(session, ctx.deps.flight_provider).search(
         trip_id, persist=False, allow_cross_trip_cache=False
     )
+    ctx.deps._search_flights_called = True
     return {
         "offers": [offer_summary(offer) for offer in outcome.offers],
         "unavailable_reason": outcome.unavailable_reason,
@@ -93,7 +108,13 @@ async def search_flights(
 async def web_search(
     ctx: RunContext[PlannerDeps], query: str, max_results: int = MAX_WEB_SEARCH_RESULTS
 ) -> list[dict]:
-    """Research real, source-attributed activities or information."""
+    """Research real, source-attributed activities or information. Call this at most once per
+    trip with one broad query (e.g. "things to do in {destination}") — never call it again."""
+    if ctx.deps._web_search_called:
+        raise ModelRetry(
+            "web_search already ran for this trip earlier in this conversation. Reuse that "
+            "result; do not call web_search again."
+        )
     started_at = time.monotonic()
     # Clamp both ends: the ceiling protects the provider token budget, and the floor of 1 keeps a
     # model-supplied 0 or negative from reaching Tavily (which would waste the call on no results).
@@ -118,6 +139,7 @@ async def web_search(
         data={"results": [{"title": result.title, "url": result.url} for result in results]},
         provider=_activity_provider_name(ctx.deps.activity_provider),
     )
+    ctx.deps._web_search_called = True
     return [
         {
             "title": result.title,

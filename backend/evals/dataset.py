@@ -5,7 +5,6 @@ from app.schemas import ClarificationOut, ItineraryOut
 from evals.evaluators import (
     CaseMetadata,
     CitationGrounding,
-    FitnessAppropriateness,
     FlightSearchTrajectory,
     LowFitnessSafety,
     NoFlightActivities,
@@ -59,7 +58,6 @@ dataset: Dataset[str, ItineraryOut | ClarificationOut, CaseMetadata] = Dataset(
         NoFlightActivities(),
         PhysicalLoad(),
         LowFitnessSafety(),
-        FitnessAppropriateness(),
     ],
     report_evaluators=[PhysicalLoadComparisons()],
 )

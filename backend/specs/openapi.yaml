@@ -541,7 +541,7 @@ components:
       properties:
         name: { type: string }
         description: { type: string }
-        intensity: { type: string }
+        intensity: { type: string, enum: [low, moderate, high] }
         source_url: { type: string }
 
     ItineraryDayOut:
