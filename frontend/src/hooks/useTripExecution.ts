@@ -1,9 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useMemo } from "react"
 import { getTripExecution } from "../api/client"
 import type { ExecutionPanelOut } from "../api/types"
-
-const IDLE_POLL_MS = 4_000
-const ACTIVE_POLL_MS = 700
+import { usePolledResource } from "./usePolledResource"
 
 interface UseTripExecutionOptions {
   tripId: number | null
@@ -22,31 +20,15 @@ export function useTripExecution({
   enabled,
   isRunActive,
 }: UseTripExecutionOptions): TripExecutionState {
-  const [panelData, setPanelData] = useState<ExecutionPanelOut | null>(null)
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  // Skip a tick if a previous (possibly slow) request is still in flight, so the ~700ms active
-  // poll can never stack overlapping /execution requests.
-  const isFetchingRef = useRef(false)
+  const fetcher = useMemo(
+    () => (tripId == null ? null : () => getTripExecution(tripId)),
+    [tripId],
+  )
+  const { data, errorMessage, refresh } = usePolledResource<ExecutionPanelOut>({
+    fetcher,
+    isRunActive,
+    enabled,
+  })
 
-  const refresh = useCallback(async () => {
-    if (tripId == null || isFetchingRef.current) return
-    isFetchingRef.current = true
-    try {
-      setPanelData(await getTripExecution(tripId))
-      setErrorMessage(null)
-    } catch {
-      setErrorMessage("Could not load execution data.")
-    } finally {
-      isFetchingRef.current = false
-    }
-  }, [tripId])
-
-  useEffect(() => {
-    if (!enabled || tripId == null) return
-    refresh()
-    const interval = setInterval(refresh, isRunActive ? ACTIVE_POLL_MS : IDLE_POLL_MS)
-    return () => clearInterval(interval)
-  }, [enabled, tripId, isRunActive, refresh])
-
-  return { panelData, errorMessage, refresh }
+  return { panelData: data, errorMessage, refresh }
 }

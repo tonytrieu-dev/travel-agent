@@ -138,10 +138,8 @@ class BookingLogOut(BaseModel):
 class ActivityOut(BaseModel):
     name: str
     description: str
-    # A closed vocabulary, not free text: the live eval trace showed the model writing
-    # descriptive phrases ("low to moderate (tram seated)") that no downstream safety check or
-    # scorer could match against a fixed term list. Pydantic validation now rejects those and
-    # pydantic-ai retries with the real error, instead of a check quietly failing to recognize it.
+    # Closed vocabulary: free text here ("low to moderate (tram seated)") defeats every
+    # downstream safety check, so reject it at parse time and let pydantic-ai retry.
     intensity: Literal["low", "moderate", "high"]
     source_url: str
 

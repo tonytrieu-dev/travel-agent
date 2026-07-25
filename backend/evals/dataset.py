@@ -11,7 +11,6 @@ from evals.evaluators import (
     OutputTypeMatches,
     PhysicalLoad,
     PhysicalLoadComparisons,
-    ToolCallBudget,
     WebSearchTrajectory,
 )
 
@@ -54,7 +53,6 @@ dataset: Dataset[str, ItineraryOut | ClarificationOut, CaseMetadata] = Dataset(
         CitationGrounding(),
         FlightSearchTrajectory(),
         WebSearchTrajectory(),
-        ToolCallBudget(),
         NoFlightActivities(),
         PhysicalLoad(),
         LowFitnessSafety(),

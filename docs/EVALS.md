@@ -26,7 +26,7 @@ Every evaluator in `evaluators.py` falls into one of two families, and the split
 |---|---|---|
 | **What it checks** | Deterministic, verifiable outcomes | Quality that doesn't reduce to a rule |
 | **How** | Plain code against the recorded tool-call trace / output shape | An `LLMJudge` (Gemini) scoring against a written rubric |
-| **This project's evaluators** | `OutputTypeMatches`, `CitationGrounding`, `NoFlightActivities`, `FlightSearchTrajectory`, `WebSearchTrajectory`, `ToolCallBudget`, `LowFitnessSafety`, `PhysicalLoad`/`PhysicalLoadComparisons` | `FitnessAppropriateness` |
+| **This project's evaluators** | `OutputTypeMatches`, `CitationGrounding`, `NoFlightActivities`, `FlightSearchTrajectory`, `WebSearchTrajectory`, `LowFitnessSafety`, `PhysicalLoad`/`PhysicalLoadComparisons` | `FitnessAppropriateness` |
 
 **Every safety-relevant property is exact, not judged.** `LowFitnessSafety` — "never hand a
 low-fitness traveler a strenuous activity" — is a regex over intensity strings
@@ -119,7 +119,9 @@ Two reliability issues surfaced by running the live eval repeatedly, not by unit
 
 **Live-verified result** (`--repeat 3`, 12 case-runs, `gpt-oss-120b` via Cerebras, recorded
 flight/activity fixtures + live LLM calls): 10/12 completed cleanly with every assertion passing,
-including `known_intensity` on all 12 — zero intensity-vocabulary failures. 2/12
+and zero runs failed on intensity vocabulary. Note the evidence is the *absence* of
+intensity-driven retry exhaustion, not a passing assertion: with `intensity` a closed `Literal`, a
+bad value can no longer reach an evaluator at all, so no scorer can report it. 2/12
 (`age_24_low_fitness [2/3]`, `age_78_low_fitness [2/3]`) still failed with
 `UnexpectedModelBehavior: Exceeded maximum output retries (3)`, unrelated to intensity. Root cause
 of that residual ~17% isn't isolated yet — the eval report only surfaces the terminal exception,

@@ -3,6 +3,7 @@
 import re
 import time
 from dataclasses import dataclass
+from typing import Literal
 
 from pydantic_ai import Agent, ModelRetry, RunContext
 from pydantic_ai.messages import ModelMessage, ToolReturnPart
@@ -42,10 +43,7 @@ class PlannerDeps:
     flight_provider: FlightProvider
     activity_provider: ActivityProvider
     fitness_level: FitnessLevel | None = None
-    # Per-run guards, not a persistence-layer cache: the live eval trace showed the model
-    # re-searching the return leg as a separate call even though outbound+return come back in one
-    # search_flights response, and re-issuing web_search beyond the prompt's "one broad search"
-    # guidance — both waste tool-call/token budget the model already has the answer for.
+    # Per-run guards, not a cache: one search_flights response already covers both legs.
     _search_flights_called: bool = False
     _web_search_called: bool = False
 
@@ -251,15 +249,8 @@ def reject_ungrounded_itinerary(
     return output
 
 
-# A low-fitness traveler must not be handed a strenuous activity. The model labels intensity in
-# free text, so match on normalized substrings — casing ("High"), phrasing ("very high"), and
-# synonyms ("strenuous") all describe the same unsafe level and must all be caught.
-_UNSAFE_INTENSITY_TERMS = ("high", "strenuous", "extreme", "vigorous", "intense")
-
-
-def _is_unsafe_intensity(intensity: str) -> bool:
-    normalized = intensity.strip().lower()
-    return any(term in normalized for term in _UNSAFE_INTENSITY_TERMS)
+# Policy, not vocabulary: "moderate" stays allowed for low fitness on purpose.
+UNSAFE_INTENSITY_FOR_LOW_FITNESS: Literal["low", "moderate", "high"] = "high"
 
 
 @agent.output_validator
@@ -274,7 +265,7 @@ def reject_unsafe_intensity(
         activity.name
         for day in output.days
         for activity in day.activities
-        if _is_unsafe_intensity(activity.intensity)
+        if activity.intensity == UNSAFE_INTENSITY_FOR_LOW_FITNESS
     ]
     if unsafe:
         raise ModelRetry(

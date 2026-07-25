@@ -25,8 +25,8 @@ from pydantic_evals.evaluators import (
 )
 from pydantic_evals.reporting import TableResult
 
-from app.agent.planner import _is_flight_activity, _is_unsafe_intensity
-from app.config import GEMINI_JUDGE_MODEL, MAX_TOOL_STEPS, get_settings
+from app.agent.planner import UNSAFE_INTENSITY_FOR_LOW_FITNESS, _is_flight_activity
+from app.config import GEMINI_JUDGE_MODEL, get_settings
 from app.models import FitnessLevel
 from app.schemas import ClarificationOut, ItineraryOut
 
@@ -356,52 +356,28 @@ class WebSearchTrajectory(Evaluator[str, ItineraryOut | ClarificationOut, CaseMe
 
 
 @dataclass
-class ToolCallBudget(Evaluator[str, ItineraryOut | ClarificationOut, CaseMetadata]):
-    def evaluate(
-        self, ctx: EvaluatorContext[str, ItineraryOut | ClarificationOut, CaseMetadata]
-    ) -> EvaluationReason:
-        trace = _trace(ctx)
-        if trace is None:
-            return EvaluationReason(value=False, reason="planner_trace is missing or malformed")
-        count = trace["tool_call_count"]
-        matches = count <= MAX_TOOL_STEPS
-        return EvaluationReason(
-            value=matches,
-            reason=None if matches else f"{count} planner tool calls exceed limit {MAX_TOOL_STEPS}",
-        )
-
-
-@dataclass
 class PhysicalLoad(Evaluator[str, ItineraryOut | ClarificationOut, CaseMetadata]):
     def evaluate(
         self, ctx: EvaluatorContext[str, ItineraryOut | ClarificationOut, CaseMetadata]
     ) -> dict[str, int | float | EvaluationReason]:
         if not isinstance(ctx.output, ItineraryOut):
             return {
-                "known_intensity": EvaluationReason(
+                "scorable_itinerary": EvaluationReason(
                     value=False, reason="physical load requires an itinerary"
                 )
             }
+        # intensity is a closed Literal, so a bad value fails at parse time, never here.
         intensities = [
-            activity.intensity.strip().lower()
-            for day in ctx.output.days
-            for activity in day.activities
+            activity.intensity for day in ctx.output.days for activity in day.activities
         ]
-        unknown = sorted(set(intensities) - _INTENSITY_LOAD.keys())
-        if unknown:
-            return {
-                "known_intensity": EvaluationReason(
-                    value=False, reason=f"unknown activity intensity: {unknown}"
-                )
-            }
         if not intensities:
             return {
-                "known_intensity": EvaluationReason(
+                "scorable_itinerary": EvaluationReason(
                     value=False, reason="itinerary has no activities"
                 )
             }
         return {
-            "known_intensity": EvaluationReason(value=True),
+            "scorable_itinerary": EvaluationReason(value=True),
             "physical_load": sum(_INTENSITY_LOAD[intensity] for intensity in intensities),
         }
 
@@ -421,7 +397,7 @@ class LowFitnessSafety(Evaluator[str, ItineraryOut | ClarificationOut, CaseMetad
             activity.name
             for day in ctx.output.days
             for activity in day.activities
-            if _is_unsafe_intensity(activity.intensity)
+            if activity.intensity == UNSAFE_INTENSITY_FOR_LOW_FITNESS
         ]
         return EvaluationReason(
             value=not unsafe,

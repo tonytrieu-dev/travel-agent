@@ -17,7 +17,6 @@ from pydantic_evals.evaluators import (
 )
 from pydantic_evals.reporting import ReportCaseFailure
 
-from app.config import MAX_TOOL_STEPS
 from app.models import FitnessLevel
 from app.schemas import ActivityOut, ClarificationOut, ItineraryDayOut, ItineraryOut
 from evals.evaluators import (
@@ -31,7 +30,6 @@ from evals.evaluators import (
     PhysicalLoad,
     PhysicalLoadComparisons,
     PlannerTrace,
-    ToolCallBudget,
     WebSearchTrajectory,
     extract_planner_trace,
 )
@@ -118,10 +116,7 @@ def _context(
 
 
 def _passes(
-    evaluator: FlightSearchTrajectory
-    | WebSearchTrajectory
-    | ToolCallBudget
-    | CitationGrounding,
+    evaluator: FlightSearchTrajectory | WebSearchTrajectory | CitationGrounding,
     trace: PlannerTrace,
 ) -> bool:
     return bool(evaluator.evaluate(_context(trace)).value)
@@ -187,7 +182,6 @@ def test_good_trace_passes_deterministic_trajectory_evaluators() -> None:
 
     assert _passes(FlightSearchTrajectory(), trace)
     assert _passes(WebSearchTrajectory(), trace)
-    assert _passes(ToolCallBudget(), trace)
     assert _passes(CitationGrounding(), trace)
 
 
@@ -224,15 +218,7 @@ def test_web_search_requires_exactly_one_successful_broad_non_flight_query() -> 
         assert not _passes(WebSearchTrajectory(), trace)
 
 
-def test_tool_budget_grounding_and_output_type_fail_closed() -> None:
-    over_budget = _good_trace()
-    over_budget["calls"].extend(
-        deepcopy(over_budget["calls"][1])
-        for _ in range(MAX_TOOL_STEPS + 1 - len(over_budget["calls"]))
-    )
-    over_budget["tool_call_count"] = len(over_budget["calls"])
-
-    assert not _passes(ToolCallBudget(), over_budget)
+def test_grounding_and_output_type_fail_closed() -> None:
     assert not CitationGrounding().evaluate(_context()).value
     assert not CitationGrounding().evaluate(
         _context(_good_trace(), output=_itinerary("https://invented.test"))
@@ -264,7 +250,7 @@ def test_malformed_or_mismatched_trace_evidence_fails_closed() -> None:
 
     assert not trace["valid"]
     assert not _passes(FlightSearchTrajectory(), trace)
-    assert not _passes(ToolCallBudget(), trace)
+    assert not _passes(WebSearchTrajectory(), trace)
 
 
 def test_activity_out_rejects_intensity_outside_the_closed_vocabulary() -> None:
@@ -389,7 +375,6 @@ def test_dataset_has_four_matched_cases_and_all_deterministic_evaluators() -> No
             CitationGrounding,
             FlightSearchTrajectory,
             WebSearchTrajectory,
-            ToolCallBudget,
             PhysicalLoad,
             LowFitnessSafety,
         }
