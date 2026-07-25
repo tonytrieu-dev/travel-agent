@@ -29,8 +29,8 @@ Every evaluator in `evaluators.py` falls into one of two families, and the split
 | **This project's evaluators** | `OutputTypeMatches`, `CitationGrounding`, `NoFlightActivities`, `FlightSearchTrajectory`, `WebSearchTrajectory`, `LowFitnessSafety`, `PhysicalLoad`/`PhysicalLoadComparisons` | `FitnessAppropriateness` |
 
 **Every safety-relevant property is exact, not judged.** `LowFitnessSafety` — "never hand a
-low-fitness traveler a strenuous activity" — is a regex over intensity strings
-(`_is_unsafe_intensity` in `app/agent/planner.py`), not an LLM judge call. An LLM judge is a
+low-fitness traveler a strenuous activity" — is an equality check against
+`UNSAFE_INTENSITY_FOR_LOW_FITNESS` in `app/agent/planner.py`, not an LLM judge call. An LLM judge is a
 probabilistic scorer: it can be right on average and still miss an individual unsafe case, which
 is an acceptable property for a *quality* signal and not an acceptable one for a *safety*
 guardrail. The rule mirrors the project's broader stance on using the model only for genuine

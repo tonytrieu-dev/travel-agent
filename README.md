@@ -22,7 +22,9 @@ moves forward.
 4. **Human-approved booking handoff** — review a proposed flight, explicitly approve it, then
    retrieve real booking options, as three separate steps. The agent never books anything itself;
    approval only unlocks a deterministic, audited workflow that hands off to the airline/OTA for
-   the actual purchase. A 30-minute price-staleness window expires stale requests automatically.
+   the actual purchase. A 30-minute price hold guards against acting on a stale fare: confirming
+   or executing past that window transitions the booking to `EXPIRED` and returns a 409 telling
+   you to search again.
 5. **Watch the agent work** — an execution panel shows every run's tool calls, token usage,
    context-budget utilization, and timing, live. It's global across all of your trips (filterable
    by route and status), not just the one you're currently planning.
