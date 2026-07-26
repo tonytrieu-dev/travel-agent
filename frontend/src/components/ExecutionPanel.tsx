@@ -12,6 +12,13 @@ function tripLabel(trip: TripRequestOut): string {
   return `${trip.origin} → ${trip.destination_airport}`
 }
 
+function formatTimestamp(value: string): string {
+  return new Date(value).toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  })
+}
+
 const EVENT_KIND_LABELS: Record<string, string> = {
   api_call: "API call",
   db_query: "Database query",
@@ -135,8 +142,8 @@ function RunEventSection({ events }: { events: ExecutionEventOut[] }) {
               </p>
             )}
             <p className="mt-1 text-xs text-slate-600">{event.detail}</p>
-            <p className="mt-1 text-xs text-slate-500">
-              {new Date(event.created_at).toLocaleString()}
+            <p className="mt-1 text-sm text-slate-600">
+              {formatTimestamp(event.created_at)}
               {event.duration_ms != null && ` · ${event.duration_ms} ms`}
             </p>
             {event.data != null && (
@@ -167,11 +174,11 @@ function AgentRunCard({ run, tripLabel }: { run: AgentRunOut; tripLabel: string 
         <div>
           <div className="flex items-center gap-2">
             <p className="font-semibold text-slate-900">Run #{run.id}</p>
-            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-500">
+            <span className="rounded bg-white px-1.5 py-0.5 text-xs font-medium text-slate-500 ring-1 ring-slate-200 ring-inset">
               {tripLabel}
             </span>
           </div>
-          <p className="text-xs text-slate-500">{new Date(run.started_at).toLocaleString()}</p>
+          <p className="text-sm text-slate-600">{formatTimestamp(run.started_at)}</p>
         </div>
         <span
           className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusStyles(run.status)}`}

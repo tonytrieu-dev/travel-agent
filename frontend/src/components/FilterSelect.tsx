@@ -49,7 +49,7 @@ export function FilterSelect({ value, onChange, options, ariaLabel }: FilterSele
         <ul
           role="listbox"
           aria-label={ariaLabel}
-          className="absolute top-full left-0 z-10 mt-1 min-w-full overflow-hidden rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-lg"
+          className="absolute top-full left-0 z-10 mt-1 min-w-full overflow-hidden rounded-lg border border-slate-200 bg-white text-sm shadow-lg"
         >
           {options.map((option) => (
             <li key={option.value}>

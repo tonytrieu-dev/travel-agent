@@ -55,7 +55,7 @@ function ApprovalTrail({ booking, routeLabel }: { booking: BookingLogOut; routeL
               {routeLabel}
             </span>
           </div>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <p className="mt-0.5 text-sm text-slate-600">
             Requested {formatTimestamp(booking.created_at)}
           </p>
         </div>
@@ -91,12 +91,12 @@ function ApprovalTrail({ booking, routeLabel }: { booking: BookingLogOut; routeL
                     <span className="text-slate-400">→</span>{" "}
                     {STATE_LABELS[transition.to_state]}
                   </p>
-                  <p className="mt-0.5 text-sm text-slate-600">
-                    <span className="text-slate-400">Actor:</span> {actorLabel(transition)}
+                  <p className="mt-0.5 text-sm">
+                    <span className="text-slate-600">Actor:</span>{" "}
+                    <span className="font-medium text-slate-900">{actorLabel(transition)}</span>
                   </p>
-                  <p className="mt-0.5 text-xs text-slate-400">
-                    {formatTimestamp(transition.created_at)} · recorded as{" "}
-                    <span className="font-mono">{transition.reason}</span>
+                  <p className="mt-0.5 text-sm text-slate-600">
+                    {formatTimestamp(transition.created_at)}
                   </p>
                 </div>
               </li>
@@ -181,7 +181,9 @@ export function ApprovalHistoryPanel({ trips, isRunActive }: ApprovalHistoryPane
             <ApprovalTrail
               key={booking.id}
               booking={booking}
-              routeLabel={routeLabels.get(booking.trip_request_id) ?? `trip ${booking.trip_request_id}`}
+              routeLabel={
+                routeLabels.get(booking.trip_request_id) ?? `Trip #${booking.trip_request_id}`
+              }
             />
           ))}
         </div>
