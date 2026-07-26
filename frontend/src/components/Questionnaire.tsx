@@ -72,11 +72,11 @@ export function Questionnaire({ onSubmit, isSubmitting, errorMessage }: Question
     const normalizedDestinationAirport = normalizeAirportCode(destinationAirport)
 
     if (!normalizedOrigin) {
-      setValidationMessage("Depart must be a 3-letter airport code, e.g. JFK.")
+      setValidationMessage("The departure airport must be a valid 3-letter airport code, like JFK.")
       return
     }
     if (!normalizedDestinationAirport) {
-      setValidationMessage("Arrive must be a 3-letter airport code, e.g. NRT.")
+      setValidationMessage("The arrival airport must be a valid 3-letter airport code, like NRT.")
       return
     }
     if (!departDate) {
