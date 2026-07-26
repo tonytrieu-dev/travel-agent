@@ -1,8 +1,21 @@
 import { useState, type ChangeEvent, type FormEvent, type ReactNode } from "react"
 import type { FitnessLevel, TripRequestCreate } from "../api/types"
 import { ChevronDownIcon } from "./ChevronDownIcon"
+import { AIRPORTS } from "../data/airports"
 
-const IATA_CODE_PATTERN = /^[A-Z]{3}$/
+const AIRPORT_OPTIONS_ID = "airport-options"
+
+// Accepts either a bare code ("JFK") or a picked suggestion ("Tokyo, Japan (NRT)") by matching
+// the trailing 3-letter code either way.
+function normalizeAirportCode(rawValue: string): string | null {
+  const match = rawValue.trim().match(/([A-Za-z]{3})\)?\s*$/)
+  return match ? match[1].toUpperCase() : null
+}
+
+function deriveDestination(airportCode: string): string {
+  const airport = AIRPORTS.find((candidate) => candidate.code === airportCode)
+  return airport ? `${airport.city}, ${airport.country}` : airportCode
+}
 
 // Every label/control in this form shares one set of classes so spacing and focus styling stay
 // identical across text, number, date, and select fields.
@@ -44,7 +57,6 @@ interface QuestionnaireProps {
 export function Questionnaire({ onSubmit, isSubmitting, errorMessage }: QuestionnaireProps) {
   const [tripType, setTripType] = useState<"round-trip" | "one-way">("round-trip")
   const [origin, setOrigin] = useState("")
-  const [destination, setDestination] = useState("")
   const [destinationAirport, setDestinationAirport] = useState("")
   const [departDate, setDepartDate] = useState("")
   const [returnDate, setReturnDate] = useState("")
@@ -56,19 +68,15 @@ export function Questionnaire({ onSubmit, isSubmitting, errorMessage }: Question
     event.preventDefault()
     setValidationMessage(null)
 
-    const normalizedOrigin = origin.trim().toUpperCase()
-    const normalizedDestinationAirport = destinationAirport.trim().toUpperCase()
+    const normalizedOrigin = normalizeAirportCode(origin)
+    const normalizedDestinationAirport = normalizeAirportCode(destinationAirport)
 
-    if (!IATA_CODE_PATTERN.test(normalizedOrigin)) {
-      setValidationMessage("Origin must be a 3-letter airport code, e.g. JFK.")
+    if (!normalizedOrigin) {
+      setValidationMessage("Depart must be a 3-letter airport code, e.g. JFK.")
       return
     }
-    if (!IATA_CODE_PATTERN.test(normalizedDestinationAirport)) {
-      setValidationMessage("Destination airport must be a 3-letter airport code, e.g. NRT.")
-      return
-    }
-    if (!destination.trim()) {
-      setValidationMessage("Destination is required.")
+    if (!normalizedDestinationAirport) {
+      setValidationMessage("Arrive must be a 3-letter airport code, e.g. NRT.")
       return
     }
     if (!departDate) {
@@ -90,7 +98,7 @@ export function Questionnaire({ onSubmit, isSubmitting, errorMessage }: Question
 
     await onSubmit({
       origin: normalizedOrigin,
-      destination: destination.trim(),
+      destination: deriveDestination(normalizedDestinationAirport),
       destination_airport: normalizedDestinationAirport,
       depart_date: departDate,
       return_date: returnDate || null,
@@ -119,17 +127,23 @@ export function Questionnaire({ onSubmit, isSubmitting, errorMessage }: Question
         <option value="one-way">One-way</option>
       </SelectField>
 
+      <datalist id={AIRPORT_OPTIONS_ID}>
+        {AIRPORTS.map((airport) => (
+          <option key={airport.code} value={`${airport.city}, ${airport.country} (${airport.code})`} />
+        ))}
+      </datalist>
+
       <div className="grid grid-cols-2 gap-5">
         <label className={FIELD_LABEL}>
           Depart
           <input
             type="text"
             value={origin}
-            onChange={(event) => setOrigin(event.target.value.toUpperCase())}
-            maxLength={3}
-            placeholder="JFK"
+            onChange={(event) => setOrigin(event.target.value)}
+            list={AIRPORT_OPTIONS_ID}
+            placeholder="JFK or New York"
             required
-            className={`${FIELD_INPUT} uppercase tracking-widest`}
+            className={FIELD_INPUT}
           />
         </label>
 
@@ -138,26 +152,14 @@ export function Questionnaire({ onSubmit, isSubmitting, errorMessage }: Question
           <input
             type="text"
             value={destinationAirport}
-            onChange={(event) => setDestinationAirport(event.target.value.toUpperCase())}
-            maxLength={3}
-            placeholder="NRT"
+            onChange={(event) => setDestinationAirport(event.target.value)}
+            list={AIRPORT_OPTIONS_ID}
+            placeholder="NRT or Tokyo"
             required
-            className={`${FIELD_INPUT} uppercase tracking-widest`}
+            className={FIELD_INPUT}
           />
         </label>
       </div>
-
-      <label className={FIELD_LABEL}>
-        Destination
-        <input
-          type="text"
-          value={destination}
-          onChange={(event) => setDestination(event.target.value)}
-          placeholder="Tokyo, Japan"
-          required
-          className={FIELD_INPUT}
-        />
-      </label>
 
       <div className={`grid gap-5 ${tripType === "one-way" ? "grid-cols-1" : "grid-cols-2"}`}>
         <label className={FIELD_LABEL}>
@@ -185,31 +187,40 @@ export function Questionnaire({ onSubmit, isSubmitting, errorMessage }: Question
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-        <label className={FIELD_LABEL}>
-          Age
-          <input
-            type="number"
-            min={0}
-            max={130}
-            value={age}
-            onChange={(event) => setAge(event.target.value)}
-            required
-            className={`${FIELD_INPUT} [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
-          />
-        </label>
+      <div className="space-y-3 border-t border-slate-200 pt-5">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-900">Itinerary preferences</h3>
+          <p className="mt-1 text-xs text-slate-500">
+            Age and fitness level tailor which activities show up in your itinerary.
+          </p>
+        </div>
 
-        <SelectField
-          label="Fitness level"
-          value={fitnessLevel}
-          onChange={(event) => setFitnessLevel(event.target.value as FitnessLevel | "")}
-          required
-        >
-          <option value="">—</option>
-          <option value="low">Low</option>
-          <option value="moderate">Moderate</option>
-          <option value="high">High</option>
-        </SelectField>
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <label className={FIELD_LABEL}>
+            Age
+            <input
+              type="number"
+              min={0}
+              max={130}
+              value={age}
+              onChange={(event) => setAge(event.target.value)}
+              required
+              className={`${FIELD_INPUT} [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
+            />
+          </label>
+
+          <SelectField
+            label="Fitness level"
+            value={fitnessLevel}
+            onChange={(event) => setFitnessLevel(event.target.value as FitnessLevel | "")}
+            required
+          >
+            <option value="">—</option>
+            <option value="low">Low</option>
+            <option value="moderate">Moderate</option>
+            <option value="high">High</option>
+          </SelectField>
+        </div>
       </div>
 
       {(validationMessage || errorMessage) && (
