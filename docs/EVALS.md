@@ -25,7 +25,7 @@ Every evaluator in `evaluators.py` falls into one of two families, and the split
 | | Exact (objective) | Subjective |
 |---|---|---|
 | **What it checks** | Deterministic, verifiable outcomes | Quality that doesn't reduce to a rule |
-| **How** | Plain code against the recorded tool-call trace / output shape | An `LLMJudge` (Gemini) scoring against a written rubric |
+| **How** | Plain code against the recorded tool-call trace / output shape | An `LLMJudge` (`gemini-3.6-flash`, `GEMINI_JUDGE_MODEL` in `app/config.py`) scoring against a written rubric |
 | **This project's evaluators** | `OutputTypeMatches`, `CitationGrounding`, `NoFlightActivities`, `FlightSearchTrajectory`, `WebSearchTrajectory`, `LowFitnessSafety`, `PhysicalLoad`/`PhysicalLoadComparisons` | `FitnessAppropriateness` |
 
 **Every safety-relevant property is exact, not judged.** `LowFitnessSafety` — "never hand a

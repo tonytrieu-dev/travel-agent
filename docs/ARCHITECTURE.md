@@ -13,8 +13,8 @@ flowchart LR
     Flights --> SearchApi[(SearchApi.io)]
     Tavily --> TavilyAPI[(Tavily API)]
     Agent --> Cerebras[(Cerebras gpt-oss-120b)]
-    Agent -.->|run_planner_durable| DBOS[DBOS workflow]
-    Repo -.->|execute_booking_durable| DBOS
+    DBOS -.->|run_planner_durable wraps| Agent
+    DBOS -.->|execute_booking_durable wraps| Repo
     DBOS --> DB
     API -->|/api/connectors| ConnSetting[(connector_setting)]
     API -->|notify_pending_approval| Slack[(Slack)]
@@ -43,8 +43,15 @@ whole" and "Open-weight model (gpt-oss-120b) over OpenAI/Anthropic proprietary A
   `POST /flights/search` is reachable on its own, independent of `POST /trips/{id}/plan` — see
   "Flight search is its own user-facing capability" in `DECISIONS.md` for why.
 - **Itinerary from a real API, tailored to age/fitness:** `web_search` (Tavily) grounds every
-  activity in a real, cited source; `output_type=[ItineraryOut, ClarificationOut]` plus the
-  `reject_unsafe_intensity` guardrail tie activity intensity to the traveler's fitness level.
+  activity in a real, cited source; `output_type=[ToolOutput(ItineraryOut),
+  ToolOutput(ClarificationOut)]` (pinned to tool-call output rather than left on `auto`, since
+  `gpt-oss-120b`'s native structured-output envelope was unreliable — see `docs/EVALS.md`) plus
+  four output-validator guardrails in `app/agent/planner.py`: `reject_unsafe_intensity` ties
+  activity intensity to the traveler's fitness level, `reject_ungrounded_itinerary` rejects any
+  activity whose source URL wasn't actually returned by a real search that run,
+  `reject_optional_clarification` blocks a clarifying question that re-asks for age/fitness once
+  they're already present, and `reject_flight_activities` rejects flight-shaped items masquerading
+  as itinerary activities.
 - **Ask, don't assume:** genuinely ambiguous inputs (not missing ones — those are required at
   intake) produce a `ClarificationOut` instead of a guessed itinerary.
 - **Visible UI:** React SPA with a live tool-call feed and an execution panel (see below).
@@ -115,10 +122,17 @@ refactor-era addition once the duplication became real, not a pattern picked up 
 
 **Supporting engineering (not protocols, but load-bearing):**
 
-- **Usage limits** — `UsageLimits(tool_calls_limit=MAX_TOOL_STEPS, total_tokens_limit=MAX_CONTEXT_TOKENS)`
-  bounds the loop so it can't spin; `MAX_CONTEXT_TOKENS` matches gpt-oss-120b's real 30K
-  tokens/minute limit on Cerebras. A run that exceeds it degrades to an honest `PlanTooComplexOut`
-  ("too complex for one pass") instead of crashing or guessing.
+- **Usage limits** — `UsageLimits(tool_calls_limit=MAX_TOOL_STEPS,
+  total_tokens_limit=MAX_CONTEXT_TOKENS, request_limit=MAX_REQUESTS_PER_RUN)` bounds the loop so it
+  can't spin; `MAX_CONTEXT_TOKENS` matches gpt-oss-120b's real 30K tokens/minute limit on Cerebras.
+  A run that exceeds it degrades to an honest `PlanTooComplexOut` ("too complex for one pass")
+  instead of crashing or guessing.
+- **Rate limiting** — a per-IP request cap (`RATE_LIMIT_MAX_REQUESTS=10`/
+  `RATE_LIMIT_WINDOW_SECONDS=60` in `app/rate_limit.py`) gates `/plan` and `/flights/search`,
+  separate from the `MAX_CONCURRENT_AGENT_RUNS` concurrency slot above: the concurrency slot caps
+  simultaneous real LLM calls, this caps request *volume* per client, protecting SearchApi's
+  one-time search quota from a retry storm (accidental double-clicks, a buggy client) rather than
+  just LLM throughput.
 - **Prompt-injection guardrail** — `sanitize_web_content` wraps untrusted Tavily text in a delimited,
   escaped block before it reaches the prompt, so embedded instructions read as data.
 - **Durable steps (DBOS)** — the planner run and booking execute are checkpointed workflows that
@@ -186,7 +200,7 @@ and never reaches the database. `execute_booking` is the highest-value guard in 
 claims the row with `SELECT ... FOR UPDATE`, re-checks state under that lock, and fetches
 booking options exactly once — a double-click from an impatient human can never trigger a second
 `booking_options` fetch or burn a second unit of the flight-search quota (see
-`test_double_execute_books_once`). This entire state machine lives outside the agent; the agent
+`test_a_concurrent_doubleexecute_books_exactly_once`). This entire state machine lives outside the agent; the agent
 can plan and search but has no tool that can move a booking's state, so "a human must click
 confirm, then execute" is structural, not a prompt instruction the model could be talked out of.
 
@@ -200,8 +214,8 @@ for this take-home; see [DECISIONS.md](DECISIONS.md).
 
 ## Slack HITL connector (`app/adapters/slack_hitl.py`, `app/routes/slack.py`, `app/routes/connectors.py`)
 
-Optional, off by default. `GET/PATCH /api/connectors` reads and flips the single-row
-`connector_setting.slack_enabled` toggle, gated so it can only be enabled when
+Optional, off by default. `GET /api/connectors` reads and `PATCH /api/connectors/slack` flips the
+single-row `connector_setting.slack_enabled` toggle, gated so it can only be enabled when
 `SLACK_BOT_TOKEN`/`SLACK_SIGNING_SECRET`/`SLACK_APPROVALS_CHANNEL_ID` are all configured (409
 otherwise). The frontend's Connectors tab (`ConnectorsPanel.tsx`) drives this toggle.
 
