@@ -1,9 +1,8 @@
 import { useState, type ChangeEvent, type FormEvent, type ReactNode } from "react"
 import type { FitnessLevel, TripRequestCreate } from "../api/types"
+import { AirportField } from "./AirportField"
 import { ChevronDownIcon } from "./ChevronDownIcon"
 import { AIRPORTS } from "../data/airports"
-
-const AIRPORT_OPTIONS_ID = "airport-options"
 
 // Accepts either a bare code ("JFK") or a picked suggestion ("Tokyo, Japan (NRT)") by matching
 // the trailing 3-letter code either way.
@@ -127,38 +126,20 @@ export function Questionnaire({ onSubmit, isSubmitting, errorMessage }: Question
         <option value="one-way">One-way</option>
       </SelectField>
 
-      <datalist id={AIRPORT_OPTIONS_ID}>
-        {AIRPORTS.map((airport) => (
-          <option key={airport.code} value={`${airport.city}, ${airport.country} (${airport.code})`} />
-        ))}
-      </datalist>
-
       <div className="grid grid-cols-2 gap-5">
-        <label className={FIELD_LABEL}>
-          Depart
-          <input
-            type="text"
-            value={origin}
-            onChange={(event) => setOrigin(event.target.value)}
-            list={AIRPORT_OPTIONS_ID}
-            placeholder="JFK or New York"
-            required
-            className={FIELD_INPUT}
-          />
-        </label>
+        <AirportField
+          label="Depart"
+          value={origin}
+          onChange={setOrigin}
+          placeholder="JFK or New York"
+        />
 
-        <label className={FIELD_LABEL}>
-          Arrive
-          <input
-            type="text"
-            value={destinationAirport}
-            onChange={(event) => setDestinationAirport(event.target.value)}
-            list={AIRPORT_OPTIONS_ID}
-            placeholder="NRT or Tokyo"
-            required
-            className={FIELD_INPUT}
-          />
-        </label>
+        <AirportField
+          label="Arrive"
+          value={destinationAirport}
+          onChange={setDestinationAirport}
+          placeholder="NRT or Tokyo"
+        />
       </div>
 
       <div className={`grid gap-5 ${tripType === "one-way" ? "grid-cols-1" : "grid-cols-2"}`}>
