@@ -257,8 +257,17 @@ no code depends on ngrok specifically, any HTTPS tunnel pointed at port 8000 wor
 The Slack callback (`routes/slack.py`) calls only `confirm_booking`/`reject_booking`, never
 `execute_booking`. **Alternative:** let Approve in Slack also execute the booking.
 **Rejected** — Slack requires an ack within 3 seconds, and execute calls SearchApi and can take up
-to `SEARCHAPI_TIMEOUT_SECONDS`; execute stays behind the frontend's existing Execute action, where
-the UI already discloses ("your flight hasn't been purchased") what execute does and doesn't do.
+to `SEARCHAPI_TIMEOUT_SECONDS`, well past that budget; a fire-and-forget execute call from the
+Slack handler would leave Slack with no reliable way to report back whether it actually succeeded.
+Execute stays a synchronous action behind the frontend's existing Execute button, where the UI
+already discloses ("your flight hasn't been purchased") what execute does and doesn't do.
+**What this means for the approver:** clicking Approve in Slack *is* the real human-in-the-loop
+decision — it moves the booking `PENDING_USER_CONFIRMATION → CONFIRMED` — but it doesn't hand back
+checkout links; whoever approved still has to open the app and click Execute to get them. That's a
+genuine two-step, two-surface flow today, not a cosmetic gap. **Production fix, not built here:**
+ack Slack immediately, run execute as a background job, and post a follow-up Slack message with the
+checkout links once it completes — deferred because one workspace and one approval button didn't
+justify standing up an async job runner for it yet.
 
 ## Connector enablement is a DB-backed toggle, not just an env var
 `connector_setting.slack_enabled` is a single-row table flipped via `/api/connectors`, separate
