@@ -131,14 +131,14 @@ export function Questionnaire({ onSubmit, isSubmitting, errorMessage }: Question
           label="Depart"
           value={origin}
           onChange={setOrigin}
-          placeholder="JFK or New York"
+          placeholder="Airport code or city"
         />
 
         <AirportField
           label="Arrive"
           value={destinationAirport}
           onChange={setDestinationAirport}
-          placeholder="NRT or Tokyo"
+          placeholder="Airport code or city"
         />
       </div>
 
@@ -196,7 +196,7 @@ export function Questionnaire({ onSubmit, isSubmitting, errorMessage }: Question
             onChange={(event) => setFitnessLevel(event.target.value as FitnessLevel | "")}
             required
           >
-            <option value="">—</option>
+            <option value=""></option>
             <option value="low">Low</option>
             <option value="moderate">Moderate</option>
             <option value="high">High</option>

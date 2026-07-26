@@ -37,6 +37,7 @@ export const AIRPORTS: Airport[] = [
   { code: "ANC", city: "Anchorage", country: "USA" },
   { code: "SLC", city: "Salt Lake City", country: "USA" },
   { code: "OAK", city: "Oakland", country: "USA" },
+  { code: "ONT", city: "Ontario", country: "USA" },
   { code: "SJC", city: "San Jose", country: "USA" },
   { code: "SMF", city: "Sacramento", country: "USA" },
   { code: "BWI", city: "Baltimore", country: "USA" },
