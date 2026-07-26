@@ -2,6 +2,26 @@
 
 Load-bearing choices, each with the alternative and why it was rejected.
 
+## PostgreSQL over a NoSQL store
+The datastore is Postgres 16, not a document/NoSQL store (MongoDB, DynamoDB, Firestore).
+**Alternative:** a document store — schemaless, and often pitched as faster to stand up for a
+quick prototype. **Rejected** — this system's data is genuinely relational (a trip owns flight
+results, an itinerary, a booking log; a booking owns its transition history; an agent run owns
+its steps), and the booking FSM's core safety guarantee — `SELECT ... FOR UPDATE` plus an audit
+write in the same ACID transaction (see "HITL booking is a REST state machine" above) — needs
+real multi-statement transactions, which most NoSQL stores either don't offer or bolt on
+awkwardly. The append-only audit tables' `BEFORE UPDATE/DELETE` trigger and the `NOT NULL`
+constraint on age/fitness (see "Age and fitness level are mandatory intake fields" above) are both
+schema-level guarantees a schemaless store can't enforce the same way. **Chosen because:**
+Postgres is a versatile fit for structured, relational, transactional data like this take-home's
+domain; familiarity from a personal project and from production use at a previous early-stage AI
+startup (via Postgres-based BaaS platforms — Supabase, Neon) removed any ramp-up risk; and
+system-wise, it let DBOS (the durable-execution layer) reuse this exact same instance in its own
+`dbos` schema instead of standing up a second database just for durability (see "DBOS for durable
+execution" below). Hosted Postgres also closes the old "NoSQL provisions faster" gap — instant
+provisioning and a generous free tier on Supabase/Neon came without giving up any relational
+guarantees.
+
 ## Dependency Injection over constructing dependencies inline
 DB sessions and external clients (`FlightProvider`, `ActivityProvider`, the booking-options
 fetcher) are injected — via FastAPI `Depends` in routes, via constructor/dataclass args

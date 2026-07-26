@@ -166,7 +166,8 @@ toggle so the Slack connector can be flipped at runtime without a restart), and 
 audit/observability tables (`booking_transition`, `execution_event`, `agent_run`, `agent_run_step`)
 in `app/models.py`. `booking_transition` and `execution_event` are append-only, enforced by a
 Postgres trigger (`reject_audit_row_mutation()`) — `UPDATE`/`DELETE` raises at the database level
-regardless of what application code attempts.
+regardless of what application code attempts. Deliberately relational, not a document store — see
+"PostgreSQL over a NoSQL store" in [DECISIONS.md](DECISIONS.md).
 
 ## HITL booking (`app/state.py`)
 
