@@ -149,7 +149,7 @@ export function ItineraryPanel({
               <p className="mt-1 text-sm text-slate-600">{day.summary}</p>
               <ul className="mt-3 space-y-2">
                 {day.activities.map((activity) => (
-                  <li key={activity.name} className="rounded-md bg-slate-50 p-3">
+                  <li key={activity.name} className="rounded-md border border-slate-100 bg-white p-3">
                     <span className="font-medium text-slate-900">{activity.name}</span>
                     <p className="mt-1 text-sm text-slate-600">{activity.description}</p>
                     <a
