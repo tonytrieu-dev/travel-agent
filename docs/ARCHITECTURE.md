@@ -34,6 +34,8 @@ over REST; there is no server-rendered coupling between them.
   always shown first. The two callers differ only in `persist`/`allow_cross_trip_cache`: the route
   persists and reaches across trips, the planner tool trusts only this trip's own recent search
   and never writes offers (see "The agent has only two read-only tools" in `DECISIONS.md`).
+  `POST /flights/search` is reachable on its own, independent of `POST /trips/{id}/plan` — see
+  "Flight search is its own user-facing capability" in `DECISIONS.md` for why.
 - **Itinerary from a real API, tailored to age/fitness:** `web_search` (Tavily) grounds every
   activity in a real, cited source; `output_type=[ItineraryOut, ClarificationOut]` plus the
   `reject_unsafe_intensity` guardrail tie activity intensity to the traveler's fitness level.

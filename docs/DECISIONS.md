@@ -70,6 +70,23 @@ nullability gap fixes that structurally instead of special-casing the validator.
 legacy rows kept their append-only audit history and got a neutral placeholder backfilled; the 2
 with no audit trail were dropped.
 
+## Flight search is its own user-facing capability, not gated behind full itinerary generation
+`POST /flights/search` lets a user look up real flight offers for a trip directly, independent of
+`POST /trips/{id}/plan`. **Alternative:** only expose flight search as the agent's internal
+`search_flights` tool, reachable solely by triggering full itinerary generation. **Rejected** —
+flights and itineraries are different asks with different costs: a flight lookup is one
+deterministic SearchApi call, while planning drives the whole agent loop (Cerebras reasoning,
+`web_search`, output validation) — slower, and it spends real, rate-limited LLM quota
+(`MAX_CONCURRENT_AGENT_RUNS` caps concurrent *LLM* calls specifically; see `app/rate_limit.py`, and
+note `/flights/search` doesn't compete for that slot the way `/plan` does). Forcing a user who just
+wants prices through the full planning path would burn that scarce budget on a task that never
+needed an LLM at all. **Reflected in the two callers' cache behavior, not just the route split:**
+the direct route persists results and reuses them across trips (`persist=True,
+allow_cross_trip_cache=True`); the planner's tool call is deliberately more conservative
+(`persist=False, allow_cross_trip_cache=False`), since it's an internal grounding step inside one
+planning run, not a user-facing catalog browse — see the entry right below for where that shared
+logic actually lives.
+
 ## Flight search and execution-run lifecycle are extracted services, not inline route/tool logic
 `FlightSearchService` (`app/services/flight_search.py`) and `ExecutionService`/`ExecutionRun`
 (`app/agent/execution_log.py`) sit behind `POST /flights/search`, the planner's `search_flights`
