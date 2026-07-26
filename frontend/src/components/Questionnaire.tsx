@@ -35,17 +35,6 @@ function SelectField({ label, value, onChange, required, children }: SelectField
   )
 }
 
-// Budget is presented as a select per the UI spec, but the backend field (budget_usd) is a
-// plain number — each band maps to a representative dollar figure sent to the API.
-const BUDGET_BANDS: { label: string; valueUsd: number | null }[] = [
-  { label: "No preference", valueUsd: null },
-  { label: "Under $1,000", valueUsd: 1000 },
-  { label: "$1,000 - $2,500", valueUsd: 2500 },
-  { label: "$2,500 - $5,000", valueUsd: 5000 },
-  { label: "$5,000 - $10,000", valueUsd: 10000 },
-  { label: "$10,000+", valueUsd: 15000 },
-]
-
 interface QuestionnaireProps {
   onSubmit: (tripRequestCreate: TripRequestCreate) => Promise<void>
   isSubmitting: boolean
@@ -61,7 +50,6 @@ export function Questionnaire({ onSubmit, isSubmitting, errorMessage }: Question
   const [returnDate, setReturnDate] = useState("")
   const [age, setAge] = useState("")
   const [fitnessLevel, setFitnessLevel] = useState<FitnessLevel | "">("")
-  const [budgetLabel, setBudgetLabel] = useState(BUDGET_BANDS[0].label)
   const [validationMessage, setValidationMessage] = useState<string | null>(null)
 
   const handleSubmit = async (event: FormEvent) => {
@@ -100,8 +88,6 @@ export function Questionnaire({ onSubmit, isSubmitting, errorMessage }: Question
       return
     }
 
-    const selectedBudgetBand = BUDGET_BANDS.find((band) => band.label === budgetLabel)
-
     await onSubmit({
       origin: normalizedOrigin,
       destination: destination.trim(),
@@ -110,7 +96,6 @@ export function Questionnaire({ onSubmit, isSubmitting, errorMessage }: Question
       return_date: returnDate || null,
       age: Number(age),
       fitness_level: fitnessLevel,
-      budget_usd: selectedBudgetBand?.valueUsd ?? null,
     })
   }
 
@@ -200,7 +185,7 @@ export function Questionnaire({ onSubmit, isSubmitting, errorMessage }: Question
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         <label className={FIELD_LABEL}>
           Age
           <input
@@ -224,18 +209,6 @@ export function Questionnaire({ onSubmit, isSubmitting, errorMessage }: Question
           <option value="low">Low</option>
           <option value="moderate">Moderate</option>
           <option value="high">High</option>
-        </SelectField>
-
-        <SelectField
-          label="Budget (optional)"
-          value={budgetLabel}
-          onChange={(event) => setBudgetLabel(event.target.value)}
-        >
-          {BUDGET_BANDS.map((band) => (
-            <option key={band.label} value={band.label}>
-              {band.label}
-            </option>
-          ))}
         </SelectField>
       </div>
 

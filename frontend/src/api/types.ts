@@ -35,7 +35,6 @@ export interface TripRequestCreate {
   return_date?: string | null
   age: number
   fitness_level: FitnessLevel
-  budget_usd?: number | null
 }
 
 export interface TripRequestUpdate {
@@ -46,7 +45,6 @@ export interface TripRequestUpdate {
   return_date?: string | null
   age?: number | null
   fitness_level?: FitnessLevel | null
-  budget_usd?: number | null
 }
 
 export interface TripRequestOut {
@@ -57,9 +55,8 @@ export interface TripRequestOut {
   destination_airport: string
   depart_date: string
   return_date?: string | null
-  age?: number | null
-  fitness_level?: FitnessLevel | null
-  budget_usd?: number | null
+  age: number
+  fitness_level: FitnessLevel
   status: TripStatus
   created_at: string
 }
