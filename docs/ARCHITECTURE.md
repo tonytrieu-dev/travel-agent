@@ -109,8 +109,8 @@ refactor-era addition once the duplication became real, not a pattern picked up 
 
 - **Usage limits** — `UsageLimits(tool_calls_limit=MAX_TOOL_STEPS, total_tokens_limit=MAX_CONTEXT_TOKENS)`
   bounds the loop so it can't spin; `MAX_CONTEXT_TOKENS` matches gpt-oss-120b's real 30K
-  tokens/minute limit on Cerebras. A run that exceeds it degrades to a clarifying question
-  instead of crashing.
+  tokens/minute limit on Cerebras. A run that exceeds it degrades to an honest `PlanTooComplexOut`
+  ("too complex for one pass") instead of crashing or guessing.
 - **Prompt-injection guardrail** — `sanitize_web_content` wraps untrusted Tavily text in a delimited,
   escaped block before it reaches the prompt, so embedded instructions read as data.
 - **Durable steps (DBOS)** — the planner run and booking execute are checkpointed workflows that
@@ -129,9 +129,13 @@ refactor-era addition once the duplication became real, not a pattern picked up 
 (`acquire_agent_run_slot`, caps concurrent real LLM calls) and runs the `@DBOS.workflow`-wrapped
 planner: `ExecutionService(session).start_run(...)` binds an `ExecutionRun` for the trip, then
 `agent.iter(...)` drives a ReAct-style loop over `search_flights`/`web_search`, capped by
-`MAX_TOOL_STEPS`/`MAX_CONTEXT_TOKENS`. The output resolves to the `ItineraryOut | ClarificationOut`
-union — a `ClarificationOut` returns questions without persisting an itinerary; an `ItineraryOut`
-persists and moves the trip to `ITINERARY_READY`. Every tool call records an `ExecutionEvent`
+`MAX_TOOL_STEPS`/`MAX_CONTEXT_TOKENS`. The agent's own structured output is `ItineraryOut |
+ClarificationOut` — a `ClarificationOut` returns questions without persisting an itinerary; an
+`ItineraryOut` persists and moves the trip to `ITINERARY_READY`. One level up, `dbos_runtime.py`
+catches `UsageLimitExceeded` around that call and turns it into a `PlanTooComplexOut` instead of
+letting the crash propagate, so what `run_planner_durable`/`/plan` actually return is the wider
+`PlannerOutput` union (`ItineraryOut | ClarificationOut | PlanTooComplexOut`, `app/schemas.py`).
+Every tool call records an `ExecutionEvent`
 through the bound run, and `ExecutionRun.persist_result` (wrapping `persist_agent_run`) derives
 `AgentRun`/`AgentRunStep` rows from the real message history and usage on both the success and
 crash-recovery failure paths (never fabricated) — `ExecutionService`/`ExecutionRun`

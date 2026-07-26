@@ -41,8 +41,14 @@ union stays for whatever's still genuinely ambiguous.
 keep them optional and let the agent's `ClarificationOut` path ask when missing (the original
 design). **Rejected** — every itinerary needs them to pace activities, so the clarify-then-resubmit
 round trip was guaranteed on nearly every real trip; validating at intake removes that round trip
-entirely instead of just making it reliable. Scoped to the API boundary only: `TripRequest.age`/
-`.fitness_level` stay nullable in the DB so existing incomplete rows keep reading fine.
+entirely instead of just making it reliable. `TripRequest.age`/`.fitness_level` are now `NOT NULL`
+in the DB too (migration `12c1788c`) — a nullable column let a handful of legacy rows carry no
+age/fitness, and `reject_optional_clarification` blocks any clarifying question that mentions
+"age"/"fitness" once other trip details are present, so a genuinely-null row trapped the model
+asking for the one thing it wasn't allowed to ask about, burning all 3 output retries. Closing the
+nullability gap fixes that structurally instead of special-casing the validator. The 210 affected
+legacy rows kept their append-only audit history and got a neutral placeholder backfilled; the 2
+with no audit trail were dropped.
 
 ## Flight search and execution-run lifecycle are extracted services, not inline route/tool logic
 `FlightSearchService` (`app/services/flight_search.py`) and `ExecutionService`/`ExecutionRun`
