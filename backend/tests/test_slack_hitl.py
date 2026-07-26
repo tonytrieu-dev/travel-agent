@@ -21,8 +21,11 @@ from app.adapters.slack_hitl import (
     verify_slack_signature,
 )
 from app.config import Settings
-from app.models import FlightSearchResult, HITLBookingLog, TripRequest
+from app.models import FitnessLevel, FlightSearchResult, HITLBookingLog, TripRequest
 from app.state import BookingState
+
+_TEST_AGE = 30
+_TEST_FITNESS_LEVEL = FitnessLevel.MODERATE
 from tests.db_helpers import get_booking, run_db, seed_booking
 
 # Slack's own documented example (https://docs.slack.dev/authentication/verifying-requests-from-slack/).
@@ -146,6 +149,8 @@ def _build_test_blocks() -> dict[str, Any]:
         destination="Paris",
         destination_airport="CDG",
         depart_date="2026-08-01",
+        age=_TEST_AGE,
+        fitness_level=_TEST_FITNESS_LEVEL,
     )
     flight = FlightSearchResult(
         id=1,
@@ -235,6 +240,7 @@ def test_notify_pending_approval_swallows_a_slack_outage_without_raising(
     trip = TripRequest(
         id=1, user_id=1, origin="JFK", destination="Paris",
         destination_airport="CDG", depart_date="2026-08-01",
+        age=_TEST_AGE, fitness_level=_TEST_FITNESS_LEVEL,
     )
     flight = FlightSearchResult(
         id=1, trip_request_id=1, offer_index=0, carrier="AF", price_usd=512.0,

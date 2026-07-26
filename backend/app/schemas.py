@@ -38,7 +38,7 @@ MIN_TRAVELER_AGE = 0
 MAX_TRAVELER_AGE = 130
 
 # Fields that must never be absent on a persisted trip; a PATCH may not clear any of them to null
-# (return_date and budget_usd stay legitimately nullable and are deliberately excluded).
+# (return_date stays legitimately nullable and is deliberately excluded).
 _REQUIRED_TRIP_FIELDS = (
     "origin",
     "destination",
@@ -170,7 +170,6 @@ class TripRequestCreate(BaseModel):
     return_date: str | None = None
     age: int
     fitness_level: FitnessLevel
-    budget_usd: float | None = None
 
     @field_validator("origin", "destination_airport")
     @classmethod
@@ -196,7 +195,6 @@ class TripRequestUpdate(BaseModel):
     return_date: str | None = None
     age: int | None = None
     fitness_level: FitnessLevel | None = None
-    budget_usd: float | None = None
 
     @field_validator("origin", "destination_airport")
     @classmethod
@@ -239,9 +237,8 @@ class TripRequestOut(BaseModel):
     destination_airport: str
     depart_date: str
     return_date: str | None = None
-    age: int | None = None
-    fitness_level: FitnessLevel | None = None
-    budget_usd: float | None = None
+    age: int
+    fitness_level: FitnessLevel
     status: TripStatus
     created_at: UtcDatetime
 

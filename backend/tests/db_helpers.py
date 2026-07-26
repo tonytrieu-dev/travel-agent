@@ -19,6 +19,7 @@ from app.models import (
     BookingTransition,
     ExecutionEvent,
     ExecutionEventKind,
+    FitnessLevel,
     FlightResultSource,
     FlightSearchResult,
     HITLBookingLog,
@@ -27,6 +28,9 @@ from app.models import (
     User,
     utcnow,
 )
+
+_DEFAULT_TEST_AGE = 30
+_DEFAULT_TEST_FITNESS_LEVEL = FitnessLevel.MODERATE
 from app.state import BookingState
 
 TEST_DATABASE_URL = "postgresql+asyncpg://tony@localhost:5432/travel_agent_test"
@@ -65,6 +69,8 @@ async def seed_booking(
         destination="Paris",
         destination_airport="CDG",
         depart_date="2026-08-01",
+        age=_DEFAULT_TEST_AGE,
+        fitness_level=_DEFAULT_TEST_FITNESS_LEVEL,
     )
     session.add(trip)
     await session.flush()
@@ -115,7 +121,8 @@ async def seed_trip(
     destination_airport: str = "CDG",
     depart_date: str = "2026-08-01",
     return_date: str | None = None,
-    budget_usd: float | None = None,
+    age: int = _DEFAULT_TEST_AGE,
+    fitness_level: FitnessLevel = _DEFAULT_TEST_FITNESS_LEVEL,
 ) -> int:
     """Insert a bare user+trip (no flight/booking) and return the trip id."""
     user = User()
@@ -130,7 +137,8 @@ async def seed_trip(
         destination_airport=destination_airport,
         depart_date=depart_date,
         return_date=return_date,
-        budget_usd=budget_usd,
+        age=age,
+        fitness_level=fitness_level,
     )
     session.add(trip)
     await session.flush()

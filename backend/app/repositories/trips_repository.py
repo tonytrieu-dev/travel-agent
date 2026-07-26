@@ -169,12 +169,8 @@ def _build_planner_prompt(trip: TripRequest) -> str:
         f"departing {trip.depart_date}"
         + (f", returning {trip.return_date}." if trip.return_date else " (one-way).")
     ]
-    if trip.age is not None:
-        parts.append(f"Traveler age: {trip.age}.")
-    if trip.fitness_level is not None:
-        parts.append(f"Fitness level: {trip.fitness_level.value}.")
-    if trip.budget_usd is not None:
-        parts.append(f"Budget: ${trip.budget_usd:.2f} USD.")
+    parts.append(f"Traveler age: {trip.age}.")
+    parts.append(f"Fitness level: {trip.fitness_level.value}.")
     return " ".join(parts)
 
 

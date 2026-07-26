@@ -474,7 +474,6 @@ components:
         return_date: { type: [string, 'null'], format: date }
         age: { type: integer }
         fitness_level: { $ref: '#/components/schemas/FitnessLevel' }
-        budget_usd: { type: [number, 'null'] }
 
     TripRequestUpdate:
       type: object
@@ -489,11 +488,10 @@ components:
           oneOf:
             - { $ref: '#/components/schemas/FitnessLevel' }
             - type: 'null'
-        budget_usd: { type: [number, 'null'] }
 
     TripRequestOut:
       type: object
-      required: [id, user_id, origin, destination, destination_airport, depart_date, status, created_at]
+      required: [id, user_id, origin, destination, destination_airport, depart_date, age, fitness_level, status, created_at]
       properties:
         id: { type: integer }
         user_id: { type: integer }
@@ -502,12 +500,8 @@ components:
         destination_airport: { type: string }
         depart_date: { type: string, format: date }
         return_date: { type: [string, 'null'], format: date }
-        age: { type: [integer, 'null'] }
-        fitness_level:
-          oneOf:
-            - { $ref: '#/components/schemas/FitnessLevel' }
-            - type: 'null'
-        budget_usd: { type: [number, 'null'] }
+        age: { type: integer }
+        fitness_level: { $ref: '#/components/schemas/FitnessLevel' }
         status: { $ref: '#/components/schemas/TripStatus' }
         created_at: { type: string, format: date-time }
 

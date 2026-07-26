@@ -49,6 +49,9 @@ async def _open_eval_trip(session: AsyncSession) -> int:
         destination_airport="SAN",
         depart_date="2026-09-01",
         return_date="2026-09-08",
+        # Placeholder only: the eval prompt (not this row) carries the case's real age/fitness.
+        age=30,
+        fitness_level=FitnessLevel.MODERATE,
     )
     session.add(trip)
     await session.flush()
