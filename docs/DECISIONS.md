@@ -2,6 +2,22 @@
 
 Load-bearing choices, each with the alternative and why it was rejected.
 
+## Why this stack, as a whole
+FastAPI + Postgres/SQLModel + Pydantic AI (Cerebras-hosted `gpt-oss-120b`) + React, chosen together
+around one constraint: the take-home says "utilize the free available APIs," and every real
+requirement — cheapest-flight comparison, an activity itinerary, HITL booking — is data that's
+genuinely relational (a trip owns flight results, an itinerary, a booking log) and needs real
+transactions for the booking state machine's `SELECT ... FOR UPDATE` guarantee. Postgres was the
+one piece of infra that could serve both the app's data model and DBOS's durability layer without
+standing up a second system (see "PostgreSQL over a NoSQL store" below). FastAPI + Pydantic AI
+were picked for the same reason as the LLM host itself: Pydantic AI is a swappable provider layer,
+not a wrapper around one vendor's SDK, which is what made the Groq → Cerebras swap a same-afternoon
+change instead of a rewrite (see "Cerebras-hosted open-weight model" below) — betting the whole
+stack on one vendor's proprietary client would have made that kind of swap much more expensive.
+Every other piece (SearchApi.io, Tavily, React/Vite/Tailwind) was picked the same way each
+individual entry below explains: real structured data over scraping, and the simplest tool that
+does the job without adding a dependency the take-home doesn't need.
+
 ## PostgreSQL over a NoSQL store
 The datastore is Postgres 16, not a document/NoSQL store (MongoDB, DynamoDB, Firestore).
 **Alternative:** a document store — schemaless, and often pitched as faster to stand up for a
@@ -144,6 +160,36 @@ re-enters the workflow body during replay, so mutating in-process state *inside*
 [ARCHITECTURE](ARCHITECTURE.md) durable-execution section refers to. Related: the non-blocking
 acquire uses a lock-guarded counter, not `asyncio.wait_for(sem.acquire(), timeout=0)`, which can
 spuriously time out even uncontended.
+
+## Open-weight model (gpt-oss-120b) over OpenAI/Anthropic proprietary APIs
+The planner runs OpenAI's open-weight `gpt-oss-120b`, hosted by Cerebras — not GPT-4o/GPT-5 via
+OpenAI's own API, and not Claude via Anthropic's own API. **Alternative:** either proprietary
+frontier API. **Rejected for this deliverable, for two compounding reasons:**
+
+1. **The brief requires free APIs, and neither proprietary API has a free tier that fits.** Both
+   OpenAI and Anthropic are pay-per-token with no sustained free tier suitable for a multi-tool-call
+   agent loop exercised repeatedly during development and re-run for evals (`--repeat k`) — trial
+   credits cover a demo, not an iteration cycle. Cerebras's free tier (30,000 tokens/minute, see
+   below) is what let itinerary generation, prompt iteration, and the eval suite all run at zero
+   marginal cost. Pricing changes over time; check each provider's current page before treating
+   these specific numbers as current (see the same caveat on the SearchApi/Tavily entries below).
+2. **An open-weight model decouples "which model" from "which host."** Because `gpt-oss-120b`'s
+   weights are open, any inference provider can serve them — this project already exercised that
+   directly: the Groq → Cerebras swap (below) was a same-afternoon config change, only possible
+   because Pydantic AI was chosen as a swappable provider layer rather than the planner being
+   written against one vendor's client (see "Why this stack, as a whole" above). GPT-4o/GPT-5 and
+   Claude are each reachable only through their own vendor's API (or that vendor's own limited
+   platform partners — Bedrock/Vertex/Foundry for Claude, Azure for OpenAI) — there is no second,
+   independent host to swap to if pricing, rate limits, or availability change. Choosing an
+   open-weight model preserves that optionality; a proprietary model doesn't.
+
+**What would make the proprietary alternative the right call:** neither of these reasons is a
+claim that OpenAI's or Anthropic's models are worse. Both have materially more mature, longer-proven
+function-calling and structured-output support than a model served through a newer inference host,
+and a funded production deployment (not a free-tier take-home) would reasonably weigh that maturity
+and a single vendor's operational predictability (SLAs, rate-limit stability) above the swappability
+argument above. The trade-off here is specific to this deliverable's constraints, not a general
+claim that open-weight beats proprietary.
 
 ## Cerebras over Groq (over Gemini)
 Cerebras runs `gpt-oss-120b` directly through Pydantic AI's native `CerebrasModel`/

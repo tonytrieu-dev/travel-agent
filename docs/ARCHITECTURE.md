@@ -24,6 +24,12 @@ flowchart LR
 The backend is a single FastAPI process. The frontend is a separate static SPA that talks to it
 over REST; there is no server-rendered coupling between them.
 
+**Why this stack:** FastAPI + Postgres/SQLModel + Pydantic AI (a Cerebras-hosted open-weight LLM)
++ React, chosen together because the take-home's data is genuinely relational (a trip owns flight
+results, an itinerary, a booking log) and the brief requires free APIs — see "Why this stack, as a
+whole" and "Open-weight model (gpt-oss-120b) over OpenAI/Anthropic proprietary APIs" in
+[DECISIONS.md](DECISIONS.md) for the full reasoning, including the pros/cons against GPT/Claude.
+
 ## Requirements → implementation
 
 - **Cheapest flights:** `FlightSearchService` (`app/services/flight_search.py`) — the one

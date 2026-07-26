@@ -112,12 +112,14 @@ async def task(
     return result.output
 
 
-def build_run_metadata(provider_mode: ProviderMode = "recorded") -> dict[str, str]:
-    return {
+def build_run_metadata(provider_mode: ProviderMode = "recorded", *, with_judge: bool = False) -> dict[str, str]:
+    metadata = {
         "model": CEREBRAS_MODEL,
-        "judge_model": GEMINI_JUDGE_MODEL,
         "provider_mode": provider_mode,
     }
+    if with_judge:
+        metadata["judge_model"] = GEMINI_JUDGE_MODEL
+    return metadata
 
 
 def _selected_dataset(
@@ -140,7 +142,7 @@ def _selected_dataset(
 
 def main(*, repeat: int = 1, live_smoke: bool = False, with_judge: bool = False) -> None:
     provider_mode: ProviderMode = "live-smoke" if live_smoke else "recorded"
-    metadata = build_run_metadata(provider_mode)
+    metadata = build_run_metadata(provider_mode, with_judge=with_judge)
     print(f"Run metadata: {metadata}")
     selected_dataset = _selected_dataset(provider_mode, with_judge=with_judge)
     report = selected_dataset.evaluate_sync(

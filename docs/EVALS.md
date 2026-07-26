@@ -102,7 +102,7 @@ tests in isolation) is what exposed.
 
 ## Output reliability fix
 
-Two reliability issues surfaced by running the live eval repeatedly, not by unit tests:
+Four reliability issues surfaced by running the live eval repeatedly, not by unit tests:
 
 1. **Duplicate tool calls.** The model sometimes called `search_flights` twice per trip (searching
    the return leg separately, even though the first response already covers both legs) and
@@ -116,18 +116,33 @@ Two reliability issues surfaced by running the live eval repeatedly, not by unit
    directly, so the model gets it right on the first attempt instead of relying on a `ModelRetry`
    correction loop (each retry resends the full conversation, which is what was driving both
    `UsageLimitExceeded` and `Exceeded maximum output retries` failures).
+3. **Output envelope mismatch.** Left on `auto`, pydantic-ai picks native structured output for
+   `gpt-oss-120b` and wraps the `ItineraryOut | ClarificationOut` union in `{"result": {"kind":
+   ...}}`. A live run showed all three output retries were the model fumbling that envelope
+   (missing `"result"`, missing `"result.kind"`, then a bad `"kind"` literal), never a real
+   validator rejection — and each retry resends the full itinerary, so one run died at 32,882
+   tokens against Cerebras's 30,000/minute limit. Fixed by pinning `output_type` to
+   `[ToolOutput(ItineraryOut), ToolOutput(ClarificationOut)]` in `app/agent/planner.py`, removing
+   the envelope ambiguity entirely.
+4. **Prose instead of a tool call.** Pinning tool output above closed the envelope retries but
+   surfaced a new one: the model sometimes replied with the itinerary as plain text instead of
+   calling the result tool. Fixed by naming the delivery contract directly in the system prompt
+   (`AGENTS.md`): "Deliver your final answer by calling the result tool for it... Never write the
+   itinerary or the question as plain text in a reply."
 
-**Live-verified result** (`--repeat 3`, 12 case-runs, `gpt-oss-120b` via Cerebras, recorded
-flight/activity fixtures + live LLM calls): 10/12 completed cleanly with every assertion passing,
-and zero runs failed on intensity vocabulary. Note the evidence is the *absence* of
-intensity-driven retry exhaustion, not a passing assertion: with `intensity` a closed `Literal`, a
-bad value can no longer reach an evaluator at all, so no scorer can report it. 2/12
-(`age_24_low_fitness [2/3]`, `age_78_low_fitness [2/3]`) still failed with
-`UnexpectedModelBehavior: Exceeded maximum output retries (3)`, unrelated to intensity. Root cause
-of that residual ~17% isn't isolated yet — the eval report only surfaces the terminal exception,
-not which output-validator triggered each retry attempt. Do not treat this as fully closed; treat
-it as the intensity/duplicate-call failure modes fixed and confirmed, with a smaller, distinct
-retry-exhaustion flake still open.
+**Live-verified result, all four fixes in place** (`--repeat 3 --with-judge`, 12 case-runs,
+`gpt-oss-120b` via Cerebras, recorded flight/activity fixtures + live LLM calls): all 12 case-runs
+completed cleanly — no `UsageLimitExceeded`, no exhausted output retries. 84/84 deterministic
+assertions passed (100%), and all four `PhysicalLoadComparisons` rows passed with real samples on
+both sides of every comparison (previously blocked by the retry exhaustion above starving 3 of the
+4 age/fitness buckets of any completed sample). The `--with-judge` evaluator itself,
+`FitnessAppropriateness`, passed 11/12: `age_78_high_fitness [3/3]` failed with the same
+`physical_load` score as a *passing* run for the same case, because the itinerary leaned on
+shuttles/rest stops/minimized walking despite the traveler's stated high fitness level — a genuine
+tone/pacing miss the numeric score can't see, which is exactly the class of failure
+`FitnessAppropriateness` exists to catch (see "Why an LLM judge instead of a human judge" above).
+Treat the token-budget/retry-exhaustion failure mode as closed; treat the one judge failure as a
+real, open model-behavior finding, not a harness bug.
 
 ## Enterprise scalability, security, and integration
 
