@@ -84,6 +84,21 @@ The planner run and booking execute are `@DBOS.workflow`s reusing the app's Post
 job (DBOS = crash recovery). **Alternative:** add `SetWorkflowID` dedup too. **Rejected** as
 redundant with the tested atomic claim.
 
+### Planner-loop external calls are wrapped as individual DBOS steps
+`agent.model.request`, `FlightProvider.search_offers`, and `ActivityProvider.search` are each
+patched with `@DBOS.step` at the point they're used, not left as plain calls inside the
+workflow body. **Why:** without this, a crash-recovery replay re-runs the whole workflow body
+from scratch, re-issuing an already-completed Cerebras call or search/activity call and paying
+for it twice. **Why free functions, not the bound methods directly:** `DBOS.step`'s decorator
+`setattr`s registration metadata onto its target, and bound methods don't support arbitrary
+attribute assignment — `_as_durable_step` wraps each bound method in a plain function instead.
+**Why patched at the instance, not via a second agent/provider class:** the model is a shared,
+module-level singleton reused by every non-DBOS caller (tests, evals); `@DBOS.step` no-ops to a
+plain call outside workflow context, so patching the singleton once at import is safe for those
+callers too, and cheaper than building a parallel `Agent`. The two providers are already built
+fresh per run inside `_run_planner_workflow`, so patching each instance right after construction
+can't double-wrap anything.
+
 ### The concurrency slot lives *outside* the DBOS workflow body
 `run_planner_durable` acquires the concurrency slot, then calls the `@DBOS.workflow`. The slot is
 plain in-process state (a lock-guarded counter). **Why outside:** DBOS's record/persist machinery

@@ -235,3 +235,10 @@ session/provider dependencies internally rather than receiving them injected, an
 mutates plain in-process state (locks, counters) from inside the workflow body — see
 [DECISIONS.md](DECISIONS.md) for the concurrency-limiter bug this constraint caused and how it
 was fixed.
+
+Within the planner run, the three calls that spend real external quota are each wrapped in their
+own `@DBOS.step` — the Cerebras completion (`agent.model.request`), the flight search
+(`FlightProvider.search_offers`), and the activity search (`ActivityProvider.search`) — so a
+crash-recovery replay reuses each call's recorded result instead of re-issuing it. See
+[DECISIONS.md](DECISIONS.md) for why these are wrapped as free functions rather than decorating
+the bound methods directly.

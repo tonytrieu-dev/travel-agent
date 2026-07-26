@@ -8,6 +8,7 @@ change from the plain, already-tested versions of the functions they call.
 from dbos import DBOS, DBOSConfig
 from pydantic_ai import AgentRun, UnexpectedModelBehavior
 from pydantic_ai.exceptions import UsageLimitExceeded
+from pydantic_ai.models import Model
 
 from app.adapters.activities_tavily import TavilyActivityProvider
 from app.adapters.flights_searchapi import get_flight_provider
@@ -24,6 +25,22 @@ from app.schemas import (
     PlannerOutput,
     PlanTooComplexOut,
 )
+
+
+def _as_durable_step(step_name: str, bound_method):
+    # DBOS.step setattrs registration metadata onto its target; bound methods can't hold
+    # arbitrary attributes, so wrap in a plain function that delegates to the bound method.
+    @DBOS.step(name=step_name)
+    async def _step(*args, **kwargs):
+        return await bound_method(*args, **kwargs)
+
+    return _step
+
+
+# Patched once at import (not in launch_dbos(), which fires once per test via the
+# function-scoped `client` fixture and would double-wrap on every call).
+assert isinstance(agent.model, Model), "agent must be built with a real Model instance"
+agent.model.request = _as_durable_step("cerebras_request", agent.model.request)
 
 
 async def _persist_failed_run(
@@ -80,9 +97,15 @@ async def _run_planner_workflow(trip_id: int, prompt: str) -> PlannerOutput:
         ExecutionService(session).start_run(trip_id, model=CEREBRAS_MODEL) as run,
     ):
         trip = await session.get(TripRequest, trip_id)
+        flight_provider = get_flight_provider(settings)
+        flight_provider.search_offers = _as_durable_step(
+            "search_flights_offers", flight_provider.search_offers
+        )
+        activity_provider = TavilyActivityProvider(settings.tavily_api_key.get_secret_value())
+        activity_provider.search = _as_durable_step("web_search", activity_provider.search)
         deps = PlannerDeps(
-            flight_provider=get_flight_provider(settings),
-            activity_provider=TavilyActivityProvider(settings.tavily_api_key.get_secret_value()),
+            flight_provider=flight_provider,
+            activity_provider=activity_provider,
             fitness_level=trip.fitness_level if trip is not None else None,
         )
         async with agent.iter(prompt, deps=deps, usage_limits=default_usage_limits()) as agent_run:

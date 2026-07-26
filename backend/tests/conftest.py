@@ -99,6 +99,14 @@ class BookingOptionsFetchSpy:
             raise RuntimeError("simulated upstream failure")
         return self.options
 
+    async def search_offers(
+        self, departure_id: str, arrival_id: str, outbound_date: str, return_date: str | None
+    ) -> FlightSearchOutcome:
+        # Booking tests never exercise this leg; present but unused, just enough to conform to
+        # the FlightProvider protocol (the durable planner workflow wraps it as a DBOS step
+        # unconditionally, whether or not search_flights is ever called in a given test).
+        return FlightSearchOutcome(offers=[], unavailable_reason=None)
+
 
 @dataclass
 class FlightSearchSpy:
