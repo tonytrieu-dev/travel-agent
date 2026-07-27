@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react"
 import { AIRPORTS, type Airport } from "../data/airports"
-import { ChevronDownIcon } from "./ChevronDownIcon"
 
 const MAX_SUGGESTIONS = 8
 
@@ -22,10 +21,6 @@ interface AirportFieldProps {
   placeholder: string
 }
 
-// A custom combobox instead of a native <input list> datalist: browsers don't let you cap or
-// scroll a datalist's popup height, and its dropdown indicator can't be restyled to match this
-// form's other dropdowns (see SelectField's ChevronDownIcon). Free typing still works even when
-// nothing matches — the airport list is a curated subset, not an exhaustive database.
 export function AirportField({ label, value, onChange, placeholder }: AirportFieldProps) {
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -45,28 +40,25 @@ export function AirportField({ label, value, onChange, placeholder }: AirportFie
     <div ref={containerRef} className="relative">
       <label className="flex flex-col gap-2 text-sm font-medium text-slate-700">
         {label}
-        <div className="relative">
-          <input
-            type="text"
-            value={value}
-            onChange={(event) => {
-              onChange(event.target.value)
-              setIsOpen(true)
-            }}
-            onFocus={() => setIsOpen(true)}
-            onKeyDown={(event) => {
-              if (event.key === "Escape") setIsOpen(false)
-            }}
-            placeholder={placeholder}
-            required
-            autoComplete="off"
-            role="combobox"
-            aria-expanded={isOpen}
-            aria-autocomplete="list"
-            className="w-full rounded-md border border-slate-300 py-2 pr-10 pl-3 text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-          />
-          <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
-        </div>
+        <input
+          type="text"
+          value={value}
+          onChange={(event) => {
+            onChange(event.target.value)
+            setIsOpen(true)
+          }}
+          onFocus={() => setIsOpen(true)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") setIsOpen(false)
+          }}
+          placeholder={placeholder}
+          required
+          autoComplete="off"
+          role="combobox"
+          aria-expanded={isOpen}
+          aria-autocomplete="list"
+          className="w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+        />
       </label>
 
       {isOpen && value.trim() && (
