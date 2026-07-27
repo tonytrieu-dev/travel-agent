@@ -19,6 +19,16 @@ function formatTimestamp(value: string): string {
   })
 }
 
+// input_summary/output_summary are json.dumps'd server-side with no indent; pretty-print when
+// they parse as JSON, otherwise show the raw string (e.g. plain-text model output) as-is.
+function formatSummary(raw: string): string {
+  try {
+    return JSON.stringify(JSON.parse(raw), null, 2)
+  } catch {
+    return raw
+  }
+}
+
 const STATUS_LABELS: Record<string, string> = {
   ok: "Successful",
   completed: "Completed",
@@ -84,7 +94,7 @@ function RunStepSection({ title, steps }: { title: string; steps: AgentRunStepOu
               <div className="mt-2">
                 <p className="text-xs font-medium text-slate-500">Input</p>
                 <pre className="mt-1 overflow-x-auto rounded bg-slate-50 p-2 text-xs whitespace-pre-wrap text-slate-600">
-                  {step.input_summary}
+                  {formatSummary(step.input_summary)}
                 </pre>
               </div>
             )}
@@ -92,7 +102,7 @@ function RunStepSection({ title, steps }: { title: string; steps: AgentRunStepOu
               <div className="mt-2">
                 <p className="text-xs font-medium text-slate-500">Result</p>
                 <pre className="mt-1 overflow-x-auto rounded bg-slate-50 p-2 text-xs whitespace-pre-wrap text-slate-600">
-                  {step.output_summary}
+                  {formatSummary(step.output_summary)}
                 </pre>
               </div>
             )}
