@@ -8,6 +8,7 @@ import hashlib
 import hmac
 import logging
 import time
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -23,6 +24,26 @@ logger = logging.getLogger(__name__)
 SLACK_SIGNATURE_MAX_AGE_SECONDS = 5 * 60
 _APPROVE_ACTION_ID = "approve_booking"
 _REJECT_ACTION_ID = "reject_booking"
+
+
+def _format_local_flight_time(raw: str) -> str:
+    """flight.depart_at/arrive_at are wall-clock strings in the departure/arrival airport's own
+    local time, straight from SearchApi, with no UTC offset attached — so this only reformats
+    for readability, it never converts a timezone (there's no zone info to convert from)."""
+    try:
+        parsed = datetime.fromisoformat(raw)
+    except ValueError:
+        return raw
+    return parsed.strftime("%b %-d, %Y, %-I:%M %p")
+
+
+def _slack_date_directive(moment_utc: datetime) -> str:
+    """Slack's `<!date^...>` renders client-side in each viewer's own local timezone, unlike a
+    plain string — the right tool here because expires_at is a real UTC instant (unlike
+    flight.depart_at above, which has no zone to convert from)."""
+    epoch_seconds = int(moment_utc.replace(tzinfo=UTC).timestamp())
+    fallback = moment_utc.isoformat()
+    return f"<!date^{epoch_seconds}^{{date_short_pretty}} at {{time}}|{fallback}>"
 
 
 def _compute_slack_signature(raw_body: bytes, timestamp: str, signing_secret: str) -> str:
@@ -89,11 +110,14 @@ def build_approval_blocks(
                         "type": "mrkdwn",
                         "text": f"*Price:*\n${flight.price_usd:,.2f} {flight.currency}",
                     },
-                    {"type": "mrkdwn", "text": f"*Departs:*\n{flight.depart_at}"},
+                    {
+                        "type": "mrkdwn",
+                        "text": f"*Departs:*\n{_format_local_flight_time(flight.depart_at)}",
+                    },
                     {"type": "mrkdwn", "text": f"*Stops:*\n{stops_text}"},
                     {
                         "type": "mrkdwn",
-                        "text": f"*Approval expires:*\n{booking.expires_at.isoformat()}",
+                        "text": f"*Approval expires:*\n{_slack_date_directive(booking.expires_at)}",
                     },
                 ],
             },
